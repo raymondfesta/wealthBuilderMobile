@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# This script helps you add the new files to your Xcode project
+# You'll need to run this and then verify in Xcode
+
+echo "====================================="
+echo "Adding Files to Xcode Project"
+echo "====================================="
+echo ""
+
+# List of files that need to be added
+echo "The following files have been copied and need to be added to your Xcode project:"
+echo ""
+echo "Models folder:"
+echo "  ✓ Budget.swift"
+echo "  ✓ Goal.swift"
+echo ""
+echo "Services folder:"
+echo "  ✓ BudgetManager.swift"
+echo "  ✓ NotificationService.swift"
+echo "  ✓ AlertRulesEngine.swift"
+echo "  ✓ SpendingPatternAnalyzer.swift"
+echo ""
+echo "Views folder:"
+echo "  ✓ ProactiveGuidanceDemoView.swift"
+echo "  ✓ ProactiveGuidanceView.swift"
+echo ""
+echo "Root folder:"
+echo "  ✓ FinancialAnalyzerApp.swift (updated)"
+echo ""
+echo "ViewModels folder:"
+echo "  ✓ FinancialViewModel.swift (updated)"
+echo ""
+echo "====================================="
+echo "MANUAL STEPS IN XCODE:"
+echo "====================================="
+echo ""
+echo "1. In Xcode, select the FinancialAnalyzer project in the Project Navigator"
+echo "2. For each folder (Models, Services, Views), right-click and select 'Add Files to FinancialAnalyzer...'"
+echo "3. Navigate to the corresponding folder and select the new files listed above"
+echo "4. IMPORTANT: Uncheck 'Copy items if needed' (files are already in place)"
+echo "5. Make sure 'FinancialAnalyzer' target is checked"
+echo "6. Click 'Add'"
+echo ""
+echo "Or try the automated approach:"
+echo "7. Close Xcode completely"
+echo "8. Press Enter to continue..."
+read
+
+echo "Opening Xcode project..."
+open "/Users/rfesta/Desktop/demo-app/FinancialAnalyzer.xcodeproj"
+
+echo ""
+echo "After Xcode opens, the files should be automatically detected."
+echo "If not, please add them manually using the steps above."
+echo ""
+echo "Then Clean Build Folder (Cmd+Shift+K) and Run (Cmd+R)"
