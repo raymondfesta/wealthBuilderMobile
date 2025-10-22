@@ -9,13 +9,46 @@ class PlaidService: ObservableObject {
     private let baseURL: String
     private var linkHandler: Handler?
 
-    init(baseURL: String = "http://192.168.1.8:3000") {
+    // Link token caching
+    private var cachedLinkToken: String?
+    private var linkTokenExpiration: Date?
+    private let linkTokenValidityDuration: TimeInterval = 20 * 60 // 20 minutes (tokens expire at 30, we refresh at 20)
+
+    init(baseURL: String = "http://localhost:3000") {
         self.baseURL = baseURL
     }
 
     // MARK: - Link Token Creation
 
-    func createLinkToken() async throws -> String {
+    /// Gets a valid link token, using cache if available
+    func getLinkToken() async throws -> String {
+        // Check if we have a valid cached token
+        if let token = cachedLinkToken,
+           let expiration = linkTokenExpiration,
+           expiration > Date() {
+            print("✅ [PlaidService] Using cached link token (expires in \(Int(expiration.timeIntervalSinceNow))s)")
+            return token
+        }
+
+        // Cache miss or expired, create new token
+        print("🔄 [PlaidService] Creating new link token...")
+        let token = try await createLinkToken()
+        cachedLinkToken = token
+        linkTokenExpiration = Date().addingTimeInterval(linkTokenValidityDuration)
+        print("✅ [PlaidService] Link token created and cached")
+        return token
+    }
+
+    /// Force refresh the link token (for background refresh)
+    func refreshLinkToken() async throws {
+        print("🔄 [PlaidService] Refreshing link token in background...")
+        let token = try await createLinkToken()
+        cachedLinkToken = token
+        linkTokenExpiration = Date().addingTimeInterval(linkTokenValidityDuration)
+        print("✅ [PlaidService] Link token refreshed successfully")
+    }
+
+    private func createLinkToken() async throws -> String {
         let endpoint = "\(baseURL)/api/plaid/create_link_token"
 
         guard let url = URL(string: endpoint) else {
@@ -60,27 +93,29 @@ class PlaidService: ObservableObject {
                 }
             }
 
-            let result = Plaid.create(configuration)
+            // Plaid Link UI operations must happen on the main thread
+            DispatchQueue.main.async {
+                let result = Plaid.create(configuration)
 
-            switch result {
-            case .success(let handler):
-                self.linkHandler = handler
-                if let vc = viewController {
-                    handler.open(presentUsing: .viewController(vc))
-                } else {
-                    handler.open(presentUsing: .custom({ linkViewController in
-                        // Present modally since we don't have a view controller
-                        DispatchQueue.main.async {
+                switch result {
+                case .success(let handler):
+                    self.linkHandler = handler
+                    if let vc = viewController {
+                        handler.open(presentUsing: .viewController(vc))
+                    } else {
+                        handler.open(presentUsing: .custom({ linkViewController in
+                            // Present modally since we don't have a view controller
+                            // Already on main thread, no need for dispatch
                             if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                                let window = windowScene.windows.first,
                                let rootVC = window.rootViewController {
                                 rootVC.present(linkViewController, animated: true)
                             }
-                        }
-                    }))
+                        }))
+                    }
+                case .failure(let error):
+                    continuation.resume(throwing: PlaidError.linkCreationFailed(error.localizedDescription))
                 }
-            case .failure(let error):
-                continuation.resume(throwing: PlaidError.linkCreationFailed(error.localizedDescription))
             }
         }
     }
@@ -88,9 +123,11 @@ class PlaidService: ObservableObject {
     // MARK: - Token Exchange
 
     private func exchangePublicToken(_ publicToken: String) async throws {
+        print("🔄 [PlaidService] Exchanging public token for access token...")
         let endpoint = "\(baseURL)/api/plaid/exchange_public_token"
 
         guard let url = URL(string: endpoint) else {
+            print("❌ [PlaidService] Invalid URL: \(endpoint)")
             throw PlaidError.invalidURL
         }
 
@@ -101,28 +138,42 @@ class PlaidService: ObservableObject {
         let body = ["public_token": publicToken]
         request.httpBody = try JSONEncoder().encode(body)
 
+        print("🔄 [PlaidService] Calling \(endpoint)...")
         let (data, response) = try await URLSession.shared.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("❌ [PlaidService] Invalid HTTP response")
+            throw PlaidError.networkError
+        }
+
+        print("🔄 [PlaidService] Response status: \(httpResponse.statusCode)")
+
+        guard httpResponse.statusCode == 200 else {
+            if let responseStr = String(data: data, encoding: .utf8) {
+                print("❌ [PlaidService] Error response: \(responseStr)")
+            }
             throw PlaidError.tokenExchangeFailed
         }
 
         let tokenResponse = try JSONDecoder().decode(AccessTokenResponse.self, from: data)
+        print("✅ [PlaidService] Token exchanged successfully, itemId: \(tokenResponse.itemId)")
 
         // Store access token securely
         try KeychainService.shared.save(
             tokenResponse.accessToken,
             for: tokenResponse.itemId
         )
+        print("✅ [PlaidService] Access token saved to Keychain for itemId: \(tokenResponse.itemId)")
     }
 
     // MARK: - Fetch Accounts
 
     func fetchAccounts(accessToken: String) async throws -> [BankAccount] {
+        print("🔄 [PlaidService] Fetching accounts...")
         let endpoint = "\(baseURL)/api/plaid/accounts"
 
         guard let url = URL(string: endpoint) else {
+            print("❌ [PlaidService] Invalid URL: \(endpoint)")
             throw PlaidError.invalidURL
         }
 
@@ -133,14 +184,38 @@ class PlaidService: ObservableObject {
         let body = ["access_token": accessToken]
         request.httpBody = try JSONEncoder().encode(body)
 
+        print("🔄 [PlaidService] Calling \(endpoint)...")
+        print("🔄 [PlaidService] Access token (first 10 chars): \(String(accessToken.prefix(10)))...")
+
         let (data, response) = try await URLSession.shared.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("❌ [PlaidService] Invalid HTTP response")
+            throw PlaidError.networkError
+        }
+
+        print("🔄 [PlaidService] Response status: \(httpResponse.statusCode)")
+
+        guard httpResponse.statusCode == 200 else {
+            if let responseStr = String(data: data, encoding: .utf8) {
+                print("❌ [PlaidService] Error response: \(responseStr)")
+            }
             throw PlaidError.accountFetchFailed
         }
 
+        // Log raw response for debugging
+        if let responseStr = String(data: data, encoding: .utf8) {
+            print("🔄 [PlaidService] Raw response: \(responseStr)")
+        }
+
         let accountsResponse = try JSONDecoder().decode(AccountsResponse.self, from: data)
+        print("✅ [PlaidService] Fetched \(accountsResponse.accounts.count) account(s)")
+
+        // Log details about each account
+        for (index, account) in accountsResponse.accounts.enumerated() {
+            print("✅ [PlaidService]   Account \(index + 1): \(account.name) (id: \(account.id), itemId: \(account.itemId))")
+        }
+
         return accountsResponse.accounts
     }
 
@@ -160,6 +235,8 @@ class PlaidService: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Increase timeout to 120 seconds for transaction fetching (can be slow on first sync)
+        request.timeoutInterval = 120
 
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
@@ -171,14 +248,18 @@ class PlaidService: ObservableObject {
         ]
         request.httpBody = try JSONEncoder().encode(body)
 
+        print("🔄 [PlaidService] Fetching transactions from \(dateFormatter.string(from: startDate)) to \(dateFormatter.string(from: endDate))...")
+
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
+            print("❌ [PlaidService] Transaction fetch failed with status: \((response as? HTTPURLResponse)?.statusCode ?? 0)")
             throw PlaidError.transactionFetchFailed
         }
 
         let transactionsResponse = try JSONDecoder().decode(TransactionsResponse.self, from: data)
+        print("✅ [PlaidService] Successfully fetched \(transactionsResponse.transactions.count) transactions")
         return transactionsResponse.transactions
     }
 

@@ -7,6 +7,7 @@ struct ProactiveGuidanceDemoView: View {
     @State private var merchantName: String = "Target"
     @State private var category: String = "Shopping"
     @State private var showNotificationTest = false
+    @State private var showClearDataConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -158,7 +159,35 @@ struct ProactiveGuidanceDemoView: View {
                     }
                 }
 
-                // Section 7: Instructions
+                // Section 7: Developer Tools
+                Section("Developer Tools") {
+                    Button("Reset Onboarding Experience") {
+                        UserDefaults.standard.set(false, forKey: "hasSeenWelcome")
+                        UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
+                    }
+                    .foregroundColor(.red)
+
+                    Text("Tap to reset the welcome and onboarding screens. Close and reopen the app to see them again.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    Divider()
+
+                    Button(action: {
+                        showClearDataConfirmation = true
+                    }) {
+                        Label("Clear All Data & Restart", systemImage: "trash.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+
+                    Text("⚠️ This will delete ALL data (Keychain tokens, cached accounts, transactions, budgets, goals) and restart the app. Use this to test a completely fresh install.")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+
+                // Section 8: Instructions
                 Section("How to Test") {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("1. Connect your bank account (Dashboard → +)")
@@ -176,10 +205,91 @@ struct ProactiveGuidanceDemoView: View {
             .sheet(isPresented: $showNotificationTest) {
                 NotificationTestView()
             }
+            .alert("Clear All Data?", isPresented: $showClearDataConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Clear & Restart", role: .destructive) {
+                    clearAllDataAndRestart()
+                }
+            } message: {
+                Text("This will permanently delete:\n• All Keychain tokens\n• Cached accounts & transactions\n• All budgets and goals\n• Onboarding state\n\nThe app will exit and you'll need to relaunch it manually. Are you sure?")
+            }
         }
     }
 
     // MARK: - Actions
+
+    /// Completely wipes all app data and restarts for testing purposes
+    private func clearAllDataAndRestart() {
+        print("🗑️ [Reset] ===== STARTING COMPLETE DATA WIPE =====")
+
+        // 1. Clear Keychain (all access tokens)
+        do {
+            let allKeys = try KeychainService.shared.allKeys()
+            print("🗑️ [Reset] Found \(allKeys.count) Keychain item(s) to delete")
+
+            for key in allKeys {
+                do {
+                    try KeychainService.shared.delete(for: key)
+                    print("🗑️ [Reset] ✅ Deleted Keychain item: \(key)")
+                } catch {
+                    print("🗑️ [Reset] ⚠️ Failed to delete Keychain item '\(key)': \(error)")
+                }
+            }
+            print("🗑️ [Reset] Keychain cleared (\(allKeys.count) items removed)")
+        } catch {
+            print("🗑️ [Reset] ⚠️ Error listing Keychain keys: \(error)")
+        }
+
+        // 2. Clear UserDefaults (all cached data)
+        print("🗑️ [Reset] Clearing UserDefaults cache...")
+        let keysToRemove = [
+            "cached_accounts",
+            "cached_transactions",
+            "cached_summary",
+            "cached_budgets",
+            "cached_goals",
+            "cached_allocation_buckets",
+            "hasSeenWelcome",
+            "hasCompletedOnboarding"
+        ]
+
+        for key in keysToRemove {
+            UserDefaults.standard.removeObject(forKey: key)
+            print("🗑️ [Reset] ✅ Removed UserDefaults key: \(key)")
+        }
+        UserDefaults.standard.synchronize()
+        print("🗑️ [Reset] UserDefaults cleared (\(keysToRemove.count) keys removed)")
+
+        // 3. Reset ViewModel state
+        print("🗑️ [Reset] Resetting ViewModel state...")
+        viewModel.accounts.removeAll()
+        viewModel.transactions.removeAll()
+        viewModel.budgetManager.budgets.removeAll()
+        viewModel.budgetManager.goals.removeAll()
+        viewModel.budgetManager.allocationBuckets.removeAll()
+        viewModel.summary = nil
+        viewModel.currentAlert = nil
+        viewModel.isShowingGuidance = false
+        viewModel.error = nil
+        print("🗑️ [Reset] ViewModel state cleared")
+
+        // 4. Cancel any pending notifications
+        print("🗑️ [Reset] Canceling all pending notifications...")
+        NotificationService.shared.cancelAllNotifications()
+        print("🗑️ [Reset] All notifications canceled")
+
+        // 5. Final log and exit
+        print("✅ [Reset] ===== DATA WIPE COMPLETE =====")
+        print("✅ [Reset] App will now exit. Please relaunch manually to see fresh state.")
+
+        // Small delay to ensure logs are printed
+        Task {
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+
+            // Force app termination for clean restart
+            exit(0)
+        }
+    }
 
     private func testPurchaseAlert() {
         guard let amount = Double(purchaseAmount) else { return }

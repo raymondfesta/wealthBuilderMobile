@@ -153,13 +153,32 @@ struct ProactiveGuidanceView: View {
                 Text("AI Insight")
                     .font(.headline)
                 Spacer()
+
+                // Show loading indicator while fetching AI insight
+                if alert.isLoadingAIInsight {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                }
             }
 
-            // Context-aware AI insight based on alert type
-            Text(aiInsightText)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .italic()
+            // Show loading message or actual insight
+            if alert.isLoadingAIInsight {
+                HStack {
+                    ProgressView()
+                    Text("Analyzing your purchase...")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .italic()
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 8)
+            } else {
+                // Context-aware AI insight based on alert type
+                Text(aiInsightText)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .italic()
+            }
         }
         .padding()
         .background(
@@ -173,6 +192,12 @@ struct ProactiveGuidanceView: View {
     }
 
     private var aiInsightText: String {
+        // Use AI-generated insight if available, otherwise fall back to hardcoded text
+        if let aiInsight = alert.aiInsight, !aiInsight.isEmpty {
+            return aiInsight
+        }
+
+        // Fallback to context-aware hardcoded insights
         switch alert.type {
         case .budgetExceeded:
             if let budget = alert.relatedBudget {

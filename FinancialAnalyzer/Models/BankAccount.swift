@@ -81,6 +81,7 @@ extension BankAccount: Codable {
 
     enum PlaidCodingKeys: String, CodingKey {
         case id = "account_id"
+        case itemId = "item_id"
         case name
         case officialName = "official_name"
         case type
@@ -116,6 +117,8 @@ extension BankAccount: Codable {
         // Try Plaid format first
         if let container = try? decoder.container(keyedBy: PlaidCodingKeys.self) {
             let id = try container.decode(String.self, forKey: .id)
+            // Decode item_id from backend-injected field (backend adds this)
+            let itemId = (try? container.decode(String.self, forKey: .itemId)) ?? ""
             let name = try container.decode(String.self, forKey: .name)
             let officialName = try? container.decode(String.self, forKey: .officialName)
             let type = try container.decode(String.self, forKey: .type)
@@ -131,7 +134,7 @@ extension BankAccount: Codable {
 
             self.init(
                 id: id,
-                itemId: "",
+                itemId: itemId,
                 name: name,
                 officialName: officialName,
                 type: type,

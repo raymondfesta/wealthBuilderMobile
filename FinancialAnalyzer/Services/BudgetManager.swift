@@ -5,10 +5,14 @@ import Foundation
 class BudgetManager: ObservableObject {
     @Published var budgets: [Budget] = []
     @Published var goals: [Goal] = []
+    @Published var allocationBuckets: [AllocationBucket] = []
     @Published var isProcessing = false
     @Published var error: Error?
 
-    init() {
+    private let baseURL: String
+
+    init(baseURL: String = "http://localhost:3000") {
+        self.baseURL = baseURL
         loadFromCache()
     }
 
@@ -16,6 +20,9 @@ class BudgetManager: ObservableObject {
 
     /// Creates or updates budgets based on transaction history
     func generateBudgets(from transactions: [Transaction]) {
+        print("💰 [BudgetManager] generateBudgets() called with \(transactions.count) transactions")
+        print("💰 [BudgetManager] Current budgets count before generation: \(budgets.count)")
+
         isProcessing = true
         defer { isProcessing = false }
 
@@ -25,6 +32,8 @@ class BudgetManager: ObservableObject {
             months: 3
         )
 
+        print("💰 [BudgetManager] Analyzer generated \(generatedBudgets.count) budgets")
+
         // Update current month's budgets
         for newBudget in generatedBudgets {
             if let existingIndex = budgets.firstIndex(where: {
@@ -32,13 +41,18 @@ class BudgetManager: ObservableObject {
                 $0.month == Date().startOfMonth
             }) {
                 // Update existing budget
+                print("💰 [BudgetManager] Updating existing budget for \(newBudget.categoryName)")
                 budgets[existingIndex].monthlyLimit = newBudget.monthlyLimit
                 budgets[existingIndex].updatedAt = Date()
             } else {
                 // Add new budget
+                print("💰 [BudgetManager] Adding new budget for \(newBudget.categoryName)")
                 budgets.append(newBudget)
             }
         }
+
+        print("💰 [BudgetManager] Final budgets count after generation: \(budgets.count)")
+        print("💰 [BudgetManager] Budget categories: \(budgets.map { $0.categoryName })")
 
         saveContext()
     }
@@ -274,6 +288,137 @@ class BudgetManager: ObservableObject {
         // Would update account balances here after successful transfer
     }
 
+    // MARK: - Allocation Buckets
+
+    /// Generates allocation buckets by calling the backend recommendation API
+    func generateAllocationBuckets(
+        monthlyIncome: Double,
+        monthlyExpenses: Double,
+        currentSavings: Double,
+        totalDebt: Double,
+        categoryBreakdown: [String: Double],
+        transactions: [Transaction],
+        accounts: [BankAccount]
+    ) async throws {
+        print("💰 [BudgetManager] Generating allocation buckets...")
+        print("💰 [BudgetManager] Input: income=$\(monthlyIncome), expenses=$\(monthlyExpenses), savings=$\(currentSavings), debt=$\(totalDebt)")
+
+        isProcessing = true
+        defer { isProcessing = false }
+
+        let endpoint = "\(baseURL)/api/ai/allocation-recommendation"
+
+        guard let url = URL(string: endpoint) else {
+            print("❌ [BudgetManager] Invalid URL: \(endpoint)")
+            throw BudgetError.invalidAllocationRequest
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 60 // AI requests can take longer
+
+        // Build the request body matching backend API expectations
+        let requestBody: [String: Any] = [
+            "monthlyIncome": monthlyIncome,
+            "monthlyExpenses": monthlyExpenses,
+            "currentSavings": currentSavings,
+            "totalDebt": totalDebt,
+            "categoryBreakdown": categoryBreakdown
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+
+        print("💰 [BudgetManager] Calling \(endpoint)...")
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("❌ [BudgetManager] Invalid HTTP response")
+            throw BudgetError.networkError
+        }
+
+        print("💰 [BudgetManager] Response status: \(httpResponse.statusCode)")
+
+        guard httpResponse.statusCode == 200 else {
+            if let responseStr = String(data: data, encoding: .utf8) {
+                print("❌ [BudgetManager] Error response: \(responseStr)")
+            }
+            throw BudgetError.allocationGenerationFailed
+        }
+
+        // Parse the response
+        let decoder = JSONDecoder()
+        let allocationResponse = try decoder.decode(AllocationResponse.self, from: data)
+
+        print("💰 [BudgetManager] Successfully received allocation recommendations")
+
+        // Convert API response to AllocationBucket objects
+        var newBuckets: [AllocationBucket] = []
+
+        // Essential Spending
+        if let essential = allocationResponse.allocations.essentialSpending {
+            let bucket = AllocationBucket(
+                type: .essentialSpending,
+                allocatedAmount: essential.amount,
+                percentageOfIncome: essential.percentage,
+                linkedCategories: essential.categories ?? [],
+                explanation: essential.explanation
+            )
+            newBuckets.append(bucket)
+            print("💰 [BudgetManager] Created Essential Spending bucket: $\(essential.amount) (\(essential.percentage)%)")
+        }
+
+        // Emergency Fund
+        if let emergency = allocationResponse.allocations.emergencyFund {
+            let bucket = AllocationBucket(
+                type: .emergencyFund,
+                allocatedAmount: emergency.amount,
+                percentageOfIncome: emergency.percentage,
+                linkedCategories: [], // Virtual bucket
+                explanation: emergency.explanation,
+                targetAmount: emergency.targetAmount,
+                monthsToTarget: emergency.monthsToTarget
+            )
+            newBuckets.append(bucket)
+            print("💰 [BudgetManager] Created Emergency Fund bucket: $\(emergency.amount) (\(emergency.percentage)%), target=$\(emergency.targetAmount ?? 0)")
+        }
+
+        // Discretionary Spending
+        if let discretionary = allocationResponse.allocations.discretionarySpending {
+            let bucket = AllocationBucket(
+                type: .discretionarySpending,
+                allocatedAmount: discretionary.amount,
+                percentageOfIncome: discretionary.percentage,
+                linkedCategories: discretionary.categories ?? [],
+                explanation: discretionary.explanation
+            )
+            newBuckets.append(bucket)
+            print("💰 [BudgetManager] Created Discretionary Spending bucket: $\(discretionary.amount) (\(discretionary.percentage)%)")
+        }
+
+        // Investments
+        if let investments = allocationResponse.allocations.investments {
+            let bucket = AllocationBucket(
+                type: .investments,
+                allocatedAmount: investments.amount,
+                percentageOfIncome: investments.percentage,
+                linkedCategories: [], // Virtual bucket
+                explanation: investments.explanation
+            )
+            newBuckets.append(bucket)
+            print("💰 [BudgetManager] Created Investments bucket: $\(investments.amount) (\(investments.percentage)%)")
+        }
+
+        // Update published property
+        self.allocationBuckets = newBuckets
+
+        // Save to cache
+        saveAllocationBucketsToCache()
+
+        print("💰 [BudgetManager] Successfully generated \(newBuckets.count) allocation buckets")
+        print("💰 [BudgetManager] Summary: \(allocationResponse.summary.basedOn)")
+    }
+
     // MARK: - Analysis
 
     /// Gets budget summary for current month
@@ -328,6 +473,7 @@ class BudgetManager: ObservableObject {
         if let goalsData = try? encoder.encode(goals) {
             UserDefaults.standard.set(goalsData, forKey: "cached_goals")
         }
+        saveAllocationBucketsToCache()
     }
 
     private func loadFromCache() {
@@ -339,6 +485,24 @@ class BudgetManager: ObservableObject {
         if let goalsData = UserDefaults.standard.data(forKey: "cached_goals"),
            let goals = try? decoder.decode([Goal].self, from: goalsData) {
             self.goals = goals
+        }
+        loadAllocationBucketsFromCache()
+    }
+
+    private func saveAllocationBucketsToCache() {
+        let encoder = JSONEncoder()
+        if let data = try? encoder.encode(allocationBuckets) {
+            UserDefaults.standard.set(data, forKey: "cached_allocation_buckets")
+            print("💰 [BudgetManager] Saved \(allocationBuckets.count) allocation buckets to cache")
+        }
+    }
+
+    private func loadAllocationBucketsFromCache() {
+        let decoder = JSONDecoder()
+        if let data = UserDefaults.standard.data(forKey: "cached_allocation_buckets"),
+           let buckets = try? decoder.decode([AllocationBucket].self, from: data) {
+            self.allocationBuckets = buckets
+            print("💰 [BudgetManager] Loaded \(buckets.count) allocation buckets from cache")
         }
     }
 
@@ -395,6 +559,9 @@ enum BudgetError: LocalizedError {
     case goalNotFound
     case budgetNotFound
     case invalidAmount
+    case invalidAllocationRequest
+    case networkError
+    case allocationGenerationFailed
 
     var errorDescription: String? {
         switch self {
@@ -406,6 +573,46 @@ enum BudgetError: LocalizedError {
             return "Budget not found"
         case .invalidAmount:
             return "Invalid amount specified"
+        case .invalidAllocationRequest:
+            return "Invalid allocation request parameters"
+        case .networkError:
+            return "Network connection failed"
+        case .allocationGenerationFailed:
+            return "Failed to generate allocation recommendations"
         }
     }
+}
+
+// MARK: - Allocation API Response Models
+
+private struct AllocationResponse: Codable {
+    let allocations: AllocationsData
+    let summary: AllocationSummary
+}
+
+private struct AllocationsData: Codable {
+    let essentialSpending: AllocationDetail?
+    let emergencyFund: EmergencyFundDetail?
+    let discretionarySpending: AllocationDetail?
+    let investments: AllocationDetail?
+}
+
+private struct AllocationDetail: Codable {
+    let amount: Double
+    let percentage: Double
+    let categories: [String]?
+    let explanation: String
+}
+
+private struct EmergencyFundDetail: Codable {
+    let amount: Double
+    let percentage: Double
+    let targetAmount: Double?
+    let monthsToTarget: Int?
+    let explanation: String
+}
+
+private struct AllocationSummary: Codable {
+    let totalAllocated: Double
+    let basedOn: String
 }

@@ -4,9 +4,17 @@ import Security
 class KeychainService {
     static let shared = KeychainService()
 
-    private let service = "com.financialanalyzer.plaid"
+    private let service: String
 
-    private init() {}
+    private init() {
+        // Use different Keychain service names for dev vs production
+        // This prevents dev data from interfering with production builds
+        #if DEBUG
+        self.service = "com.financialanalyzer.plaid.dev"
+        #else
+        self.service = "com.financialanalyzer.plaid"
+        #endif
+    }
 
     // MARK: - Save
 

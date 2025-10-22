@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "dev:reset": "node -e \"require('fs').writeFileSync('plaid_tokens.json', '{}')\" && echo '✅ Tokens cleared. Restart server to apply.' && npm run dev",
+    "reset": "node -e \"require('fs').writeFileSync('plaid_tokens.json', '{}')\" && echo '✅ Backend tokens cleared'"
   },
   "keywords": [
     "plaid",

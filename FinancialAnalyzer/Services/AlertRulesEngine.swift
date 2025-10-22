@@ -345,17 +345,44 @@ struct AlertRulesEngine {
 
 // MARK: - Supporting Types
 
-struct ProactiveAlert: Identifiable {
+class ProactiveAlert: Identifiable, ObservableObject {
     let id = UUID()
     let type: AlertType
     let severity: AlertSeverity
     let title: String
     let message: String
     let actionOptions: [AlertAction]
-    var relatedBudget: Budget? = nil
-    var relatedGoal: Goal? = nil
+    var relatedBudget: Budget?
+    var relatedGoal: Goal?
     var impactSummary: ImpactSummary
-    let createdAt: Date = Date()
+    @Published var aiInsight: String?  // AI-generated insight from backend
+    @Published var isLoadingAIInsight: Bool  // Indicates AI fetch in progress
+    let createdAt: Date
+
+    init(
+        type: AlertType,
+        severity: AlertSeverity,
+        title: String,
+        message: String,
+        actionOptions: [AlertAction],
+        relatedBudget: Budget? = nil,
+        relatedGoal: Goal? = nil,
+        impactSummary: ImpactSummary,
+        aiInsight: String? = nil,
+        isLoadingAIInsight: Bool = false
+    ) {
+        self.type = type
+        self.severity = severity
+        self.title = title
+        self.message = message
+        self.actionOptions = actionOptions
+        self.relatedBudget = relatedBudget
+        self.relatedGoal = relatedGoal
+        self.impactSummary = impactSummary
+        self.aiInsight = aiInsight
+        self.isLoadingAIInsight = isLoadingAIInsight
+        self.createdAt = Date()
+    }
 
     enum AlertType {
         case budgetExceeded

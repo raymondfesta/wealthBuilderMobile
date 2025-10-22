@@ -1,0 +1,103 @@
+==============================================================================
+CLEAR ALL DATA BUTTON - UI LOCATION
+==============================================================================
+
+FILE: FinancialAnalyzer/Views/ProactiveGuidanceDemoView.swift
+
+NAVIGATION PATH: App → Demo Tab → Scroll to Bottom → "Developer Tools" Section
+
+UI HIERARCHY:
+-------------
+
+ProactiveGuidanceDemoView
+└── NavigationStack
+    └── Form
+        ├── Section: "Current Financial State"
+        ├── Section: "Active Budgets"
+        ├── Section: "Financial Goals"
+        ├── Section: "Test Purchase Alert"
+        ├── Section: "Test Notifications"
+        ├── Section: "Quick Actions"
+        └── Section: "Developer Tools"  ← NEW BUTTON HERE
+            ├── Button: "Reset Onboarding Experience" (existing)
+            │   └── Warning text (existing)
+            │
+            ├── Divider  ← NEW
+            │
+            ├── Button: "Clear All Data & Restart"  ← NEW
+            │   ├── Style: .borderedProminent
+            │   ├── Tint: .red
+            │   ├── Icon: trash.fill
+            │   └── Full width label
+            │
+            └── Warning Text (red caption)  ← NEW
+                "⚠️ This will delete ALL data..."
+
+ALERT (shown on button tap):
+-----------------------------
+
+Alert: "Clear All Data?"
+├── Message: Lists all data that will be deleted
+├── Button: "Cancel" (role: .cancel)
+└── Button: "Clear & Restart" (role: .destructive)
+    └── Action: clearAllDataAndRestart()
+
+BEFORE/AFTER COMPARISON:
+------------------------
+
+BEFORE (Developer Tools section):
+┌──────────────────────────────────────┐
+│ Developer Tools                      │
+├──────────────────────────────────────┤
+│ Reset Onboarding Experience          │
+│ Tap to reset the welcome and...      │
+└──────────────────────────────────────┘
+
+AFTER (Developer Tools section):
+┌──────────────────────────────────────┐
+│ Developer Tools                      │
+├──────────────────────────────────────┤
+│ Reset Onboarding Experience          │
+│ Tap to reset the welcome and...      │
+│ ────────────────────────────────     │ ← Divider
+│ ┌──────────────────────────────────┐ │
+│ │  🗑️  Clear All Data & Restart    │ │ ← Red button
+│ └──────────────────────────────────┘ │
+│ ⚠️ This will delete ALL data...     │ ← Warning
+└──────────────────────────────────────┘
+
+VISUAL CHARACTERISTICS:
+-----------------------
+
+Button Appearance:
+• Color: Red (destructive action)
+• Style: Filled/bordered prominent
+• Icon: Trash can (trash.fill)
+• Width: Full width of section
+• Text: "Clear All Data & Restart"
+
+Warning Text:
+• Color: Red (system red color)
+• Font: Caption (small)
+• Icon: ⚠️ warning emoji
+• Multi-line text explaining consequences
+
+CODE SNIPPET (lines 174-188):
+------------------------------
+
+Divider()
+
+Button(action: {
+    showClearDataConfirmation = true
+}) {
+    Label("Clear All Data & Restart", systemImage: "trash.fill")
+        .frame(maxWidth: .infinity)
+}
+.buttonStyle(.borderedProminent)
+.tint(.red)
+
+Text("⚠️ This will delete ALL data (Keychain tokens, cached accounts, transactions, budgets, goals) and restart the app. Use this to test a completely fresh install.")
+    .font(.caption)
+    .foregroundColor(.red)
+
+==============================================================================

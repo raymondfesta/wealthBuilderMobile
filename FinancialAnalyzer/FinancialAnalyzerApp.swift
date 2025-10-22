@@ -4,19 +4,19 @@ import UserNotifications
 @main
 struct FinancialAnalyzerApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
-    @State private var showOnboarding = false
+    @AppStorage("hasSeenWelcome") private var hasSeenWelcome = false
+    @State private var showWelcome = false
 
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .sheet(isPresented: $showOnboarding) {
-                    OnboardingView(isPresented: $showOnboarding)
+                .sheet(isPresented: $showWelcome) {
+                    WelcomePageView(isPresented: $showWelcome)
                 }
                 .onAppear {
-                    if !hasCompletedOnboarding {
-                        showOnboarding = true
-                        hasCompletedOnboarding = true
+                    if !hasSeenWelcome {
+                        showWelcome = true
+                        hasSeenWelcome = true
                     }
                 }
         }
@@ -57,6 +57,14 @@ struct ContentView: View {
                 .tabItem {
                     Label("Demo", systemImage: "testtube.2")
                 }
+
+            #if DEBUG
+            // Debug tab for development only
+            DebugView(viewModel: viewModel)
+                .tabItem {
+                    Label("Debug", systemImage: "wrench.and.screwdriver.fill")
+                }
+            #endif
         }
         .sheet(isPresented: $viewModel.isShowingGuidance) {
             if let alert = viewModel.currentAlert {

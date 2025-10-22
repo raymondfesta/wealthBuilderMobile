@@ -99,3 +99,6 @@ iOSInjectionProject/
 # API Keys
 Config.xcconfig
 Secrets.plist
+
+# Backend - Plaid access tokens
+backend/plaid_tokens.json
