@@ -441,6 +441,12 @@ struct AllocationPlannerView: View {
             return
         }
 
+        // CRITICAL: Prevent modification of Essential Spending (defense in depth)
+        guard changedBucket.isModifiable else {
+            print("⚠️ [AllocationPlanner] Attempted to modify non-modifiable bucket: \(changedBucket.displayName)")
+            return
+        }
+
         // Get the old amount
         let oldAmount = editedBuckets[bucketId] ?? changedBucket.allocatedAmount
 
@@ -491,15 +497,17 @@ struct AllocationPlannerView: View {
                 let currentAmount = editedBuckets[bucket.id] ?? bucket.allocatedAmount
                 let proportion = currentAmount / totalOtherBuckets
                 let adjustment = -delta * proportion
-                let newValue = max(0, currentAmount + adjustment)
-                print("      • \(bucket.displayName): \(formatCurrency(currentAmount)) → \(formatCurrency(newValue)) (proportion: \(Int(proportion * 100))%)")
-                editedBuckets[bucket.id] = newValue
-            }
-        }
+                let newValue = currentAmount + adjustment
 
-        // Ensure Essential Spending bucket maintains its original amount
-        if let essentialBucket = viewModel.budgetManager.allocationBuckets.first(where: { $0.type == .essentialSpending }) {
-            editedBuckets[essentialBucket.id] = essentialBucket.allocatedAmount
+                // Validate that the new value is non-negative
+                if newValue < 0 {
+                    print("      ⚠️ Auto-adjustment would make \(bucket.displayName) negative ($\(newValue)). Setting to $0.")
+                }
+
+                let clampedValue = max(0, newValue)
+                print("      • \(bucket.displayName): \(formatCurrency(currentAmount)) → \(formatCurrency(clampedValue)) (proportion: \(Int(proportion * 100))%)")
+                editedBuckets[bucket.id] = clampedValue
+            }
         }
 
         // Final adjustment: ensure total equals exactly 100% by correcting rounding errors
@@ -509,11 +517,22 @@ struct AllocationPlannerView: View {
 
         if abs(difference) > 0.01 {
             // Find the largest modifiable bucket that wasn't just changed
-            if let largestBucket = otherModifiableBuckets.max(by: {
+            // CRITICAL: Ensure we never apply rounding to Essential Spending
+            let modifiableForRounding = otherModifiableBuckets.filter { $0.type != .essentialSpending }
+
+            if let largestBucket = modifiableForRounding.max(by: {
                 (editedBuckets[$0.id] ?? $0.allocatedAmount) < (editedBuckets[$1.id] ?? $1.allocatedAmount)
             }) {
                 let currentValue = editedBuckets[largestBucket.id] ?? largestBucket.allocatedAmount
-                editedBuckets[largestBucket.id] = max(0, currentValue + difference)
+                let adjustedValue = currentValue + difference
+
+                // Warn if adjustment would make bucket negative
+                if adjustedValue < 0 {
+                    print("   ⚠️ Rounding adjustment would make \(largestBucket.displayName) negative ($\(adjustedValue)). Clamping to $0.")
+                }
+
+                editedBuckets[largestBucket.id] = max(0, adjustedValue)
+                print("   ↳ Applied rounding adjustment of \(formatCurrency(difference)) to \(largestBucket.displayName)")
             }
         }
 
@@ -549,7 +568,27 @@ struct AllocationPlannerView: View {
                 otherBucketsTotal += editedBuckets[bucket.id] ?? bucket.allocatedAmount
             }
             // Largest bucket gets exactly the remainder to guarantee 100%
-            editedBuckets[largestBucket.id] = monthlyIncome - otherBucketsTotal
+            let remainingAmount = monthlyIncome - otherBucketsTotal
+
+            // Safety check: Don't allow negative values
+            if remainingAmount < 0 {
+                print("⚠️ [AllocationPlanner] Warning: Final adjustment would make \(largestBucket.displayName) negative ($\(remainingAmount)). Aborting save.")
+                showValidationError()
+                return
+            }
+
+            editedBuckets[largestBucket.id] = remainingAmount
+        }
+
+        // Final safety check: ensure no negative values before saving
+        for bucket in viewModel.budgetManager.allocationBuckets {
+            let amount = editedBuckets[bucket.id] ?? bucket.allocatedAmount
+            if amount < 0 {
+                print("⚠️ [AllocationPlanner] Error: \(bucket.displayName) has negative value ($\(amount)). Aborting save.")
+                validationMessage = "\(bucket.displayName) has an invalid negative value. Please adjust allocations."
+                showingValidationError = true
+                return
+            }
         }
 
         // Update bucket amounts with edited values (now guaranteed to be exactly 100%)

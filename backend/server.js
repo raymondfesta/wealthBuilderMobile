@@ -132,6 +132,98 @@ app.get('/api/debug/items', (req, res) => {
   });
 });
 
+// ========== DEVELOPER ENDPOINTS (for development environment only) ==========
+
+// Get development environment status
+app.get('/api/dev/status', (req, res) => {
+  const items = Array.from(accessTokens.keys());
+  res.json({
+    status: 'ok',
+    environment: process.env.PLAID_ENV || 'sandbox',
+    timestamp: new Date().toISOString(),
+    tokens: {
+      count: items.length,
+      itemIds: items
+    }
+  });
+});
+
+// Reset all tokens (clears plaid_tokens.json)
+app.post('/api/dev/reset-all', (req, res) => {
+  try {
+    console.log('🔄 [Dev] Resetting all tokens...');
+
+    const beforeCount = accessTokens.size;
+
+    // Clear in-memory map
+    accessTokens.clear();
+
+    // Clear file storage
+    fs.writeFileSync(TOKENS_FILE, JSON.stringify({}), 'utf8');
+
+    console.log(`✅ [Dev] Reset complete. Removed ${beforeCount} tokens.`);
+
+    res.json({
+      success: true,
+      message: `Reset complete. Removed ${beforeCount} tokens.`,
+      cleared: beforeCount
+    });
+  } catch (error) {
+    console.error('❌ [Dev] Error resetting tokens:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Reset specific item token
+app.post('/api/dev/reset-item/:itemId', (req, res) => {
+  try {
+    const { itemId } = req.params;
+
+    if (!itemId) {
+      return res.status(400).json({
+        success: false,
+        error: 'itemId is required'
+      });
+    }
+
+    console.log(`🔄 [Dev] Removing token for item: ${itemId}`);
+
+    const existed = accessTokens.has(itemId);
+
+    if (!existed) {
+      return res.status(404).json({
+        success: false,
+        error: `Item ${itemId} not found`
+      });
+    }
+
+    // Remove from memory
+    accessTokens.delete(itemId);
+
+    // Save to file
+    saveTokens();
+
+    console.log(`✅ [Dev] Removed token for item: ${itemId}`);
+
+    res.json({
+      success: true,
+      message: `Token for item ${itemId} removed`,
+      itemId
+    });
+  } catch (error) {
+    console.error('❌ [Dev] Error removing item:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ========== END DEVELOPER ENDPOINTS ==========
+
 // Create Link Token
 app.post('/api/plaid/create_link_token', async (req, res) => {
   try {
@@ -954,9 +1046,34 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
     // Ensure amounts sum exactly to monthlyIncome (handle rounding)
     const totalAllocated = essentialAmount + emergencyFundAmount + discretionaryAmount + investmentAmount;
     const roundingAdjustment = monthlyIncome - totalAllocated;
-    const adjustedEssentialAmount = essentialAmount + roundingAdjustment;
 
-    console.log(`🎯 [Allocation] Calculated amounts - Essential: $${adjustedEssentialAmount} (${essentialPercentage}%), Emergency: $${emergencyFundAmount} (${emergencyFundPercentage}%), Discretionary: $${discretionaryAmount} (${discretionaryPercentage}%), Investment: $${investmentAmount} (${investmentPercentage}%)`);
+    // Apply rounding adjustment to the LARGEST modifiable bucket (not Essential Spending)
+    // This ensures Essential Spending stays at the calculated value based on actual data
+    const modifiableBuckets = [
+      { name: 'emergency', amount: emergencyFundAmount },
+      { name: 'discretionary', amount: discretionaryAmount },
+      { name: 'investment', amount: investmentAmount }
+    ];
+
+    const largestBucket = modifiableBuckets.reduce((max, bucket) =>
+      bucket.amount > max.amount ? bucket : max
+    );
+
+    let adjustedEssentialAmount = essentialAmount;
+    let adjustedEmergencyAmount = emergencyFundAmount;
+    let adjustedDiscretionaryAmount = discretionaryAmount;
+    let adjustedInvestmentAmount = investmentAmount;
+
+    if (largestBucket.name === 'emergency') {
+      adjustedEmergencyAmount += roundingAdjustment;
+    } else if (largestBucket.name === 'discretionary') {
+      adjustedDiscretionaryAmount += roundingAdjustment;
+    } else {
+      adjustedInvestmentAmount += roundingAdjustment;
+    }
+
+    console.log(`🎯 [Allocation] Applied rounding adjustment of $${roundingAdjustment} to ${largestBucket.name}`);
+    console.log(`🎯 [Allocation] Final amounts - Essential: $${adjustedEssentialAmount} (${essentialPercentage}%), Emergency: $${adjustedEmergencyAmount} (${emergencyFundPercentage}%), Discretionary: $${adjustedDiscretionaryAmount} (${discretionaryPercentage}%), Investment: $${adjustedInvestmentAmount} (${investmentPercentage}%)`);
 
     // Calculate months to reach emergency fund target
     let monthsToTarget = 0;
@@ -975,9 +1092,9 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
       emergencyFundTarget,
       allocations: {
         essential: { amount: adjustedEssentialAmount, percentage: essentialPercentage },
-        emergencyFund: { amount: emergencyFundAmount, percentage: emergencyFundPercentage },
-        discretionary: { amount: discretionaryAmount, percentage: discretionaryPercentage },
-        investment: { amount: investmentAmount, percentage: investmentPercentage },
+        emergencyFund: { amount: adjustedEmergencyAmount, percentage: emergencyFundPercentage },
+        discretionary: { amount: adjustedDiscretionaryAmount, percentage: discretionaryPercentage },
+        investment: { amount: adjustedInvestmentAmount, percentage: investmentPercentage },
       },
     });
 
@@ -990,7 +1107,7 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
           explanation: explanations.essential,
         },
         emergencyFund: {
-          amount: emergencyFundAmount,
+          amount: adjustedEmergencyAmount,
           percentage: emergencyFundPercentage,
           targetAmount: emergencyFundTarget,
           currentSavings: savings,
@@ -998,13 +1115,13 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
           explanation: explanations.emergencyFund,
         },
         discretionarySpending: {
-          amount: discretionaryAmount,
+          amount: adjustedDiscretionaryAmount,
           percentage: discretionaryPercentage,
           categories: userDiscretionaryCategories.length > 0 ? userDiscretionaryCategories : discretionaryCategoryList,
           explanation: explanations.discretionary,
         },
         investments: {
-          amount: investmentAmount,
+          amount: adjustedInvestmentAmount,
           percentage: investmentPercentage,
           explanation: explanations.investment,
         },

@@ -274,24 +274,37 @@ struct AllocationBucketCard: View {
             .pickerStyle(.segmented)
             .onChange(of: emergencyFundMonths) { newValue in
                 print("🎯 [EmergencyFund] Picker changed to \(newValue) months")
-                // Calculate new allocated amount based on target and savings period
-                if let essentialSpending = essentialSpendingAmount {
-                    // Target = essential spending × selected months
-                    let targetAmount = essentialSpending * Double(newValue)
 
-                    // Assume 2-year savings period (24 months) as reasonable default
-                    let savingsPeriodMonths = 24.0
+                // Get the CURRENT essential spending from editedBuckets (after any adjustments)
+                guard let essentialSpending = essentialSpendingAmount, essentialSpending > 0 else {
+                    print("   ⚠️ Essential spending amount not available or invalid, cannot calculate")
+                    return
+                }
 
-                    // Monthly allocation = target / savings period
-                    let newAmount = targetAmount / savingsPeriodMonths
+                // Target = essential spending × selected months
+                let targetAmount = essentialSpending * Double(newValue)
 
-                    // Clamp to valid range (0 to monthly income)
-                    let clampedAmount = min(max(newAmount, 0), monthlyIncome)
-                    print("   ↳ Calculated new amount: \(formatCurrency(clampedAmount))")
-                    localAmount = clampedAmount
+                // Update the bucket's target amount (this is metadata, not the allocation)
+                bucket.targetAmount = targetAmount
+
+                // Assume 2-year savings period (24 months) as reasonable default
+                let savingsPeriodMonths = 24.0
+
+                // Monthly allocation = target / savings period
+                let newAmount = targetAmount / savingsPeriodMonths
+
+                // Clamp to valid range (0 to monthly income)
+                let clampedAmount = min(max(newAmount, 0), monthlyIncome)
+
+                print("   ↳ New target: \(formatCurrency(targetAmount))")
+                print("   ↳ Calculated new monthly amount: \(formatCurrency(clampedAmount))")
+
+                // Update local amount first to prevent state desync
+                localAmount = clampedAmount
+
+                // CRITICAL: Use DispatchQueue.main.async to ensure state update completes before triggering parent update
+                DispatchQueue.main.async {
                     updateAmount(clampedAmount)
-                } else {
-                    print("   ⚠️ Essential spending amount not available, cannot calculate")
                 }
             }
 
