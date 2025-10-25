@@ -5,15 +5,18 @@ struct CategoryDetailView: View {
     let category: BucketCategory
     let amount: Double
     let summary: FinancialSummary
-    let transactions: [Transaction]
     let accounts: [BankAccount]
+    @ObservedObject var viewModel: FinancialViewModel
+
+    @State private var selectedTransaction: Transaction?
+    @State private var showValidationSheet = false
 
     private var categoryTransactions: [Transaction] {
-        TransactionAnalyzer.transactionsForBucket(category, from: transactions)
+        TransactionAnalyzer.transactionsForBucket(category, from: viewModel.transactions)
     }
 
     private var topContributors: [Transaction] {
-        TransactionAnalyzer.topContributors(for: category, from: transactions, limit: 10)
+        TransactionAnalyzer.topContributors(for: category, from: viewModel.transactions, limit: 10)
     }
 
     private var contributingAccounts: [BankAccount] {
@@ -21,7 +24,7 @@ struct CategoryDetailView: View {
     }
 
     private var monthlyTrends: [(Date, Double)] {
-        let trends = TransactionAnalyzer.monthlyTrends(from: transactions, bucket: category)
+        let trends = TransactionAnalyzer.monthlyTrends(from: viewModel.transactions, bucket: category)
         return trends.sorted { $0.key < $1.key }.map { ($0.key, $0.value) }
     }
 
@@ -55,6 +58,20 @@ struct CategoryDetailView: View {
         }
         .navigationTitle(category.rawValue)
         .navigationBarTitleDisplayMode(.large)
+        .sheet(item: $selectedTransaction) { transaction in
+            TransactionValidationSheet(
+                transaction: transaction,
+                matchingCount: viewModel.countMatchingTransactions(transaction),
+                onValidate: { correctedCategory, applyToAll in
+                    // Use viewModel's validation method with persistence and UI refresh
+                    viewModel.validateTransaction(
+                        transaction,
+                        correctedCategory: correctedCategory,
+                        applyToAll: applyToAll
+                    )
+                }
+            )
+        }
     }
 
     // MARK: - Subviews
@@ -210,6 +227,9 @@ struct CategoryDetailView: View {
             VStack(spacing: 8) {
                 ForEach(topContributors, id: \.id) { transaction in
                     ContributorTransactionRow(transaction: transaction, category: category)
+                        .onTapGesture {
+                            selectedTransaction = transaction
+                        }
                 }
             }
         }
@@ -251,7 +271,10 @@ struct CategoryDetailView: View {
 
             VStack(spacing: 8) {
                 ForEach(categoryTransactions.sorted(by: { $0.date > $1.date }).prefix(20), id: \.id) { transaction in
-                    TransactionRow(transaction: transaction)
+                    ContributorTransactionRow(transaction: transaction, category: category)
+                        .onTapGesture {
+                            selectedTransaction = transaction
+                        }
                 }
 
                 if categoryTransactions.count > 20 {
@@ -332,10 +355,23 @@ struct ContributorTransactionRow: View {
                 .frame(width: 4)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(transaction.name)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .lineLimit(1)
+                HStack(spacing: 8) {
+                    Text(transaction.name)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+
+                    // Validation indicators
+                    if transaction.userValidated {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                    } else if transaction.needsValidation {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(confidenceColor(transaction.confidenceLevel))
+                    }
+                }
 
                 HStack(spacing: 8) {
                     if let merchantName = transaction.merchantName {
@@ -343,11 +379,23 @@ struct ContributorTransactionRow: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .lineLimit(1)
+
+                        Text("•")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
 
-                    Text("•")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    // Show Plaid detailed category for transparency
+                    if let pfc = transaction.personalFinanceCategory {
+                        Text(formatPFCCategory(pfc.detailed))
+                            .font(.caption)
+                            .foregroundColor(.blue.opacity(0.7))
+                            .lineLimit(1)
+
+                        Text("•")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
 
                     Text(transaction.date, style: .date)
                         .font(.caption)
@@ -374,6 +422,14 @@ struct ContributorTransactionRow: View {
         category == .income ? .green : .primary
     }
 
+    private func confidenceColor(_ level: ConfidenceLevel) -> Color {
+        switch level {
+        case .veryHigh, .high: return .green
+        case .medium: return .yellow
+        case .low, .unknown: return .orange
+        }
+    }
+
     private var formattedAmount: String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
@@ -384,6 +440,13 @@ struct ContributorTransactionRow: View {
         } else {
             return formatter.string(from: NSNumber(value: transaction.amount)) ?? "$0.00"
         }
+    }
+
+    private func formatPFCCategory(_ detailed: String) -> String {
+        // Convert "FOOD_AND_DRINK_RESTAURANTS" to "Food And Drink Restaurants"
+        return detailed
+            .replacingOccurrences(of: "_", with: " ")
+            .capitalized
     }
 }
 

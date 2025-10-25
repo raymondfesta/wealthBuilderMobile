@@ -14,6 +14,22 @@ final class AllocationBucket: Identifiable, ObservableObject {
     @Published var monthsToTarget: Int? // For emergency fund only
     @Published var createdAt: Date
     @Published var updatedAt: Date
+    @Published var changeFromOriginal: Double = 0 // Track change for visual indicators
+    @Published var isLocked: Bool = false // Whether this bucket is protected from auto-adjustment
+
+    /// Recommended minimum allocation as a percentage of income
+    var recommendedMinimumPercentage: Double {
+        switch type {
+        case .essentialSpending:
+            return 0 // Cannot be modified, no minimum needed
+        case .emergencyFund:
+            return 10 // Minimum 10% for basic safety net
+        case .discretionarySpending:
+            return 0 // Can be zero if needed
+        case .investments:
+            return 5 // Minimum 5% for wealth building
+        }
+    }
 
     // Computed property to calculate current balance from linked budgets
     // This would be calculated by summing remaining amounts from linked Budget objects
@@ -45,6 +61,80 @@ final class AllocationBucket: Identifiable, ObservableObject {
         return type != .essentialSpending
     }
 
+    /// Validates discretionary spending limits (35% warning, 50% hard limit)
+    func validateDiscretionarySpending(monthlyIncome: Double) -> DiscretionarySpendingValidation {
+        guard type == .discretionarySpending, monthlyIncome > 0 else {
+            return .valid
+        }
+
+        let percentage = (allocatedAmount / monthlyIncome) * 100
+
+        if percentage >= 50 {
+            return .hardLimit(currentPercentage: percentage)
+        } else if percentage >= 35 {
+            return .warning(currentPercentage: percentage)
+        } else {
+            return .valid
+        }
+    }
+
+    /// Calculates the effective duration (in months) that the Emergency Fund target represents
+    /// Based on current target amount and essential spending
+    func calculateEffectiveDuration(essentialSpending: Double) -> Int {
+        guard type == .emergencyFund, let target = targetAmount, essentialSpending > 0 else {
+            return 6 // Default to 6 months if not applicable
+        }
+
+        let months = Int(round(target / essentialSpending))
+
+        // Map to closest valid option (3, 6, or 12 months)
+        if months <= 4 {
+            return 3
+        } else if months <= 9 {
+            return 6
+        } else {
+            return 12
+        }
+    }
+
+    /// Calculates the maximum safe allocation for this bucket given income and other buckets
+    /// Returns the dollar amount that represents the safe maximum
+    func getMaxSafeAllocation(monthlyIncome: Double, otherBuckets: [AllocationBucket]) -> Double {
+        guard monthlyIncome > 0 else { return 0 }
+
+        // Calculate minimum required for other buckets
+        var minimumForOthers: Double = 0
+        for bucket in otherBuckets {
+            if bucket.id != self.id {
+                let minPercentage = bucket.recommendedMinimumPercentage
+                minimumForOthers += (monthlyIncome * minPercentage / 100)
+            }
+        }
+
+        // Maximum for this bucket is income minus minimums for others
+        let maximum = monthlyIncome - minimumForOthers
+
+        // Apply type-specific hard limits
+        switch type {
+        case .discretionarySpending:
+            // Hard limit of 50% for discretionary
+            return min(maximum, monthlyIncome * 0.50)
+        case .essentialSpending:
+            // Essential spending is locked and calculated, but return current value
+            return allocatedAmount
+        case .emergencyFund, .investments:
+            // No hard upper limit beyond what's left after minimums
+            return max(0, maximum)
+        }
+    }
+
+    /// Returns the recommended minimum allocation amount in dollars
+    func getRecommendedMinimum(monthlyIncome: Double) -> Double {
+        return monthlyIncome * recommendedMinimumPercentage / 100
+    }
+
+    // MARK: - Initializer
+
     init(
         id: String = UUID().uuidString,
         type: AllocationBucketType,
@@ -75,6 +165,42 @@ final class AllocationBucket: Identifiable, ObservableObject {
         self.percentageOfIncome = percentage
         self.updatedAt = Date()
     }
+
+    /// Sets the original amount baseline for change tracking
+    func setOriginalAmount(_ amount: Double) {
+        self.changeFromOriginal = 0
+    }
+
+    /// Updates the change indicator
+    func updateChange(from originalAmount: Double) {
+        self.changeFromOriginal = self.allocatedAmount - originalAmount
+    }
+}
+
+// MARK: - Discretionary Spending Validation
+
+enum DiscretionarySpendingValidation {
+    case valid
+    case warning(currentPercentage: Double)
+    case hardLimit(currentPercentage: Double)
+
+    var isValid: Bool {
+        if case .hardLimit = self {
+            return false
+        }
+        return true
+    }
+
+    var message: String {
+        switch self {
+        case .valid:
+            return ""
+        case .warning(let percentage):
+            return "⚠️ Discretionary spending is at \(Int(percentage))%. Consider keeping it below 35% for better financial health."
+        case .hardLimit(let percentage):
+            return "🚫 Discretionary spending limit exceeded (\(Int(percentage))%). Please reduce to 50% or less of your income."
+        }
+    }
 }
 
 // MARK: - Codable conformance
@@ -90,6 +216,8 @@ extension AllocationBucket: Codable {
         case monthsToTarget
         case createdAt
         case updatedAt
+        case changeFromOriginal
+        case isLocked
     }
 
     func encode(to encoder: Encoder) throws {
@@ -104,6 +232,8 @@ extension AllocationBucket: Codable {
         try container.encodeIfPresent(monthsToTarget, forKey: .monthsToTarget)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(updatedAt, forKey: .updatedAt)
+        try container.encode(changeFromOriginal, forKey: .changeFromOriginal)
+        try container.encode(isLocked, forKey: .isLocked)
     }
 
     convenience init(from decoder: Decoder) throws {
@@ -118,6 +248,8 @@ extension AllocationBucket: Codable {
         let monthsToTarget = try? container.decode(Int.self, forKey: .monthsToTarget)
         let createdAt = try container.decode(Date.self, forKey: .createdAt)
         let updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        let changeFromOriginal = (try? container.decode(Double.self, forKey: .changeFromOriginal)) ?? 0
+        let isLocked = (try? container.decode(Bool.self, forKey: .isLocked)) ?? false
 
         self.init(
             id: id,
@@ -131,6 +263,8 @@ extension AllocationBucket: Codable {
             createdAt: createdAt,
             updatedAt: updatedAt
         )
+        self.changeFromOriginal = changeFromOriginal
+        self.isLocked = isLocked
     }
 }
 

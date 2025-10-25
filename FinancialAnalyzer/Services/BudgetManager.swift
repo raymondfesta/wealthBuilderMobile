@@ -11,7 +11,7 @@ class BudgetManager: ObservableObject {
 
     private let baseURL: String
 
-    init(baseURL: String = "http://localhost:3000") {
+    init(baseURL: String = "http://192.168.1.8:3000") {
         self.baseURL = baseURL
         loadFromCache()
     }
@@ -297,11 +297,13 @@ class BudgetManager: ObservableObject {
         currentSavings: Double,
         totalDebt: Double,
         categoryBreakdown: [String: Double],
+        healthMetrics: FinancialHealthMetrics,
         transactions: [Transaction],
         accounts: [BankAccount]
     ) async throws {
         print("💰 [BudgetManager] Generating allocation buckets...")
         print("💰 [BudgetManager] Input: income=$\(monthlyIncome), expenses=$\(monthlyExpenses), savings=$\(currentSavings), debt=$\(totalDebt)")
+        print("💰 [BudgetManager] Health Metrics: score=\(healthMetrics.healthScore), savingsRate=\(healthMetrics.savingsRate), emergencyFund=\(healthMetrics.emergencyFundMonthsCovered) months")
 
         isProcessing = true
         defer { isProcessing = false }
@@ -316,15 +318,25 @@ class BudgetManager: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 60 // AI requests can take longer
+        request.timeoutInterval = 90 // AI requests can take longer, especially on physical devices with network latency
 
         // Build the request body matching backend API expectations
+        // Include health metrics to enable health-aware allocation recommendations
         let requestBody: [String: Any] = [
             "monthlyIncome": monthlyIncome,
             "monthlyExpenses": monthlyExpenses,
             "currentSavings": currentSavings,
             "totalDebt": totalDebt,
-            "categoryBreakdown": categoryBreakdown
+            "categoryBreakdown": categoryBreakdown,
+            "healthMetrics": [
+                "healthScore": healthMetrics.healthScore,
+                "savingsRate": healthMetrics.savingsRate,
+                "emergencyFundMonthsCovered": healthMetrics.emergencyFundMonthsCovered,
+                "debtToIncomeRatio": healthMetrics.debtToIncomeRatio,
+                "incomeStability": healthMetrics.incomeStability.rawValue,
+                "monthlySavings": healthMetrics.monthlySavings,
+                "monthlySavingsTrend": healthMetrics.monthlySavingsTrend.rawValue
+            ]
         ]
 
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)

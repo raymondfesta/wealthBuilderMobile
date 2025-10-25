@@ -210,7 +210,7 @@ struct DebugView: View {
 
     private func checkBackendStatus() async {
         do {
-            let baseURL = "http://localhost:3000"
+            let baseURL = "http://192.168.1.8:3000"
             guard let url = URL(string: "\(baseURL)/health") else {
                 backendStatus = .disconnected
                 return
@@ -281,7 +281,7 @@ struct DebugView: View {
         viewModel.summary = nil
         viewModel.budgetManager.budgets = []
         viewModel.budgetManager.goals = []
-        viewModel.allocationBuckets = []
+        viewModel.budgetManager.allocationBuckets = []
         viewModel.userJourneyState = .noAccountsConnected
 
         // Clear UserDefaults flags
@@ -313,7 +313,7 @@ struct DebugView: View {
         viewModel.summary = nil
         viewModel.budgetManager.budgets = []
         viewModel.budgetManager.goals = []
-        viewModel.allocationBuckets = []
+        viewModel.budgetManager.allocationBuckets = []
         viewModel.userJourneyState = .noAccountsConnected
 
         // 4. Reset UserDefaults flags
@@ -332,7 +332,7 @@ struct DebugView: View {
 
     private func clearBackendTokens() async {
         do {
-            let baseURL = "http://localhost:3000"
+            let baseURL = "http://192.168.1.8:3000"
             guard let url = URL(string: "\(baseURL)/api/dev/reset-all") else {
                 debugInfo += "❌ Invalid backend URL\n"
                 return

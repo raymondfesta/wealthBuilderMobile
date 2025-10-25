@@ -6,7 +6,7 @@ class AIInsightService {
 
     private let baseURL: String
 
-    init(baseURL: String = "http://localhost:3000") {
+    init(baseURL: String = "http://192.168.1.8:3000") {
         self.baseURL = baseURL
     }
 
@@ -75,7 +75,7 @@ class AIInsightService {
 
         print("✅ [AIInsight] Received insight (\(jsonResponse.usage.totalTokens) tokens)")
 
-        return jsonResponse.insight
+        return jsonResponse.insight ?? jsonResponse.explanation ?? "No insight available"
     }
 
     /// Fetches AI recommendation for savings allocation
@@ -136,7 +136,67 @@ class AIInsightService {
 
         print("✅ [AIInsight] Received savings recommendation (\(jsonResponse.usage.totalTokens) tokens)")
 
-        return jsonResponse.insight
+        return jsonResponse.insight ?? jsonResponse.explanation ?? "No recommendation available"
+    }
+
+    /// Fetches AI explanation for allocation change
+    func explainAllocationChange(
+        bucketType: String,
+        oldAmount: Double,
+        newAmount: Double,
+        monthlyIncome: Double,
+        impactedBuckets: [(name: String, change: Double)]
+    ) async throws -> String {
+        guard let url = URL(string: "\(baseURL)/api/ai/explain-allocation-change") else {
+            throw AIInsightError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 30
+
+        let impactedBucketsArray = impactedBuckets.map { bucket in
+            ["name": bucket.name, "change": bucket.change]
+        }
+
+        let requestBody: [String: Any] = [
+            "bucketType": bucketType,
+            "oldAmount": oldAmount,
+            "newAmount": newAmount,
+            "monthlyIncome": monthlyIncome,
+            "impactedBuckets": impactedBucketsArray
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+
+        print("🤖 [AIInsight] Requesting allocation change explanation for \(bucketType)")
+
+        // Make network request with error wrapping
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch let error as NSError {
+            if error.code == NSURLErrorTimedOut {
+                throw AIInsightError.timeout
+            }
+            throw AIInsightError.networkError(error)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AIInsightError.invalidResponse
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            print("❌ [AIInsight] Failed with status: \(httpResponse.statusCode)")
+            throw AIInsightError.serverError(statusCode: httpResponse.statusCode)
+        }
+
+        let jsonResponse = try JSONDecoder().decode(AIInsightResponse.self, from: data)
+
+        print("✅ [AIInsight] Received explanation (\(jsonResponse.usage.totalTokens) tokens)")
+
+        return jsonResponse.explanation ?? jsonResponse.insight ?? "Unable to generate explanation"
     }
 }
 
@@ -164,7 +224,8 @@ struct GoalContext {
 // MARK: - Response Models
 
 struct AIInsightResponse: Codable {
-    let insight: String
+    let insight: String?
+    let explanation: String?
     let usage: TokenUsage
 }
 

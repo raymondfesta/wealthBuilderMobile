@@ -1,77 +1,6 @@
 import Foundation
 import SwiftUI
 
-/// Represents different loading steps in the account connection flow
-enum LoadingStep: Equatable {
-    case idle
-    case connectingToBank
-    case fetchingAccounts
-    case analyzingTransactions(count: Int)
-    case generatingBudgets
-    case complete
-
-    var stepNumber: Int {
-        switch self {
-        case .idle: return -1
-        case .connectingToBank: return 0
-        case .fetchingAccounts: return 1
-        case .analyzingTransactions: return 2
-        case .generatingBudgets: return 3
-        case .complete: return 4
-        }
-    }
-
-    var title: String {
-        switch self {
-        case .idle:
-            return "Preparing..."
-        case .connectingToBank:
-            return "Connecting to Bank"
-        case .fetchingAccounts:
-            return "Fetching Accounts"
-        case .analyzingTransactions(let count):
-            if count > 0 {
-                return "Analyzing \(count) Transactions"
-            } else {
-                return "Analyzing Transactions"
-            }
-        case .generatingBudgets:
-            return "Generating Budgets"
-        case .complete:
-            return "Complete"
-        }
-    }
-
-    var message: String {
-        switch self {
-        case .idle:
-            return "Setting up your connection..."
-        case .connectingToBank:
-            return "Establishing secure connection..."
-        case .fetchingAccounts:
-            return "Loading your account information..."
-        case .analyzingTransactions(let count):
-            if count > 0 {
-                return "Processing your spending patterns..."
-            } else {
-                return "Retrieving transaction history..."
-            }
-        case .generatingBudgets:
-            return "Creating personalized budgets..."
-        case .complete:
-            return "Your financial data is ready!"
-        }
-    }
-
-    static let allSteps: [LoadingStep] = [
-        .connectingToBank,
-        .fetchingAccounts,
-        .analyzingTransactions(count: 0),
-        .generatingBudgets,
-        .complete
-    ]
-}
-
 @MainActor
 class FinancialViewModel: ObservableObject {
     @Published var summary: FinancialSummary?
@@ -93,6 +22,11 @@ class FinancialViewModel: ObservableObject {
     @Published var currentAlert: ProactiveAlert?
     @Published var isShowingGuidance = false
 
+    // Financial health metrics
+    @Published var healthMetrics: FinancialHealthMetrics?
+    @Published var previousHealthMetrics: FinancialHealthMetrics?
+    @Published var showHealthReport = false
+
     // Notification navigation
     var navigationCoordinator: NotificationNavigationCoordinator?
 
@@ -110,7 +44,16 @@ class FinancialViewModel: ObservableObject {
     init(plaidService: PlaidService = PlaidService()) {
         self.plaidService = plaidService
         self.budgetManager = BudgetManager()
-        loadFromCache()
+
+        // Skip cache loading if auto-reset is enabled
+        // This ensures we start with truly fresh data
+        if ProcessInfo.processInfo.arguments.contains("-ResetDataOnLaunch") {
+            print("🔄 [ViewModel] Auto-reset detected - skipping cache load for fresh start")
+            // State will remain at default: .noAccountsConnected
+        } else {
+            loadFromCache()
+        }
+
         setupNotificationObservers()
         startLinkTokenPreloading()
     }
@@ -167,9 +110,16 @@ class FinancialViewModel: ObservableObject {
             await fetchAccountsOnly()
             print("✅ [Connect] Account fetch complete!")
         } catch {
-            print("❌ [Connect] Error connecting bank account: \(error.localizedDescription)")
-            print("❌ [Connect] Error details: \(error)")
-            self.error = error
+            // Handle user cancellation gracefully (not an error, just user choice)
+            if case PlaidError.userCancelled = error {
+                print("ℹ️ [Connect] User cancelled bank connection")
+                // Don't set error - this is intentional user action, not a failure
+            } else {
+                // Real errors (network, API failures) should be shown to user
+                print("❌ [Connect] Error connecting bank account: \(error.localizedDescription)")
+                print("❌ [Connect] Error details: \(error)")
+                self.error = error
+            }
         }
     }
 
@@ -390,15 +340,29 @@ class FinancialViewModel: ObservableObject {
             self.transactions = allTransactions
 
             // Calculate financial summary
-            self.summary = TransactionAnalyzer.calculateSummary(
+            let calculatedSummary = TransactionAnalyzer.calculateSummary(
+                transactions: allTransactions,
+                accounts: accounts
+            )
+            self.summary = calculatedSummary
+
+            // Calculate health metrics for allocation planning
+            // Note: This does NOT show the health report UI (that's a separate feature accessed via toolbar)
+            print("📊 [Analyze Finances] Calculating health metrics for allocation planning...")
+            self.healthMetrics = FinancialHealthCalculator.calculateHealthMetrics(
+                summary: calculatedSummary,
                 transactions: allTransactions,
                 accounts: accounts
             )
 
+            // Cache health metrics
+            cacheHealthMetrics()
+            print("📊 [Analyze Finances] ✅ Health metrics calculated and cached")
+
             // Save to cache
             saveToCache()
 
-            // Update state: analysis complete but no plan yet
+            // Update state: show analysis results
             userJourneyState = .analysisComplete
 
             // Mark complete
@@ -427,6 +391,13 @@ class FinancialViewModel: ObservableObject {
             print("❌ [Analyze Finances] Critical error: \(error.localizedDescription)")
             self.error = error
         }
+    }
+
+    /// Proceeds from health report to plan creation (DEPRECATED - now goes directly to allocation planning)
+    func proceedToCreatePlan() async {
+        // No longer needed - analysis goes directly to allocation planning
+        // Kept for backward compatibility but does nothing
+        print("⚠️ [Create Plan] proceedToCreatePlan is deprecated")
     }
 
     /// Creates personalized budget and goal recommendations based on transaction history
@@ -488,15 +459,25 @@ class FinancialViewModel: ObservableObject {
                 .reduce(0, +)
 
             print("🎯 [Create Plan] Current savings: \(currentSavings), Total debt: \(totalDebt)")
-            print("🎯 [Create Plan] Generating allocation buckets...")
 
-            // Generate allocation buckets (calls backend API)
+            // Validate health metrics are available
+            guard let healthMetrics = self.healthMetrics else {
+                print("❌ [Create Plan] No health metrics available")
+                error = NSError(domain: "FinancialViewModel", code: 5,
+                              userInfo: [NSLocalizedDescriptionKey: "Health metrics not available. Please re-analyze your finances."])
+                return
+            }
+
+            print("🎯 [Create Plan] Generating allocation buckets with health-aware AI...")
+
+            // Generate allocation buckets (calls backend API with health metrics)
             try await budgetManager.generateAllocationBuckets(
                 monthlyIncome: monthlyIncome,
                 monthlyExpenses: monthlyExpenses,
                 currentSavings: currentSavings,
                 totalDebt: totalDebt,
                 categoryBreakdown: categoryBreakdown,
+                healthMetrics: healthMetrics,
                 transactions: transactions,
                 accounts: accounts
             )
@@ -1006,6 +987,147 @@ class FinancialViewModel: ObservableObject {
         currentAlert = nil
     }
 
+    // MARK: - Health Report Setup
+
+    /// Sets up health report after user completes account tagging
+    /// Calculates health metrics and recalculates allocation with health-aware logic
+    func setupHealthReport() async {
+        print("🏥 [Health Setup] Starting health report setup...")
+
+        // Validate preconditions
+        guard !accounts.isEmpty else {
+            print("❌ [Health Setup] Cannot setup - no accounts connected")
+            return
+        }
+
+        guard !transactions.isEmpty else {
+            print("❌ [Health Setup] Cannot setup - no transaction data")
+            return
+        }
+
+        guard let summary = self.summary else {
+            print("❌ [Health Setup] Cannot setup - no summary available")
+            return
+        }
+
+        // Calculate health metrics using tagged accounts
+        print("🏥 [Health Setup] Calculating health metrics with tagged accounts...")
+        self.healthMetrics = FinancialHealthCalculator.calculateHealthMetrics(
+            summary: summary,
+            transactions: transactions,
+            accounts: accounts
+        )
+
+        // Cache metrics
+        cacheHealthMetrics()
+
+        // Save setup completion flag
+        UserDefaults.standard.set(true, forKey: "health_report_setup_completed")
+        print("🏥 [Health Setup] Setup completion saved to UserDefaults")
+
+        // Recalculate allocation with health-aware logic
+        guard let healthMetrics = self.healthMetrics else {
+            print("❌ [Health Setup] Health metrics calculation failed")
+            return
+        }
+
+        print("🏥 [Health Setup] Recalculating allocation with health-aware logic...")
+
+        do {
+            // Calculate current savings and debt
+            let currentSavings = accounts
+                .filter { $0.type == "depository" }
+                .compactMap { $0.availableBalance ?? $0.currentBalance }
+                .reduce(0, +)
+
+            let totalDebt = accounts
+                .filter { $0.type == "credit" || $0.subtype?.contains("loan") == true }
+                .compactMap { $0.currentBalance }
+                .reduce(0, +)
+
+            let categoryBreakdown = calculateCategoryBreakdown(transactions)
+
+            // Regenerate allocation buckets with health metrics
+            try await budgetManager.generateAllocationBuckets(
+                monthlyIncome: summary.avgMonthlyIncome,
+                monthlyExpenses: summary.avgMonthlyExpenses,
+                currentSavings: currentSavings,
+                totalDebt: totalDebt,
+                categoryBreakdown: categoryBreakdown,
+                healthMetrics: healthMetrics,
+                transactions: transactions,
+                accounts: accounts
+            )
+
+            print("🏥 [Health Setup] Allocation recalculated with \(budgetManager.allocationBuckets.count) buckets")
+
+            // Save to cache
+            saveToCache()
+
+            // Show success message
+            await MainActor.run {
+                successMessage = "Health report activated! Your allocation has been optimized."
+                showSuccessBanner = true
+            }
+
+            // Auto-dismiss after 4 seconds
+            Task {
+                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                await MainActor.run {
+                    showSuccessBanner = false
+                }
+            }
+
+            print("✅ [Health Setup] Health report setup complete")
+
+        } catch {
+            print("❌ [Health Setup] Failed to recalculate allocation: \(error.localizedDescription)")
+            await MainActor.run {
+                self.error = error
+            }
+        }
+    }
+
+    /// Recalculates health metrics when account tags change
+    /// Used when user manually updates tags outside of setup flow
+    func recalculateHealth() async {
+        print("🏥 [Health Recalc] Recalculating health metrics...")
+
+        guard let summary = self.summary else {
+            print("❌ [Health Recalc] Cannot recalculate - no summary available")
+            return
+        }
+
+        // Recalculate health metrics
+        self.healthMetrics = FinancialHealthCalculator.calculateHealthMetrics(
+            summary: summary,
+            transactions: transactions,
+            accounts: accounts
+        )
+
+        // Cache updated metrics
+        cacheHealthMetrics()
+
+        // Save to persistent storage
+        saveToCache()
+
+        // Show feedback
+        await MainActor.run {
+            successMessage = "Health metrics updated"
+            showSuccessBanner = true
+        }
+
+        // Auto-dismiss after 2 seconds
+        Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            await MainActor.run {
+                showSuccessBanner = false
+            }
+        }
+
+        print("✅ [Health Recalc] Health metrics recalculated")
+    }
+
     // MARK: - Notification Handling
 
     private func setupNotificationObservers() {
@@ -1051,6 +1173,139 @@ class FinancialViewModel: ObservableObject {
     /// Handle notification tap from coordinator
     func handleNotificationNavigation(userInfo: [AnyHashable: Any]) {
         navigationCoordinator?.handleNotificationTap(userInfo: userInfo)
+    }
+
+    // MARK: - Transaction Validation Helpers
+
+    /// Returns all transactions that need user validation
+    var transactionsNeedingValidation: [Transaction] {
+        transactions.filter { $0.needsValidation && !$0.userValidated }
+    }
+
+    /// Returns validation progress (validated count, total count)
+    var validationProgress: (validated: Int, total: Int) {
+        let needsValidation = transactions.filter { $0.needsValidation }
+        let validated = needsValidation.filter { $0.userValidated }
+        return (validated.count, needsValidation.count)
+    }
+
+    /// Returns count of transactions needing validation for a specific bucket category
+    func needsValidationCount(for bucket: BucketCategory) -> Int {
+        let bucketTransactions = TransactionAnalyzer.transactionsForBucket(bucket, from: transactions)
+        return bucketTransactions.filter { $0.needsValidation && !$0.userValidated }.count
+    }
+
+    /// Persists accounts to UserDefaults (for tag changes)
+    func saveAccounts() {
+        print("💾 [Persistence] Saving accounts with tags...")
+        let encoder = JSONEncoder()
+        if let accountsData = try? encoder.encode(accounts) {
+            UserDefaults.standard.set(accountsData, forKey: "cached_accounts")
+            print("💾 [Persistence] ✅ Saved \(accounts.count) accounts")
+        } else {
+            print("💾 [Persistence] ❌ Failed to encode accounts")
+        }
+    }
+
+    /// Persists transactions to UserDefaults (for validation state changes)
+    func saveTransactions() {
+        print("💾 [Persistence] Saving transactions with validation states...")
+        let encoder = JSONEncoder()
+        if let transactionsData = try? encoder.encode(transactions) {
+            UserDefaults.standard.set(transactionsData, forKey: "cached_transactions")
+            print("💾 [Persistence] ✅ Saved \(transactions.count) transactions")
+        } else {
+            print("💾 [Persistence] ❌ Failed to encode transactions")
+        }
+    }
+
+    /// Validates a transaction with optional bulk validation for similar transactions
+    /// - Parameters:
+    ///   - transaction: The transaction being validated
+    ///   - correctedCategory: New category if user corrected it, nil if confirming Plaid's category
+    ///   - applyToAll: If true, applies validation to all transactions with same Plaid detailed category
+    /// - Returns: Number of transactions validated
+    @discardableResult
+    func validateTransaction(
+        _ transaction: Transaction,
+        correctedCategory: BucketCategory?,
+        applyToAll: Bool
+    ) -> Int {
+        print("✅ [Validation] Starting validation for transaction: \(transaction.name)")
+        print("✅ [Validation] Corrected category: \(correctedCategory?.rawValue ?? "none")")
+        print("✅ [Validation] Apply to all: \(applyToAll)")
+
+        var validatedCount = 0
+
+        if applyToAll, let pfc = transaction.personalFinanceCategory {
+            // Find all transactions with same Plaid detailed category and bucket category
+            let targetBucketCategory = correctedCategory ?? transaction.bucketCategory
+            let matchingTransactions = transactions.filter { t in
+                // Match by Plaid detailed category
+                guard let tPfc = t.personalFinanceCategory else { return false }
+                guard tPfc.detailed == pfc.detailed else { return false }
+
+                // Only apply to unvalidated transactions in the same bucket
+                guard !t.userValidated else { return false }
+                guard t.bucketCategory == targetBucketCategory else { return false }
+
+                return true
+            }
+
+            print("✅ [Validation] Found \(matchingTransactions.count) matching transactions")
+
+            // Apply validation to all matching transactions
+            for matchingTransaction in matchingTransactions {
+                if let corrected = correctedCategory {
+                    matchingTransaction.userCorrectedCategory = corrected
+                }
+                matchingTransaction.userValidated = true
+                validatedCount += 1
+            }
+        } else {
+            // Apply to just this one transaction
+            if let corrected = correctedCategory {
+                transaction.userCorrectedCategory = corrected
+            }
+            transaction.userValidated = true
+            validatedCount = 1
+        }
+
+        print("✅ [Validation] Validated \(validatedCount) transaction(s)")
+
+        // Persist changes
+        saveTransactions()
+
+        // Force SwiftUI to detect changes by reassigning the array
+        // This triggers @Published wrapper to notify all observers (including badge counts)
+        self.transactions = self.transactions
+
+        return validatedCount
+    }
+
+    /// Counts matching transactions for bulk validation preview
+    /// - Parameter transaction: Transaction to find matches for
+    /// - Returns: Number of other unvalidated transactions with same Plaid detailed category
+    func countMatchingTransactions(_ transaction: Transaction) -> Int {
+        guard let pfc = transaction.personalFinanceCategory else { return 0 }
+
+        let targetBucketCategory = transaction.bucketCategory
+        let matchingCount = transactions.filter { t in
+            // Don't count the transaction itself
+            guard t.id != transaction.id else { return false }
+
+            // Match by Plaid detailed category
+            guard let tPfc = t.personalFinanceCategory else { return false }
+            guard tPfc.detailed == pfc.detailed else { return false }
+
+            // Only count unvalidated transactions in the same bucket
+            guard !t.userValidated else { return false }
+            guard t.bucketCategory == targetBucketCategory else { return false }
+
+            return true
+        }.count
+
+        return matchingCount
     }
 
     // MARK: - Private Helpers
@@ -1198,7 +1453,48 @@ class FinancialViewModel: ObservableObject {
             inferStateFromCache()
         }
 
+        // Load health metrics
+        loadCachedHealthMetrics()
+
         print("💾 [Cache Load] Cache load complete - Accounts: \(accounts.count), Transactions: \(transactions.count)")
+    }
+
+    // MARK: - Health Metrics Caching
+
+    /// Caches current health metrics and moves current to previous
+    private func cacheHealthMetrics() {
+        guard let metrics = healthMetrics else { return }
+
+        let encoder = JSONEncoder()
+        if let data = try? encoder.encode(metrics) {
+            // Move current to previous for next time
+            if let currentData = UserDefaults.standard.data(forKey: "cached_health_metrics") {
+                UserDefaults.standard.set(currentData, forKey: "cached_previous_health_metrics")
+            }
+
+            // Save new current
+            UserDefaults.standard.set(data, forKey: "cached_health_metrics")
+            print("💾 [Health] Saved health metrics to cache")
+        }
+    }
+
+    /// Loads current and previous health metrics from cache
+    private func loadCachedHealthMetrics() {
+        let decoder = JSONDecoder()
+
+        // Load current metrics
+        if let currentData = UserDefaults.standard.data(forKey: "cached_health_metrics"),
+           let current = try? decoder.decode(FinancialHealthMetrics.self, from: currentData) {
+            healthMetrics = current
+            print("💾 [Health] Loaded current health metrics from cache")
+        }
+
+        // Load previous metrics for comparison
+        if let previousData = UserDefaults.standard.data(forKey: "cached_previous_health_metrics"),
+           let previous = try? decoder.decode(FinancialHealthMetrics.self, from: previousData) {
+            previousHealthMetrics = previous
+            print("💾 [Health] Loaded previous health metrics for comparison")
+        }
     }
 
     /// Infers user journey state from cached data (for existing users after app update)
@@ -1207,19 +1503,29 @@ class FinancialViewModel: ObservableObject {
         print("   - Accounts: \(accounts.count)")
         print("   - Summary: \(summary != nil ? "exists" : "nil")")
         print("   - Budgets: \(budgetManager.budgets.count)")
+        print("   - Allocation Buckets: \(budgetManager.allocationBuckets.count)")
 
         if accounts.isEmpty {
             userJourneyState = .noAccountsConnected
             print("✅ [State] Inferred: .noAccountsConnected (no accounts)")
-        } else if budgetManager.budgets.isEmpty && summary == nil {
+        } else if budgetManager.budgets.isEmpty && budgetManager.allocationBuckets.isEmpty && summary == nil {
             userJourneyState = .accountsConnected
             print("✅ [State] Inferred: .accountsConnected (accounts exist, no analysis)")
-        } else if budgetManager.budgets.isEmpty && summary != nil {
+        } else if summary != nil && budgetManager.allocationBuckets.isEmpty {
+            // Has summary but no allocation buckets - analysis complete
             userJourneyState = .analysisComplete
-            print("✅ [State] Inferred: .analysisComplete (analysis exists, no budgets)")
-        } else {
+            print("✅ [State] Inferred: .analysisComplete (summary exists, awaiting plan creation)")
+        } else if budgetManager.budgets.isEmpty && !budgetManager.allocationBuckets.isEmpty {
+            // Has allocation buckets but no budgets - in allocation planning
+            userJourneyState = .allocationPlanning
+            print("✅ [State] Inferred: .allocationPlanning (allocation buckets exist, awaiting confirmation)")
+        } else if !budgetManager.budgets.isEmpty {
             userJourneyState = .planCreated
             print("✅ [State] Inferred: .planCreated (budgets exist)")
+        } else {
+            // Default to accountsConnected if unclear
+            userJourneyState = .accountsConnected
+            print("✅ [State] Inferred: .accountsConnected (default fallback)")
         }
     }
 
@@ -1236,16 +1542,13 @@ class FinancialViewModel: ObservableObject {
             if accounts.isEmpty {
                 print("⚠️ [State] WARNING: State is .accountsConnected but accounts is empty")
             }
-            if summary != nil {
-                print("⚠️ [State] WARNING: State is .accountsConnected but summary exists (analysis already run)")
-            }
 
         case .analysisComplete:
             if summary == nil {
                 print("⚠️ [State] WARNING: State is .analysisComplete but summary is nil")
             }
-            if !budgetManager.budgets.isEmpty {
-                print("⚠️ [State] WARNING: State is .analysisComplete but budgets exist (plan already created)")
+            if accounts.isEmpty {
+                print("⚠️ [State] WARNING: State is .analysisComplete but accounts is empty")
             }
 
         case .allocationPlanning:

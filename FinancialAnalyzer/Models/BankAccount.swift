@@ -1,5 +1,44 @@
 import Foundation
 
+/// User-defined tags for account designation
+/// Allows users to mark accounts for specific purposes to improve health calculations
+enum AccountTag: String, Codable, CaseIterable, Hashable {
+    case emergencyFund = "Emergency Fund"
+    case savingsGoal = "Savings Goal"
+    case retirement = "Retirement"
+    case investment = "Investment"
+    case billPay = "Bill Pay"
+    case discretionary = "Discretionary Spending"
+
+    var icon: String {
+        switch self {
+        case .emergencyFund: return "shield.fill"
+        case .savingsGoal: return "target"
+        case .retirement: return "chart.line.uptrend.xyaxis"
+        case .investment: return "chart.bar.fill"
+        case .billPay: return "dollarsign.circle.fill"
+        case .discretionary: return "creditcard.fill"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .emergencyFund:
+            return "3-12 months of essential expenses for emergencies"
+        case .savingsGoal:
+            return "Saving for specific goals (vacation, home, etc.)"
+        case .retirement:
+            return "Long-term retirement savings (401k, IRA, etc.)"
+        case .investment:
+            return "Investment accounts for wealth building"
+        case .billPay:
+            return "Primary account for paying bills and expenses"
+        case .discretionary:
+            return "Spending money for non-essential purchases"
+        }
+    }
+}
+
 final class BankAccount: Identifiable {
     var id: String
     var itemId: String
@@ -13,6 +52,9 @@ final class BankAccount: Identifiable {
     var limit: Double?
     var isoCurrencyCode: String?
     var lastSyncDate: Date?
+
+    // User-defined tags for account purposes
+    var tags: Set<AccountTag> = []
 
     init(
         id: String,
@@ -60,6 +102,28 @@ extension BankAccount {
     var isInvestment: Bool {
         type == "investment" || type == "brokerage"
     }
+
+    // MARK: - Tag Helpers
+
+    var isEmergencyFund: Bool {
+        tags.contains(.emergencyFund)
+    }
+
+    var isSavingsGoal: Bool {
+        tags.contains(.savingsGoal)
+    }
+
+    func addTag(_ tag: AccountTag) {
+        tags.insert(tag)
+    }
+
+    func removeTag(_ tag: AccountTag) {
+        tags.remove(tag)
+    }
+
+    func hasTag(_ tag: AccountTag) -> Bool {
+        tags.contains(tag)
+    }
 }
 
 // MARK: - Codable for Plaid API response
@@ -77,6 +141,7 @@ extension BankAccount: Codable {
         case limit
         case isoCurrencyCode
         case lastSyncDate
+        case tags
     }
 
     enum PlaidCodingKeys: String, CodingKey {
@@ -111,6 +176,7 @@ extension BankAccount: Codable {
         try container.encodeIfPresent(limit, forKey: .limit)
         try container.encodeIfPresent(isoCurrencyCode, forKey: .isoCurrencyCode)
         try container.encodeIfPresent(lastSyncDate, forKey: .lastSyncDate)
+        try container.encode(Array(tags), forKey: .tags) // Encode Set as Array
     }
 
     convenience init(from decoder: Decoder) throws {
@@ -162,6 +228,7 @@ extension BankAccount: Codable {
         let limit = try? container.decode(Double.self, forKey: .limit)
         let isoCurrencyCode = try? container.decode(String.self, forKey: .isoCurrencyCode)
         let lastSyncDate = try? container.decode(Date.self, forKey: .lastSyncDate)
+        let tagsArray = try container.decodeIfPresent([AccountTag].self, forKey: .tags) ?? []
 
         self.init(
             id: id,
@@ -177,5 +244,8 @@ extension BankAccount: Codable {
             isoCurrencyCode: isoCurrencyCode,
             lastSyncDate: lastSyncDate
         )
+
+        // Apply tags after initialization
+        self.tags = Set(tagsArray)
     }
 }

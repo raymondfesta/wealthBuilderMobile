@@ -1,0 +1,1089 @@
+{
+  "version": 2,
+  "seed": "financial_health_stress_test_2025_v2",
+  "override_accounts": [
+    {
+      "type": "depository",
+      "subtype": "checking",
+      "starting_balance": 3200,
+      "meta": {
+        "name": "Primary Checking",
+        "official_name": "Chase Total Checking"
+      },
+      "transactions": [
+        {
+          "date_posted": "2025-10-01",
+          "date_transacted": "2025-10-01",
+          "amount": -2500,
+          "description": "PAYROLL DEPOSIT - ACME CORP",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-15",
+          "date_transacted": "2025-10-15",
+          "amount": -2500,
+          "description": "PAYROLL DEPOSIT - ACME CORP",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-02",
+          "date_transacted": "2025-10-02",
+          "amount": 1200,
+          "description": "TRANSFER TO BILLS CHECKING",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-02",
+          "date_transacted": "2025-10-02",
+          "amount": 800,
+          "description": "TRANSFER TO DISCRETIONARY CASH",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-02",
+          "date_transacted": "2025-10-02",
+          "amount": 500,
+          "description": "TRANSFER TO EMERGENCY FUND",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-02",
+          "date_transacted": "2025-10-02",
+          "amount": 300,
+          "description": "TRANSFER TO SHORT-TERM GOALS",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-05",
+          "date_transacted": "2025-10-05",
+          "amount": 450,
+          "description": "CREDIT CARD PAYMENT - CHASE SAPPHIRE",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-01",
+          "date_transacted": "2025-09-01",
+          "amount": -2500,
+          "description": "PAYROLL DEPOSIT - ACME CORP",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-15",
+          "date_transacted": "2025-09-15",
+          "amount": -2500,
+          "description": "PAYROLL DEPOSIT - ACME CORP",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-02",
+          "date_transacted": "2025-09-02",
+          "amount": 1200,
+          "description": "TRANSFER TO BILLS CHECKING",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-02",
+          "date_transacted": "2025-09-02",
+          "amount": 800,
+          "description": "TRANSFER TO DISCRETIONARY CASH",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-08-01",
+          "date_transacted": "2025-08-01",
+          "amount": -2500,
+          "description": "PAYROLL DEPOSIT - ACME CORP",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-08-15",
+          "date_transacted": "2025-08-15",
+          "amount": -2500,
+          "description": "PAYROLL DEPOSIT - ACME CORP",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-07-01",
+          "date_transacted": "2025-07-01",
+          "amount": -2500,
+          "description": "PAYROLL DEPOSIT - ACME CORP",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-07-15",
+          "date_transacted": "2025-07-15",
+          "amount": -2500,
+          "description": "PAYROLL DEPOSIT - ACME CORP",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-06-01",
+          "date_transacted": "2025-06-01",
+          "amount": -2500,
+          "description": "PAYROLL DEPOSIT - ACME CORP",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-06-15",
+          "date_transacted": "2025-06-15",
+          "amount": -2500,
+          "description": "PAYROLL DEPOSIT - ACME CORP",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-06-30",
+          "date_transacted": "2025-06-30",
+          "amount": -750,
+          "description": "BONUS PAYMENT - ACME CORP Q2",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-05-01",
+          "date_transacted": "2025-05-01",
+          "amount": -2500,
+          "description": "PAYROLL DEPOSIT - ACME CORP",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-05-15",
+          "date_transacted": "2025-05-15",
+          "amount": -2500,
+          "description": "PAYROLL DEPOSIT - ACME CORP",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-04-01",
+          "date_transacted": "2025-04-01",
+          "amount": -2500,
+          "description": "PAYROLL DEPOSIT - ACME CORP",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-04-15",
+          "date_transacted": "2025-04-15",
+          "amount": -2500,
+          "description": "PAYROLL DEPOSIT - ACME CORP",
+          "currency": "USD"
+        }
+      ]
+    },
+    {
+      "type": "depository",
+      "subtype": "checking",
+      "starting_balance": 1850,
+      "meta": {
+        "name": "Bills Checking",
+        "official_name": "Chase Bills Account"
+      },
+      "transactions": [
+        {
+          "date_posted": "2025-10-02",
+          "date_transacted": "2025-10-02",
+          "amount": -1200,
+          "description": "TRANSFER FROM PRIMARY CHECKING",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-01",
+          "date_transacted": "2025-10-01",
+          "amount": 1800,
+          "description": "RENT PAYMENT - PROPERTYMANAGEMENT LLC",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-05",
+          "date_transacted": "2025-10-05",
+          "amount": 120,
+          "description": "PACIFIC GAS & ELECTRIC",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-08",
+          "date_transacted": "2025-10-08",
+          "amount": 65,
+          "description": "COMCAST INTERNET",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-10",
+          "date_transacted": "2025-10-10",
+          "amount": 45,
+          "description": "WATER UTILITY DEPARTMENT",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-12",
+          "date_transacted": "2025-10-12",
+          "amount": 15,
+          "description": "NETFLIX",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-12",
+          "date_transacted": "2025-10-12",
+          "amount": 10,
+          "description": "SPOTIFY",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-15",
+          "date_transacted": "2025-10-15",
+          "amount": 12,
+          "description": "APPLE ICLOUD STORAGE",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-18",
+          "date_transacted": "2025-10-18",
+          "amount": 85,
+          "description": "AUTO INSURANCE - GEICO",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-01",
+          "date_transacted": "2025-09-01",
+          "amount": 1800,
+          "description": "RENT PAYMENT - PROPERTYMANAGEMENT LLC",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-05",
+          "date_transacted": "2025-09-05",
+          "amount": 110,
+          "description": "PACIFIC GAS & ELECTRIC",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-08",
+          "date_transacted": "2025-09-08",
+          "amount": 65,
+          "description": "COMCAST INTERNET",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-08-01",
+          "date_transacted": "2025-08-01",
+          "amount": 1800,
+          "description": "RENT PAYMENT - PROPERTYMANAGEMENT LLC",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-07-01",
+          "date_transacted": "2025-07-01",
+          "amount": 1800,
+          "description": "RENT PAYMENT - PROPERTYMANAGEMENT LLC",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-06-01",
+          "date_transacted": "2025-06-01",
+          "amount": 1800,
+          "description": "RENT PAYMENT - PROPERTYMANAGEMENT LLC",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-05-01",
+          "date_transacted": "2025-05-01",
+          "amount": 1800,
+          "description": "RENT PAYMENT - PROPERTYMANAGEMENT LLC",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-04-01",
+          "date_transacted": "2025-04-01",
+          "amount": 1800,
+          "description": "RENT PAYMENT - PROPERTYMANAGEMENT LLC",
+          "currency": "USD"
+        }
+      ]
+    },
+    {
+      "type": "depository",
+      "subtype": "checking",
+      "starting_balance": 450,
+      "meta": {
+        "name": "Discretionary Cash Management",
+        "official_name": "Fidelity Cash Management"
+      },
+      "transactions": [
+        {
+          "date_posted": "2025-10-02",
+          "date_transacted": "2025-10-02",
+          "amount": -800,
+          "description": "TRANSFER FROM PRIMARY CHECKING",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-03",
+          "date_transacted": "2025-10-03",
+          "amount": 45,
+          "description": "STARBUCKS #2451",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-04",
+          "date_transacted": "2025-10-04",
+          "amount": 65,
+          "description": "CHIPOTLE MEXICAN GRILL",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-06",
+          "date_transacted": "2025-10-06",
+          "amount": 120,
+          "description": "AMAZON.COM",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-07",
+          "date_transacted": "2025-10-07",
+          "amount": 28,
+          "description": "PANERA BREAD",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-09",
+          "date_transacted": "2025-10-09",
+          "amount": 85,
+          "description": "TARGET STORE T-2145",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-11",
+          "date_transacted": "2025-10-11",
+          "amount": 15,
+          "description": "MOVIE THEATER AMC",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-13",
+          "date_transacted": "2025-10-13",
+          "amount": 42,
+          "description": "UBER TRIP",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-16",
+          "date_transacted": "2025-10-16",
+          "amount": 95,
+          "description": "NICE RESTAURANT DOWNTOWN",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-18",
+          "date_transacted": "2025-10-18",
+          "amount": 35,
+          "description": "BOOKSTORE",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-20",
+          "date_transacted": "2025-10-20",
+          "amount": 150,
+          "description": "ATHLETIC SHOES OUTLET",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-05",
+          "date_transacted": "2025-09-05",
+          "amount": 52,
+          "description": "WEEKEND BRUNCH SPOT",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-10",
+          "date_transacted": "2025-09-10",
+          "amount": 225,
+          "description": "BEST BUY - ELECTRONICS",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-08-14",
+          "date_transacted": "2025-08-14",
+          "amount": 180,
+          "description": "SPECIAL OCCASION DINNER",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-07-22",
+          "date_transacted": "2025-07-22",
+          "amount": 95,
+          "description": "CONCERT TICKETS",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-06-10",
+          "date_transacted": "2025-06-10",
+          "amount": 145,
+          "description": "SPORTING GOODS STORE",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-05-18",
+          "date_transacted": "2025-05-18",
+          "amount": 78,
+          "description": "SPA DAY TREAT",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-04-25",
+          "date_transacted": "2025-04-25",
+          "amount": 165,
+          "description": "CLOTHING STORE",
+          "currency": "USD"
+        }
+      ]
+    },
+    {
+      "type": "depository",
+      "subtype": "checking",
+      "starting_balance": 2800,
+      "meta": {
+        "name": "Emergency Buffer",
+        "official_name": "Ally Emergency Buffer"
+      },
+      "transactions": [
+        {
+          "date_posted": "2025-05-15",
+          "date_transacted": "2025-05-15",
+          "amount": -2800,
+          "description": "INITIAL EMERGENCY BUFFER FUNDING",
+          "currency": "USD"
+        }
+      ]
+    },
+    {
+      "type": "depository",
+      "subtype": "savings",
+      "starting_balance": 11500,
+      "meta": {
+        "name": "Emergency Fund - HYSA",
+        "official_name": "Marcus High Yield Savings"
+      },
+      "transactions": [
+        {
+          "date_posted": "2025-10-02",
+          "date_transacted": "2025-10-02",
+          "amount": -500,
+          "description": "MONTHLY TRANSFER FROM PRIMARY",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-31",
+          "date_transacted": "2025-10-31",
+          "amount": -42,
+          "description": "INTEREST PAYMENT",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-02",
+          "date_transacted": "2025-09-02",
+          "amount": -500,
+          "description": "MONTHLY TRANSFER FROM PRIMARY",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-30",
+          "date_transacted": "2025-09-30",
+          "amount": -40,
+          "description": "INTEREST PAYMENT",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-08-02",
+          "date_transacted": "2025-08-02",
+          "amount": -500,
+          "description": "MONTHLY TRANSFER FROM PRIMARY",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-08-31",
+          "date_transacted": "2025-08-31",
+          "amount": -38,
+          "description": "INTEREST PAYMENT",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-07-02",
+          "date_transacted": "2025-07-02",
+          "amount": -500,
+          "description": "MONTHLY TRANSFER FROM PRIMARY",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-07-31",
+          "date_transacted": "2025-07-31",
+          "amount": -37,
+          "description": "INTEREST PAYMENT",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-06-02",
+          "date_transacted": "2025-06-02",
+          "amount": -500,
+          "description": "MONTHLY TRANSFER FROM PRIMARY",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-06-30",
+          "date_transacted": "2025-06-30",
+          "amount": -36,
+          "description": "INTEREST PAYMENT",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-05-02",
+          "date_transacted": "2025-05-02",
+          "amount": -500,
+          "description": "MONTHLY TRANSFER FROM PRIMARY",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-05-31",
+          "date_transacted": "2025-05-31",
+          "amount": -35,
+          "description": "INTEREST PAYMENT",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-04-02",
+          "date_transacted": "2025-04-02",
+          "amount": -500,
+          "description": "MONTHLY TRANSFER FROM PRIMARY",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-04-30",
+          "date_transacted": "2025-04-30",
+          "amount": -34,
+          "description": "INTEREST PAYMENT",
+          "currency": "USD"
+        }
+      ]
+    },
+    {
+      "type": "depository",
+      "subtype": "savings",
+      "starting_balance": 3000,
+      "meta": {
+        "name": "Short-Term Goals",
+        "official_name": "Ally Short-Term Savings"
+      },
+      "transactions": [
+        {
+          "date_posted": "2025-10-02",
+          "date_transacted": "2025-10-02",
+          "amount": -300,
+          "description": "MONTHLY TRANSFER - VACATION FUND",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-02",
+          "date_transacted": "2025-09-02",
+          "amount": -300,
+          "description": "MONTHLY TRANSFER - VACATION FUND",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-08-02",
+          "date_transacted": "2025-08-02",
+          "amount": -300,
+          "description": "MONTHLY TRANSFER - VACATION FUND",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-07-02",
+          "date_transacted": "2025-07-02",
+          "amount": -300,
+          "description": "MONTHLY TRANSFER - VACATION FUND",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-06-02",
+          "date_transacted": "2025-06-02",
+          "amount": -300,
+          "description": "MONTHLY TRANSFER - VACATION FUND",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-05-02",
+          "date_transacted": "2025-05-02",
+          "amount": -300,
+          "description": "MONTHLY TRANSFER - VACATION FUND",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-04-02",
+          "date_transacted": "2025-04-02",
+          "amount": -300,
+          "description": "MONTHLY TRANSFER - VACATION FUND",
+          "currency": "USD"
+        }
+      ]
+    },
+    {
+      "type": "investment",
+      "subtype": "401k",
+      "starting_balance": 45800,
+      "meta": {
+        "name": "401k Retirement",
+        "official_name": "Fidelity 401k - ACME CORP"
+      },
+      "transactions": [
+        {
+          "date_posted": "2025-10-01",
+          "date_transacted": "2025-10-01",
+          "amount": -500,
+          "description": "EMPLOYEE CONTRIBUTION",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-01",
+          "date_transacted": "2025-10-01",
+          "amount": -250,
+          "description": "EMPLOYER MATCH",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-15",
+          "date_transacted": "2025-10-15",
+          "amount": -500,
+          "description": "EMPLOYEE CONTRIBUTION",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-15",
+          "date_transacted": "2025-10-15",
+          "amount": -250,
+          "description": "EMPLOYER MATCH",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-01",
+          "date_transacted": "2025-09-01",
+          "amount": -500,
+          "description": "EMPLOYEE CONTRIBUTION",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-01",
+          "date_transacted": "2025-09-01",
+          "amount": -250,
+          "description": "EMPLOYER MATCH",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-15",
+          "date_transacted": "2025-09-15",
+          "amount": -500,
+          "description": "EMPLOYEE CONTRIBUTION",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-15",
+          "date_transacted": "2025-09-15",
+          "amount": -250,
+          "description": "EMPLOYER MATCH",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-08-01",
+          "date_transacted": "2025-08-01",
+          "amount": -500,
+          "description": "EMPLOYEE CONTRIBUTION",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-08-01",
+          "date_transacted": "2025-08-01",
+          "amount": -250,
+          "description": "EMPLOYER MATCH",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-07-01",
+          "date_transacted": "2025-07-01",
+          "amount": -500,
+          "description": "EMPLOYEE CONTRIBUTION",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-06-01",
+          "date_transacted": "2025-06-01",
+          "amount": -500,
+          "description": "EMPLOYEE CONTRIBUTION",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-05-01",
+          "date_transacted": "2025-05-01",
+          "amount": -500,
+          "description": "EMPLOYEE CONTRIBUTION",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-04-01",
+          "date_transacted": "2025-04-01",
+          "amount": -500,
+          "description": "EMPLOYEE CONTRIBUTION",
+          "currency": "USD"
+        }
+      ]
+    },
+    {
+      "type": "investment",
+      "subtype": "ira",
+      "starting_balance": 21250,
+      "meta": {
+        "name": "Roth IRA",
+        "official_name": "Vanguard Roth IRA"
+      },
+      "transactions": [
+        {
+          "date_posted": "2025-10-01",
+          "date_transacted": "2025-10-01",
+          "amount": -500,
+          "description": "MONTHLY CONTRIBUTION",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-01",
+          "date_transacted": "2025-09-01",
+          "amount": -500,
+          "description": "MONTHLY CONTRIBUTION",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-08-01",
+          "date_transacted": "2025-08-01",
+          "amount": -500,
+          "description": "MONTHLY CONTRIBUTION",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-07-01",
+          "date_transacted": "2025-07-01",
+          "amount": -500,
+          "description": "MONTHLY CONTRIBUTION",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-06-01",
+          "date_transacted": "2025-06-01",
+          "amount": -500,
+          "description": "MONTHLY CONTRIBUTION",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-05-01",
+          "date_transacted": "2025-05-01",
+          "amount": -500,
+          "description": "MONTHLY CONTRIBUTION",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-04-01",
+          "date_transacted": "2025-04-01",
+          "amount": -500,
+          "description": "MONTHLY CONTRIBUTION",
+          "currency": "USD"
+        }
+      ]
+    },
+    {
+      "type": "investment",
+      "subtype": "brokerage",
+      "starting_balance": 14200,
+      "meta": {
+        "name": "Taxable Brokerage",
+        "official_name": "Vanguard Individual Brokerage"
+      },
+      "transactions": [
+        {
+          "date_posted": "2025-10-05",
+          "date_transacted": "2025-10-05",
+          "amount": -300,
+          "description": "AUTO INVESTMENT - VTI",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-20",
+          "date_transacted": "2025-10-20",
+          "amount": -32,
+          "description": "DIVIDEND - VANGUARD TOTAL STOCK",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-05",
+          "date_transacted": "2025-09-05",
+          "amount": -300,
+          "description": "AUTO INVESTMENT - VTI",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-20",
+          "date_transacted": "2025-09-20",
+          "amount": -30,
+          "description": "DIVIDEND - VANGUARD TOTAL STOCK",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-08-05",
+          "date_transacted": "2025-08-05",
+          "amount": -300,
+          "description": "AUTO INVESTMENT - VTI",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-08-20",
+          "date_transacted": "2025-08-20",
+          "amount": -28,
+          "description": "DIVIDEND - VANGUARD TOTAL STOCK",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-07-05",
+          "date_transacted": "2025-07-05",
+          "amount": -300,
+          "description": "AUTO INVESTMENT - VTI",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-07-20",
+          "date_transacted": "2025-07-20",
+          "amount": -26,
+          "description": "DIVIDEND - VANGUARD TOTAL STOCK",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-06-05",
+          "date_transacted": "2025-06-05",
+          "amount": -300,
+          "description": "AUTO INVESTMENT - VTI",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-06-20",
+          "date_transacted": "2025-06-20",
+          "amount": -25,
+          "description": "DIVIDEND - VANGUARD TOTAL STOCK",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-05-05",
+          "date_transacted": "2025-05-05",
+          "amount": -300,
+          "description": "AUTO INVESTMENT - VTI",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-05-20",
+          "date_transacted": "2025-05-20",
+          "amount": -24,
+          "description": "DIVIDEND - VANGUARD TOTAL STOCK",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-04-05",
+          "date_transacted": "2025-04-05",
+          "amount": -300,
+          "description": "AUTO INVESTMENT - VTI",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-04-20",
+          "date_transacted": "2025-04-20",
+          "amount": -22,
+          "description": "DIVIDEND - VANGUARD TOTAL STOCK",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-08-15",
+          "date_transacted": "2025-08-15",
+          "amount": -1000,
+          "description": "BUY - AAPL 5 SHARES @ $200",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-05-20",
+          "date_transacted": "2025-05-20",
+          "amount": -800,
+          "description": "BUY - MSFT 3 SHARES @ $266",
+          "currency": "USD"
+        }
+      ]
+    },
+    {
+      "type": "credit",
+      "subtype": "credit card",
+      "starting_balance": 1850,
+      "meta": {
+        "name": "Chase Sapphire Reserve",
+        "official_name": "Chase Sapphire Reserve Credit Card"
+      },
+      "transactions": [
+        {
+          "date_posted": "2025-10-03",
+          "date_transacted": "2025-10-03",
+          "amount": 75,
+          "description": "WHOLE FOODS MARKET",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-05",
+          "date_transacted": "2025-10-05",
+          "amount": 55,
+          "description": "SHELL GAS STATION",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-06",
+          "date_transacted": "2025-10-06",
+          "amount": 120,
+          "description": "COSTCO WHOLESALE",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-08",
+          "date_transacted": "2025-10-08",
+          "amount": 45,
+          "description": "CVS PHARMACY",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-10",
+          "date_transacted": "2025-10-10",
+          "amount": 85,
+          "description": "TRADER JOES",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-12",
+          "date_transacted": "2025-10-12",
+          "amount": 250,
+          "description": "AIRLINE TICKET - SOUTHWEST",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-14",
+          "date_transacted": "2025-10-14",
+          "amount": 195,
+          "description": "HOTEL STAY - MARRIOTT",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-17",
+          "date_transacted": "2025-10-17",
+          "amount": 85,
+          "description": "FINE DINING RESTAURANT",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-19",
+          "date_transacted": "2025-10-19",
+          "amount": 35,
+          "description": "CAR WASH PREMIUM",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-10-21",
+          "date_transacted": "2025-10-21",
+          "amount": -50,
+          "description": "REFUND - AMAZON RETURN",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-05",
+          "date_transacted": "2025-09-05",
+          "amount": -450,
+          "description": "PAYMENT - THANK YOU",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-08",
+          "date_transacted": "2025-09-08",
+          "amount": 125,
+          "description": "WHOLE FOODS MARKET",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-12",
+          "date_transacted": "2025-09-12",
+          "amount": 200,
+          "description": "GYM MEMBERSHIP ANNUAL",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-15",
+          "date_transacted": "2025-09-15",
+          "amount": 95,
+          "description": "SAFEWAY GROCERIES",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-18",
+          "date_transacted": "2025-09-18",
+          "amount": 48,
+          "description": "CHEVRON GAS",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-09-22",
+          "date_transacted": "2025-09-22",
+          "amount": 110,
+          "description": "KROGER GROCERIES",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-08-05",
+          "date_transacted": "2025-08-05",
+          "amount": 88,
+          "description": "SPROUTS FARMERS MARKET",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-08-10",
+          "date_transacted": "2025-08-10",
+          "amount": 75,
+          "description": "AMAZON PRIME - HOME GOODS",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-08-15",
+          "date_transacted": "2025-08-15",
+          "amount": 125,
+          "description": "HOME DEPOT - TOOLS",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-07-12",
+          "date_transacted": "2025-07-12",
+          "amount": 165,
+          "description": "RESTAURANT - ANNIVERSARY",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-06-18",
+          "date_transacted": "2025-06-18",
+          "amount": 220,
+          "description": "WEEKEND GETAWAY - HOTEL",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-05-25",
+          "date_transacted": "2025-05-25",
+          "amount": 145,
+          "description": "ELECTRONICS STORE",
+          "currency": "USD"
+        },
+        {
+          "date_posted": "2025-04-30",
+          "date_transacted": "2025-04-30",
+          "amount": 98,
+          "description": "AUTO PARTS STORE",
+          "currency": "USD"
+        }
+      ]
+    }
+  ]
+}

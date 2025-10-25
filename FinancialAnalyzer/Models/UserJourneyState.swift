@@ -32,7 +32,7 @@ enum UserJourneyState: String, Codable {
         case .accountsConnected:
             return "Ready to analyze your finances"
         case .analysisComplete:
-            return "Ready to create your financial plan"
+            return "Review your spending breakdown"
         case .allocationPlanning:
             return "Review AI-generated allocation recommendations"
         case .planCreated:
@@ -66,7 +66,7 @@ enum UserJourneyState: String, Codable {
     }
 
     var canCreatePlan: Bool {
-        self == .analysisComplete
+        self == .analysisComplete || self == .allocationPlanning
     }
 
     var canReviewAllocation: Bool {

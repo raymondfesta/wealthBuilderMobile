@@ -10,11 +10,9 @@ struct AllocationBucketCard: View {
     var onAmountChanged: ((Double) -> Void)?
     var onReset: (() -> Void)?
 
-    @State private var isExpanded: Bool = false
-    @State private var showingExplanation: Bool = false
+    @State private var showingDetailsSheet: Bool = false
     @State private var localAmount: Double = 0
-    @State private var isEditingTextField: Bool = false
-    @State private var emergencyFundMonths: Int = 6 // For Emergency Fund duration picker
+    @State private var debounceTask: Task<Void, Never>? = nil
 
     // Initialize local amount from editedAmount
     init(bucket: AllocationBucket, monthlyIncome: Double, editedAmount: Binding<Double>, originalAmount: Double? = nil, essentialSpendingAmount: Double? = nil, onAmountChanged: ((Double) -> Void)? = nil, onReset: (() -> Void)? = nil) {
@@ -26,61 +24,62 @@ struct AllocationBucketCard: View {
         self.onAmountChanged = onAmountChanged
         self.onReset = onReset
         self._localAmount = State(initialValue: editedAmount.wrappedValue)
-
-        // Initialize emergency fund months from bucket target (prevents race condition)
-        if bucket.type == .emergencyFund,
-           let targetAmount = bucket.targetAmount,
-           let essentialSpending = essentialSpendingAmount,
-           essentialSpending > 0 {
-            let months = Int(round(targetAmount / essentialSpending))
-            // Map to closest valid value (3, 6, or 12)
-            if months <= 4 {
-                self._emergencyFundMonths = State(initialValue: 3)
-            } else if months <= 9 {
-                self._emergencyFundMonths = State(initialValue: 6)
-            } else {
-                self._emergencyFundMonths = State(initialValue: 12)
-            }
-        } else {
-            self._emergencyFundMonths = State(initialValue: 6)
-        }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header: Icon, Name, Amount, Percentage
-            headerSection
+        VStack(alignment: .leading, spacing: 0) {
+            // Compressed header
+            compressedHeader
+                .padding(.bottom, 20)
 
-            // Emergency Fund: Show Target Duration picker instead of slider
+            // Hero number display
+            heroNumberSection
+                .padding(.bottom, 16)
+
+            // All modifiable buckets: Show custom slider
+            if bucket.isModifiable {
+                customSliderSection
+                    .padding(.bottom, 12)
+            }
+
+            // Emergency Fund: Show coverage info
             if bucket.type == .emergencyFund {
-                emergencyFundDurationPicker
-            }
-            // Other modifiable buckets: Show slider and text field
-            else if bucket.isModifiable {
-                sliderSection
-                textFieldSection
+                emergencyFundInfoDisplay
+                    .padding(.bottom, 12)
             }
 
-            // Expand/collapse button
-            expandButton
-
-            // Expandable details section (inside card)
-            if isExpanded {
-                Divider()
-                    .padding(.vertical, 8)
-
-                expandedDetailsContent
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+            // Contextual warnings
+            if bucket.type == .discretionarySpending {
+                discretionarySpendingWarning
+                    .padding(.bottom, 12)
             }
+
+            if bucket.type == .emergencyFund {
+                emergencyFundWarning
+                    .padding(.bottom, 12)
+            }
+
+            if bucket.type == .investments {
+                investmentsWarning
+                    .padding(.bottom, 12)
+            }
+
+            // "Why This Amount?" button
+            whyThisAmountButton
         }
-        .padding()
+        .padding(20)
         .background(Color(.systemBackground))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isExpanded)
+        .sheet(isPresented: $showingDetailsSheet) {
+            AllocationDetailsSheet(
+                bucket: bucket,
+                monthlyIncome: monthlyIncome,
+                essentialSpendingAmount: essentialSpendingAmount
+            )
+        }
         .onChange(of: editedAmount) { newValue in
             // Sync localAmount when parent updates the binding (e.g., auto-adjustment of other buckets)
-            // Only update if there's a meaningful difference to avoid fighting with user input
             if abs(localAmount - newValue) > 0.01 {
                 localAmount = newValue
             }
@@ -89,508 +88,338 @@ struct AllocationBucketCard: View {
 
     // MARK: - Subviews
 
-    private var headerSection: some View {
-        HStack(alignment: .top, spacing: 16) {
-            // Icon with colored background
+    /// Compressed header with icon, name, and action buttons
+    private var compressedHeader: some View {
+        HStack(spacing: 12) {
+            // Icon (smaller, 32px)
             ZStack {
                 Circle()
                     .fill(Color(hex: bucket.color).opacity(0.15))
-                    .frame(width: 56, height: 56)
+                    .frame(width: 32, height: 32)
 
                 Image(systemName: bucket.icon)
-                    .font(.system(size: 24))
+                    .font(.system(size: 16))
                     .foregroundColor(Color(hex: bucket.color))
             }
 
-            // Name and amount
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    Text(bucket.displayName)
-                        .font(.headline)
-                        .foregroundColor(.primary)
+            // Bucket name
+            Text(bucket.displayName)
+                .font(.subheadline)
+                .fontWeight(.semibold)
 
-                    // Non-modifiable badge
-                    if !bucket.isModifiable {
-                        Text("CALCULATED")
-                            .font(.caption2)
-                            .fontWeight(.bold)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.blue.opacity(0.2))
-                            .foregroundColor(.blue)
-                            .cornerRadius(4)
+            // Non-modifiable badge
+            if !bucket.isModifiable {
+                Text("LOCKED")
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.blue.opacity(0.2))
+                    .foregroundColor(.blue)
+                    .cornerRadius(4)
+            }
+
+            Spacer()
+
+            // Lock toggle button (for modifiable buckets)
+            if bucket.isModifiable {
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        bucket.isLocked.toggle()
                     }
+                    let generator = UIImpactFeedbackGenerator(style: .light)
+                    generator.impactOccurred()
+                } label: {
+                    Image(systemName: bucket.isLocked ? "lock.fill" : "lock.open.fill")
+                        .font(.subheadline)
+                        .foregroundColor(bucket.isLocked ? .orange : .secondary)
+                        .rotationEffect(.degrees(bucket.isLocked ? 0 : 15))
                 }
+                .accessibilityLabel(bucket.isLocked ? "Unlock bucket" : "Lock bucket")
+            }
+
+            // Info button
+            Button {
+                showingDetailsSheet = true
+                let generator = UIImpactFeedbackGenerator(style: .light)
+                generator.impactOccurred()
+            } label: {
+                Image(systemName: "info.circle")
+                    .font(.subheadline)
+                    .foregroundColor(.blue)
+            }
+            .accessibilityLabel("Show allocation details")
+        }
+    }
+
+    /// Hero number section - makes the amount the visual focal point
+    private var heroNumberSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            // Amount - largest element (48pt)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(formatCurrency(editedAmount))
+                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .foregroundColor(Color(hex: bucket.color))
+
+                // Change indicator (only if changed)
+                if bucket.isModifiable && abs(bucket.changeFromOriginal) > 0.01 {
+                    changeIndicatorBadge
+                        .transition(.scale.combined(with: .opacity))
+                }
+
+                // Reset button (if changed)
+                if bucket.isModifiable && hasChanged && onReset != nil {
+                    Button {
+                        onReset?()
+                        let generator = UINotificationFeedbackGenerator()
+                        generator.notificationOccurred(.success)
+                    } label: {
+                        Image(systemName: "arrow.counterclockwise.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(.blue)
+                    }
+                    .accessibilityLabel("Reset to suggested amount")
+                }
+            }
+
+            // Percentage and description
+            HStack(spacing: 8) {
+                Text("\(Int(percentageOfIncome))%")
+                    .font(.title3)
+                    .foregroundColor(.secondary)
+
+                Text("•")
+                    .font(.title3)
+                    .foregroundColor(.secondary)
 
                 Text(bucket.description)
                     .font(.caption)
                     .foregroundColor(.secondary)
-                    .lineLimit(2)
-
-                Spacer().frame(height: 4)
-
-                // Current allocated amount with reset button
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(formatCurrency(editedAmount))
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(Color(hex: bucket.color))
-
-                    // Show reset button if amount changed and bucket is modifiable
-                    if bucket.isModifiable && hasChanged && onReset != nil {
-                        Button {
-                            onReset?()
-                        } label: {
-                            Image(systemName: "arrow.counterclockwise.circle.fill")
-                                .font(.title3)
-                                .foregroundColor(.blue)
-                        }
-                        .accessibilityLabel("Reset to suggested amount")
-                    }
-                }
-
-                // Percentage of income
-                Text("\(Int(percentageOfIncome))% of monthly income")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .lineLimit(1)
             }
-
-            Spacer()
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(bucket.displayName), \(formatCurrency(editedAmount)), \(Int(percentageOfIncome))% of income")
     }
 
-    private var sliderSection: some View {
+    /// Custom slider section with color-coded safety zones
+    private var customSliderSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(bucket.isModifiable ? "Adjust Allocation" : "Calculated Amount")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.secondary)
-
-                if !bucket.isModifiable {
-                    Spacer()
-                    Text("Based on your actual spending data")
-                        .font(.caption)
-                        .foregroundColor(.blue)
+            // Custom slider with safety zones
+            CustomSlider(
+                value: $localAmount,
+                in: 0...monthlyIncome,
+                step: 50,
+                recommendedValue: bucket.getRecommendedMinimum(monthlyIncome: monthlyIncome),
+                warningThreshold: bucket.getRecommendedMinimum(monthlyIncome: monthlyIncome) * 0.5,
+                hardLimit: bucket.getMaxSafeAllocation(monthlyIncome: monthlyIncome, otherBuckets: []),
+                color: Color(hex: bucket.color),
+                onEditingChanged: { editing in
+                    if !editing {
+                        updateAmount(localAmount)
+                    }
                 }
-            }
+            )
 
-            HStack(spacing: 12) {
+            // Min/Max labels
+            HStack {
                 Text("$0")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                    .frame(width: 30, alignment: .leading)
 
-                Slider(
-                    value: $localAmount,
-                    in: 0...(monthlyIncome),
-                    step: 50,
-                    onEditingChanged: { editing in
-                        if !editing {
-                            // User finished sliding
-                            updateAmount(localAmount)
-                        }
-                    }
-                )
-                .tint(Color(hex: bucket.color))
-                .disabled(!bucket.isModifiable)
-                .opacity(bucket.isModifiable ? 1.0 : 0.5)
-                .accessibilityLabel("Allocation amount slider")
-                .accessibilityValue("\(formatCurrency(localAmount))")
-                .accessibilityHint(bucket.isModifiable ? "Adjust the amount allocated to \(bucket.displayName)" : "This amount is calculated and cannot be changed")
+                Spacer()
 
                 Text(formatCurrency(monthlyIncome))
                     .font(.caption)
                     .foregroundColor(.secondary)
-                    .frame(width: 60, alignment: .trailing)
             }
         }
     }
 
-    private var textFieldSection: some View {
-        HStack {
-            Text("Precise Amount:")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+    /// Emergency Fund information display - shows coverage and time to goal
+    private var emergencyFundInfoDisplay: some View {
+        Group {
+            if let essentialSpending = essentialSpendingAmount, essentialSpending > 0 {
+                VStack(alignment: .leading, spacing: 12) {
+                    // Coverage and Goal metrics
+                    HStack(spacing: 16) {
+                        // Current Coverage
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Current Coverage")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
 
-            Spacer()
-
-            HStack(spacing: 4) {
-                Text("$")
-                    .foregroundColor(.secondary)
-
-                TextField("0", value: $localAmount, format: .number)
-                    .keyboardType(.decimalPad)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 100)
-                    .multilineTextAlignment(.trailing)
-                    .disabled(!bucket.isModifiable)
-                    .opacity(bucket.isModifiable ? 1.0 : 0.7)
-                    .onChange(of: localAmount) { newValue in
-                        // Clamp to valid range
-                        if newValue > monthlyIncome {
-                            localAmount = monthlyIncome
-                        } else if newValue < 0 {
-                            localAmount = 0
+                            let monthsCovered = editedAmount / essentialSpending
+                            Text(String(format: "%.1f months", monthsCovered))
+                                .font(.title3)
+                                .fontWeight(.bold)
+                                .foregroundColor(monthsCovered >= 6 ? .green : .orange)
                         }
-                        updateAmount(localAmount)
+
+                        Spacer()
+
+                        // Time to 6-month goal
+                        VStack(alignment: .trailing, spacing: 4) {
+                            Text("To 6-Month Goal")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+
+                            let targetAmount = essentialSpending * 6.0
+                            let monthsToGoal = editedAmount > 0 ? Int(ceil(targetAmount / editedAmount)) : 0
+                            Text("\(monthsToGoal) months")
+                                .font(.title3)
+                                .fontWeight(.bold)
+                                .foregroundColor(.blue)
+                        }
                     }
-                    .accessibilityLabel("Precise allocation amount")
-                    .accessibilityHint(bucket.isModifiable ? "Enter exact dollar amount for \(bucket.displayName)" : "This amount is calculated and cannot be changed")
-            }
-        }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(8)
-        .opacity(bucket.isModifiable ? 1.0 : 0.7)
-    }
+                    .padding(12)
+                    .background(Color.orange.opacity(0.1))
+                    .cornerRadius(12)
 
-    private var emergencyFundDurationPicker: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Duration picker header
-            HStack {
-                Text("Target Duration")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.secondary)
-
-                Spacer()
-
-                if let essentialSpending = essentialSpendingAmount {
-                    Text("Based on \(formatCurrency(essentialSpending))/mo essential")
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                }
-            }
-
-            // Segmented picker for months
-            Picker("Emergency Fund Months", selection: $emergencyFundMonths) {
-                Text("3 months").tag(3)
-                Text("6 months").tag(6)
-                Text("12 months").tag(12)
-            }
-            .pickerStyle(.segmented)
-            .onChange(of: emergencyFundMonths) { newValue in
-                print("🎯 [EmergencyFund] Picker changed to \(newValue) months")
-
-                // Get the CURRENT essential spending from editedBuckets (after any adjustments)
-                guard let essentialSpending = essentialSpendingAmount, essentialSpending > 0 else {
-                    print("   ⚠️ Essential spending amount not available or invalid, cannot calculate")
-                    return
-                }
-
-                // Target = essential spending × selected months
-                let targetAmount = essentialSpending * Double(newValue)
-
-                // Update the bucket's target amount (this is metadata, not the allocation)
-                bucket.targetAmount = targetAmount
-
-                // Assume 2-year savings period (24 months) as reasonable default
-                let savingsPeriodMonths = 24.0
-
-                // Monthly allocation = target / savings period
-                let newAmount = targetAmount / savingsPeriodMonths
-
-                // Clamp to valid range (0 to monthly income)
-                let clampedAmount = min(max(newAmount, 0), monthlyIncome)
-
-                print("   ↳ New target: \(formatCurrency(targetAmount))")
-                print("   ↳ Calculated new monthly amount: \(formatCurrency(clampedAmount))")
-
-                // Update local amount first to prevent state desync
-                localAmount = clampedAmount
-
-                // CRITICAL: Use DispatchQueue.main.async to ensure state update completes before triggering parent update
-                DispatchQueue.main.async {
-                    updateAmount(clampedAmount)
-                }
-            }
-
-            // Show calculated target
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Emergency Fund Target")
+                    // Explanation text
+                    Text("At \(formatCurrency(editedAmount))/month, you're building an emergency fund to cover 6 months of essential expenses (\(formatCurrency(essentialSpending))/month).")
                         .font(.caption)
                         .foregroundColor(.secondary)
-
-                    if let essentialSpending = essentialSpendingAmount {
-                        Text(formatCurrency(essentialSpending * Double(emergencyFundMonths)))
-                            .font(.title3)
-                            .fontWeight(.bold)
-                            .foregroundColor(.orange)
-                    }
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("Monthly Allocation")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    Text(formatCurrency(editedAmount))
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundColor(Color(hex: bucket.color))
                 }
             }
-            .padding()
-            .background(Color.orange.opacity(0.1))
-            .cornerRadius(12)
         }
-        .padding(.vertical, 8)
-        .accessibilityLabel("Emergency fund target duration")
-        .accessibilityValue("\(emergencyFundMonths) months")
     }
 
-    private var expandButton: some View {
+    /// Button to open details sheet
+    private var whyThisAmountButton: some View {
         Button {
-            withAnimation {
-                isExpanded.toggle()
-            }
+            showingDetailsSheet = true
+            let generator = UIImpactFeedbackGenerator(style: .light)
+            generator.impactOccurred()
         } label: {
             HStack {
-                Image(systemName: "info.circle")
+                Image(systemName: "info.circle.fill")
                     .foregroundColor(Color(hex: bucket.color))
 
-                Text(isExpanded ? "Hide Details" : "Why This Amount?")
+                Text("Why This Amount?")
                     .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(Color(hex: bucket.color))
+                    .fontWeight(.semibold)
 
                 Spacer()
 
-                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            .padding(.vertical, 8)
-        }
-        .accessibilityLabel(isExpanded ? "Hide allocation details" : "Show allocation details")
-    }
-
-    private var expandedDetailsContent: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // AI Explanation
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "sparkles")
-                        .foregroundColor(.purple)
-                    Text("AI Recommendation")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                }
-
-                Text(bucket.explanation)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding()
-            .background(Color.purple.opacity(0.05))
+            .padding(12)
+            .background(Color(hex: bucket.color).opacity(0.05))
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.purple.opacity(0.2), lineWidth: 1)
+                    .stroke(Color(hex: bucket.color).opacity(0.2), lineWidth: 1)
             )
+        }
+        .accessibilityLabel("Show allocation details and explanation")
+    }
 
-            // Emergency Fund specific details
-            if bucket.type == .emergencyFund,
-               let targetAmount = bucket.targetAmount,
-               let monthsToTarget = bucket.monthsToTarget {
-                emergencyFundDetails(targetAmount: targetAmount, monthsToTarget: monthsToTarget)
-            }
+    /// Warning for Emergency Fund below recommended minimum
+    private var emergencyFundWarning: some View {
+        let recommendedMinimum = bucket.getRecommendedMinimum(monthlyIncome: monthlyIncome)
+        let isBelowMinimum = editedAmount < recommendedMinimum
 
-            // Linked categories (for spending buckets)
-            if !bucket.linkedBudgetCategories.isEmpty {
-                linkedCategoriesSection
+        return Group {
+            if isBelowMinimum {
+                warningBox(
+                    icon: "exclamationmark.triangle.fill",
+                    color: .orange,
+                    title: "Below Recommended Minimum",
+                    message: "Your emergency fund allocation is below the recommended \(Int(bucket.recommendedMinimumPercentage))% (\(formatCurrency(recommendedMinimum))). Consider increasing this for better financial security."
+                )
             }
         }
     }
 
-    private func emergencyFundDetails(targetAmount: Double, monthsToTarget: Int) -> some View {
-        // Use the target amount from the bucket (already calculated)
-        let calculatedTarget = targetAmount
-        let calculatedMonthsToTarget = calculatedTarget > 0 && editedAmount > 0 ? Int(ceil(calculatedTarget / editedAmount)) : 0
-        // Derive the months from the target amount and essential spending
-        let targetMonths = essentialSpendingAmount ?? 0 > 0 ? Int(calculatedTarget / (essentialSpendingAmount ?? 1)) : 6
+    /// Warning for Investments below recommended minimum
+    private var investmentsWarning: some View {
+        let recommendedMinimum = bucket.getRecommendedMinimum(monthlyIncome: monthlyIncome)
+        let isBelowMinimum = editedAmount < recommendedMinimum
 
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "target")
-                    .foregroundColor(.orange)
-                Text("Emergency Fund Goal")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-            }
-
-            // Calculation breakdown
-            if let essentialSpending = essentialSpendingAmount {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Calculation")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.secondary)
-
-                    HStack {
-                        Text("Essential Spending:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        Text("\(formatCurrency(essentialSpending))/month")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                    }
-
-                    HStack {
-                        Text("× \(targetMonths) months")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        Text("=")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-
-                    HStack {
-                        Text("Target Amount:")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.primary)
-                        Spacer()
-                        Text(formatCurrency(calculatedTarget))
-                            .font(.subheadline)
-                            .fontWeight(.bold)
-                            .foregroundColor(.orange)
-                    }
-                }
-                .padding(.vertical, 8)
-            }
-
-            Divider()
-
-            // Current contribution and timeline
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Monthly Contribution:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text(formatCurrency(editedAmount))
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                }
-
-                HStack {
-                    Text("Time to Reach Goal:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text("\(calculatedMonthsToTarget) months")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                }
-
-                // Progress visualization
-                let progress = calculatedTarget > 0 ? min(editedAmount * Double(calculatedMonthsToTarget) / calculatedTarget, 1.0) : 0
-                VStack(alignment: .leading, spacing: 4) {
-                    ProgressView(value: progress)
-                        .tint(.green)
-                    Text("Projected completion: \(Int(progress * 100))%")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
+        return Group {
+            if isBelowMinimum {
+                warningBox(
+                    icon: "info.circle.fill",
+                    color: .blue,
+                    title: "Low Investment Allocation",
+                    message: "Allocating at least \(Int(bucket.recommendedMinimumPercentage))% (\(formatCurrency(recommendedMinimum))) to investments helps build long-term wealth and prepare for retirement."
+                )
             }
         }
+    }
+
+    private var discretionarySpendingWarning: some View {
+        let validation = bucket.validateDiscretionarySpending(monthlyIncome: monthlyIncome)
+
+        return Group {
+            switch validation {
+            case .valid:
+                EmptyView()
+            case .warning(let percentage):
+                warningBox(
+                    icon: "exclamationmark.triangle.fill",
+                    color: .orange,
+                    title: "High Discretionary Spending",
+                    message: "At \(Int(percentage))% of income. Financial experts recommend keeping this below 35% for better savings and financial flexibility."
+                )
+            case .hardLimit(let percentage):
+                warningBox(
+                    icon: "xmark.octagon.fill",
+                    color: .red,
+                    title: "Discretionary Spending Limit Exceeded",
+                    message: "At \(Int(percentage))% of income. Please reduce to 50% or below. Excessive discretionary spending can prevent building emergency funds and achieving financial goals."
+                )
+            }
+        }
+    }
+
+    private func warningBox(icon: String, color: Color, title: String, message: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                    .font(.subheadline)
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(color)
+            }
+
+            Text(message)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
         .padding()
-        .background(Color.orange.opacity(0.05))
+        .background(color.opacity(0.1))
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.orange.opacity(0.2), lineWidth: 1)
+                .stroke(color.opacity(0.3), lineWidth: 1.5)
         )
     }
 
-    private var linkedCategoriesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "tag.fill")
-                    .foregroundColor(.blue)
-                Text("Included Spending Categories")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-            }
+    private var changeIndicatorBadge: some View {
+        let change = bucket.changeFromOriginal
+        let isIncrease = change > 0
+        let arrow = isIncrease ? "↑" : "↓"
+        let color: Color = isIncrease ? .green : .orange
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("This allocation covers your spending in the following categories:")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                // Display categories as detailed rows
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(bucket.linkedBudgetCategories, id: \.self) { category in
-                        HStack(spacing: 8) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.caption)
-                                .foregroundColor(Color(hex: bucket.color))
-
-                            Text(category)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-
-                            Spacer()
-
-                            // Visual indicator badge
-                            Text(categoryBadgeText(for: category))
-                                .font(.caption2)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color(hex: bucket.color).opacity(0.15))
-                                .foregroundColor(Color(hex: bucket.color))
-                                .cornerRadius(6)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-                .padding()
-                .background(Color(.secondarySystemBackground))
-                .cornerRadius(8)
-
-                // Help text
-                Text("Your actual spending in these categories was analyzed to determine this allocation amount.")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                    .italic()
-            }
+        return HStack(spacing: 2) {
+            Text(arrow)
+                .font(.caption)
+                .fontWeight(.bold)
+            Text(formatCurrency(abs(change)))
+                .font(.caption)
+                .fontWeight(.semibold)
         }
-        .padding()
-        .background(Color.blue.opacity(0.05))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.blue.opacity(0.2), lineWidth: 1)
-        )
-    }
-
-    private func categoryBadgeText(for category: String) -> String {
-        // Map common categories to helpful badges
-        let badges: [String: String] = [
-            "Groceries": "ESSENTIAL",
-            "Rent": "ESSENTIAL",
-            "Utilities": "ESSENTIAL",
-            "Transportation": "ESSENTIAL",
-            "Insurance": "ESSENTIAL",
-            "Healthcare": "ESSENTIAL",
-            "Entertainment": "LIFESTYLE",
-            "Dining": "LIFESTYLE",
-            "Shopping": "LIFESTYLE",
-            "Travel": "LIFESTYLE",
-            "Hobbies": "LIFESTYLE"
-        ]
-        return badges[category] ?? "TRACKED"
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(color.opacity(0.15))
+        .foregroundColor(color)
+        .cornerRadius(8)
+        .accessibilityLabel("\(isIncrease ? "Increased" : "Decreased") by \(formatCurrency(abs(change)))")
     }
 
     // MARK: - Computed Properties
@@ -614,9 +443,11 @@ struct AllocationBucketCard: View {
         }
 
         print("   🔄 [AllocationBucketCard] \(bucket.displayName) updateAmount: \(formatCurrency(editedAmount)) → \(formatCurrency(newAmount))")
+
         editedAmount = newAmount
         onAmountChanged?(newAmount)
     }
+
 
     private func formatCurrency(_ amount: Double) -> String {
         let formatter = NumberFormatter()
@@ -682,35 +513,6 @@ struct FlowLayout: Layout {
     }
 }
 
-// MARK: - Color Hex Extension
-
-extension Color {
-    /// Initialize Color from hex string (e.g., "#FF5733" or "FF5733")
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-
-        let r, g, b: UInt64
-        switch hex.count {
-        case 3: // RGB (12-bit)
-            (r, g, b) = ((int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6: // RGB (24-bit)
-            (r, g, b) = (int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (r, g, b) = (0, 0, 0)
-        }
-
-        self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue: Double(b) / 255,
-            opacity: 1
-        )
-    }
-}
-
 // MARK: - Preview
 
 #Preview("Allocation Bucket Card") {
@@ -724,7 +526,7 @@ extension Color {
         monthsToTarget: 50
     )
 
-    return ScrollView {
+    ScrollView {
         VStack(spacing: 20) {
             AllocationBucketCard(
                 bucket: emergencyBucket,

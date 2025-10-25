@@ -3,7 +3,78 @@ import Foundation
 struct TransactionAnalyzer {
     // MARK: - Category to Bucket Mapping
 
+    /// Categorizes a transaction into a high-level bucket using Plaid's Personal Finance Category
+    /// Leverages 90%+ accuracy from Plaid's PFC taxonomy with confidence scoring
     static func categorizeToBucket(
+        amount: Double,
+        category: [String],
+        categoryId: String?,
+        personalFinanceCategory: PersonalFinanceCategory? = nil
+    ) -> BucketCategory {
+        // PRIORITY 1: Use Plaid Personal Finance Category if available with HIGH confidence
+        if let pfc = personalFinanceCategory,
+           pfc.confidenceLevel == .veryHigh || pfc.confidenceLevel == .high {
+            let bucket = mapPFCToBucket(pfc.primary, detailed: pfc.detailed, amount: amount)
+            print("📊 [PFC] Using Plaid category '\(pfc.primary)' (\(pfc.confidenceLevel.rawValue)) → \(bucket.rawValue)")
+            return bucket
+        }
+
+        // PRIORITY 2: Use Plaid PFC even with lower confidence (better than keyword matching)
+        if let pfc = personalFinanceCategory {
+            let bucket = mapPFCToBucket(pfc.primary, detailed: pfc.detailed, amount: amount)
+            print("⚠️ [PFC] Using Plaid category '\(pfc.primary)' (\(pfc.confidenceLevel.rawValue) confidence) → \(bucket.rawValue)")
+            return bucket
+        }
+
+        // FALLBACK: Use legacy keyword matching (less accurate, should trigger validation)
+        print("⚠️ [Legacy] No PFC data, using keyword matching (needs validation)")
+        return legacyCategorizeToBucket(amount: amount, category: category, categoryId: categoryId)
+    }
+
+    /// Maps Plaid's Personal Finance Category to our 6 high-level buckets
+    /// Based on Plaid's 16 primary categories
+    private static func mapPFCToBucket(_ primary: String, detailed: String, amount: Double) -> BucketCategory {
+        let primaryUpper = primary.uppercased()
+
+        switch primaryUpper {
+        case "INCOME":
+            return .income
+
+        case "TRANSFER_IN":
+            // Money coming in - treat as income unless it's between own accounts
+            if detailed.contains("ACCOUNT") {
+                return .cash // Internal transfer
+            }
+            return .income
+
+        case "TRANSFER_OUT":
+            // Check if it's going to investment/savings
+            if detailed.contains("INVESTMENT") || detailed.contains("RETIREMENT") || detailed.contains("SAVINGS") {
+                return .invested
+            }
+            // Check if it's a loan/debt payment
+            if detailed.contains("LOAN") || detailed.contains("CREDIT") {
+                return .debt
+            }
+            return .expenses
+
+        case "LOAN_PAYMENTS":
+            return .debt
+
+        case "BANK_FEES", "RENT_AND_UTILITIES", "FOOD_AND_DRINK",
+             "GENERAL_MERCHANDISE", "HOME_IMPROVEMENT", "MEDICAL",
+             "PERSONAL_CARE", "GENERAL_SERVICES", "GOVERNMENT_AND_NON_PROFIT",
+             "TRANSPORTATION", "TRAVEL", "ENTERTAINMENT":
+            return .expenses
+
+        default:
+            // Unknown PFC category - use amount to guess
+            return amount < 0 ? .income : .expenses
+        }
+    }
+
+    /// Legacy categorization using keyword matching (less accurate, kept as fallback)
+    private static func legacyCategorizeToBucket(
         amount: Double,
         category: [String],
         categoryId: String?

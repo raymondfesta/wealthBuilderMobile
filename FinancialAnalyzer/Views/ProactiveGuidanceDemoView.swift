@@ -185,6 +185,27 @@ struct ProactiveGuidanceDemoView: View {
                     Text("⚠️ This will delete ALL data (Keychain tokens, cached accounts, transactions, budgets, goals) and restart the app. Use this to test a completely fresh install.")
                         .font(.caption)
                         .foregroundColor(.red)
+
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Pro Tip: Automatic Reset", systemImage: "lightbulb.fill")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.blue)
+
+                        Text("Enable '-ResetDataOnLaunch' in Xcode scheme settings to automatically clear all data on every build. No more manual reset steps!")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        Text("Xcode → Product → Scheme → Edit Scheme → Arguments → Check '-ResetDataOnLaunch'")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .italic()
+                    }
+                    .padding(12)
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(8)
                 }
 
                 // Section 8: Instructions
@@ -219,75 +240,14 @@ struct ProactiveGuidanceDemoView: View {
     // MARK: - Actions
 
     /// Completely wipes all app data and restarts for testing purposes
+    /// Uses DataResetManager for centralized reset logic
     private func clearAllDataAndRestart() {
-        print("🗑️ [Reset] ===== STARTING COMPLETE DATA WIPE =====")
-
-        // 1. Clear Keychain (all access tokens)
-        do {
-            let allKeys = try KeychainService.shared.allKeys()
-            print("🗑️ [Reset] Found \(allKeys.count) Keychain item(s) to delete")
-
-            for key in allKeys {
-                do {
-                    try KeychainService.shared.delete(for: key)
-                    print("🗑️ [Reset] ✅ Deleted Keychain item: \(key)")
-                } catch {
-                    print("🗑️ [Reset] ⚠️ Failed to delete Keychain item '\(key)': \(error)")
-                }
-            }
-            print("🗑️ [Reset] Keychain cleared (\(allKeys.count) items removed)")
-        } catch {
-            print("🗑️ [Reset] ⚠️ Error listing Keychain keys: \(error)")
-        }
-
-        // 2. Clear UserDefaults (all cached data)
-        print("🗑️ [Reset] Clearing UserDefaults cache...")
-        let keysToRemove = [
-            "cached_accounts",
-            "cached_transactions",
-            "cached_summary",
-            "cached_budgets",
-            "cached_goals",
-            "cached_allocation_buckets",
-            "hasSeenWelcome",
-            "hasCompletedOnboarding"
-        ]
-
-        for key in keysToRemove {
-            UserDefaults.standard.removeObject(forKey: key)
-            print("🗑️ [Reset] ✅ Removed UserDefaults key: \(key)")
-        }
-        UserDefaults.standard.synchronize()
-        print("🗑️ [Reset] UserDefaults cleared (\(keysToRemove.count) keys removed)")
-
-        // 3. Reset ViewModel state
-        print("🗑️ [Reset] Resetting ViewModel state...")
-        viewModel.accounts.removeAll()
-        viewModel.transactions.removeAll()
-        viewModel.budgetManager.budgets.removeAll()
-        viewModel.budgetManager.goals.removeAll()
-        viewModel.budgetManager.allocationBuckets.removeAll()
-        viewModel.summary = nil
-        viewModel.currentAlert = nil
-        viewModel.isShowingGuidance = false
-        viewModel.error = nil
-        print("🗑️ [Reset] ViewModel state cleared")
-
-        // 4. Cancel any pending notifications
-        print("🗑️ [Reset] Canceling all pending notifications...")
-        NotificationService.shared.cancelAllNotifications()
-        print("🗑️ [Reset] All notifications canceled")
-
-        // 5. Final log and exit
-        print("✅ [Reset] ===== DATA WIPE COMPLETE =====")
-        print("✅ [Reset] App will now exit. Please relaunch manually to see fresh state.")
-
-        // Small delay to ensure logs are printed
         Task {
-            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-
-            // Force app termination for clean restart
-            exit(0)
+            await DataResetManager.resetAll(
+                viewModel: viewModel,
+                includeBackend: true,
+                shouldExit: true
+            )
         }
     }
 

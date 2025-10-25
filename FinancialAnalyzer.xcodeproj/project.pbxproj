@@ -1,0 +1,616 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		991CAD642EAD528200000EDB /* FinancialHealthMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD612EAD528200000EDB /* FinancialHealthMetrics.swift */; };
+		991CAD652EAD528200000EDB /* LoadingStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD622EAD528200000EDB /* LoadingStep.swift */; };
+		991CAD662EAD528200000EDB /* PersonalFinanceCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD632EAD528200000EDB /* PersonalFinanceCategory.swift */; };
+		991CAD682EAD529E00000EDB /* FinancialHealthCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD672EAD529E00000EDB /* FinancialHealthCalculator.swift */; };
+		991CAD712EAD531400000EDB /* FinancialHealthReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD6E2EAD531400000EDB /* FinancialHealthReportView.swift */; };
+		991CAD722EAD531400000EDB /* ConnectedAccountsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD6A2EAD531400000EDB /* ConnectedAccountsSheet.swift */; };
+		991CAD732EAD531400000EDB /* AllocationDetailsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD692EAD531400000EDB /* AllocationDetailsSheet.swift */; };
+		991CAD742EAD531400000EDB /* CustomSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD6B2EAD531400000EDB /* CustomSlider.swift */; };
+		991CAD752EAD531400000EDB /* HealthReportEmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD6F2EAD531400000EDB /* HealthReportEmptyStateView.swift */; };
+		991CAD762EAD531400000EDB /* HealthReportSetupFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD702EAD531400000EDB /* HealthReportSetupFlow.swift */; };
+		991CAD772EAD531400000EDB /* DebugView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD6C2EAD531400000EDB /* DebugView.swift */; };
+		991CAD782EAD531400000EDB /* FinancialHealthDashboardSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD6D2EAD531400000EDB /* FinancialHealthDashboardSection.swift */; };
+		991CAD7B2EAD533300000EDB /* HealthReportComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD792EAD533300000EDB /* HealthReportComponents.swift */; };
+		991CAD7F2EAD535300000EDB /* DataResetManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD7D2EAD535300000EDB /* DataResetManager.swift */; };
+		991CAD802EAD535300000EDB /* ColorPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD7C2EAD535300000EDB /* ColorPalette.swift */; };
+		991CAD812EAD535300000EDB /* UserDefaultsExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD7E2EAD535300000EDB /* UserDefaultsExtension.swift */; };
+		991CAD852EAD537200000EDB /* ColorExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD822EAD537200000EDB /* ColorExtensions.swift */; };
+		991CAD862EAD537200000EDB /* HapticFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD832EAD537200000EDB /* HapticFeedback.swift */; };
+		991CAD882EAD544300000EDB /* AllocationEditorViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD872EAD544300000EDB /* AllocationEditorViewModel.swift */; };
+		9978B8F32EA811860065A5FE /* SuccessBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9978B8F22EA811860065A5FE /* SuccessBanner.swift */; };
+		9978B8F42EA811860065A5FE /* AddBudgetSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9978B8F02EA811860065A5FE /* AddBudgetSheet.swift */; };
+		9978B8F52EA811860065A5FE /* LoadingOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9978B8F12EA811860065A5FE /* LoadingOverlay.swift */; };
+		9978B8F72EA8399C0065A5FE /* AllocationBucket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9978B8F62EA8399C0065A5FE /* AllocationBucket.swift */; };
+		9978B8FB2EA839BB0065A5FE /* AllocationBucketDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9978B8F92EA839BB0065A5FE /* AllocationBucketDetailView.swift */; };
+		9978B8FC2EA839BB0065A5FE /* AllocationBucketCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9978B8F82EA839BB0065A5FE /* AllocationBucketCard.swift */; };
+		9978B8FD2EA839BB0065A5FE /* AllocationPlannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9978B8FA2EA839BB0065A5FE /* AllocationPlannerView.swift */; };
+		99806AC42E94D1CB00114B52 /* Budget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99806AC22E94D1CB00114B52 /* Budget.swift */; };
+		99806AC52E94D1CB00114B52 /* Goal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99806AC32E94D1CB00114B52 /* Goal.swift */; };
+		99806ACA2E94D20E00114B52 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99806AC82E94D20E00114B52 /* NotificationService.swift */; };
+		99806ACB2E94D20E00114B52 /* AlertRulesEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99806AC62E94D20E00114B52 /* AlertRulesEngine.swift */; };
+		99806ACC2E94D20E00114B52 /* SpendingPatternAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99806AC92E94D20E00114B52 /* SpendingPatternAnalyzer.swift */; };
+		99806ACD2E94D20E00114B52 /* BudgetManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99806AC72E94D20E00114B52 /* BudgetManager.swift */; };
+		99806ACE2E94D24F00114B52 /* NotificationNavigationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99806ACD2E94D24F00114B52 /* NotificationNavigationCoordinator.swift */; };
+		99806AD02E94D22C00114B52 /* ProactiveGuidanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99806ACF2E94D22C00114B52 /* ProactiveGuidanceView.swift */; };
+		99806AD12E94D22C00114B52 /* ProactiveGuidanceDemoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99806ACE2E94D22C00114B52 /* ProactiveGuidanceDemoView.swift */; };
+		99CA9B802EAC1FA600822E05 /* TransactionValidationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99CA9B7F2EAC1FA600822E05 /* TransactionValidationSheet.swift */; };
+		99CA9B812EAC1FA600822E05 /* AccountTagSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99CA9B7E2EAC1FA600822E05 /* AccountTagSheet.swift */; };
+		FA001001 /* FinancialAnalyzerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA001000 /* FinancialAnalyzerApp.swift */; };
+		FA001002 /* Transaction.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA002000 /* Transaction.swift */; };
+		FA001003 /* BankAccount.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA002001 /* BankAccount.swift */; };
+		FA001004 /* BucketCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA002002 /* BucketCategory.swift */; };
+		FA001005 /* FinancialSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA002003 /* FinancialSummary.swift */; };
+		FA001006 /* PlaidService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA003000 /* PlaidService.swift */; };
+		FA001007 /* TransactionAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA003001 /* TransactionAnalyzer.swift */; };
+		FA001008 /* FinancialViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA004000 /* FinancialViewModel.swift */; };
+		FA001009 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA005000 /* DashboardView.swift */; };
+		FA001010 /* TransactionsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA005001 /* TransactionsListView.swift */; };
+		FA001011 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA005002 /* OnboardingView.swift */; };
+		FA001012 /* AccountsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA005003 /* AccountsView.swift */; };
+		FA001013 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA006000 /* KeychainService.swift */; };
+		FA001014 /* LinkKit in Frameworks */ = {isa = PBXBuildFile; productRef = FA007000 /* LinkKit */; };
+		FA001015 /* CategoryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA005005 /* CategoryDetailView.swift */; };
+		FA001016 /* WelcomePageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA005006 /* WelcomePageView.swift */; };
+		FA001017 /* AIInsightService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA003003 /* AIInsightService.swift */; };
+		FA001018 /* UserJourneyState.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA002005 /* UserJourneyState.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		991CAD612EAD528200000EDB /* FinancialHealthMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialHealthMetrics.swift; sourceTree = "<group>"; };
+		991CAD622EAD528200000EDB /* LoadingStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingStep.swift; sourceTree = "<group>"; };
+		991CAD632EAD528200000EDB /* PersonalFinanceCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalFinanceCategory.swift; sourceTree = "<group>"; };
+		991CAD672EAD529E00000EDB /* FinancialHealthCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialHealthCalculator.swift; sourceTree = "<group>"; };
+		991CAD692EAD531400000EDB /* AllocationDetailsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationDetailsSheet.swift; sourceTree = "<group>"; };
+		991CAD6A2EAD531400000EDB /* ConnectedAccountsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectedAccountsSheet.swift; sourceTree = "<group>"; };
+		991CAD6B2EAD531400000EDB /* CustomSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomSlider.swift; sourceTree = "<group>"; };
+		991CAD6C2EAD531400000EDB /* DebugView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugView.swift; sourceTree = "<group>"; };
+		991CAD6D2EAD531400000EDB /* FinancialHealthDashboardSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialHealthDashboardSection.swift; sourceTree = "<group>"; };
+		991CAD6E2EAD531400000EDB /* FinancialHealthReportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialHealthReportView.swift; sourceTree = "<group>"; };
+		991CAD6F2EAD531400000EDB /* HealthReportEmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthReportEmptyStateView.swift; sourceTree = "<group>"; };
+		991CAD702EAD531400000EDB /* HealthReportSetupFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthReportSetupFlow.swift; sourceTree = "<group>"; };
+		991CAD792EAD533300000EDB /* HealthReportComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthReportComponents.swift; sourceTree = "<group>"; };
+		991CAD7C2EAD535300000EDB /* ColorPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorPalette.swift; sourceTree = "<group>"; };
+		991CAD7D2EAD535300000EDB /* DataResetManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataResetManager.swift; sourceTree = "<group>"; };
+		991CAD7E2EAD535300000EDB /* UserDefaultsExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDefaultsExtension.swift; sourceTree = "<group>"; };
+		991CAD822EAD537200000EDB /* ColorExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorExtensions.swift; sourceTree = "<group>"; };
+		991CAD832EAD537200000EDB /* HapticFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticFeedback.swift; sourceTree = "<group>"; };
+		991CAD872EAD544300000EDB /* AllocationEditorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationEditorViewModel.swift; sourceTree = "<group>"; };
+		9978B8F02EA811860065A5FE /* AddBudgetSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBudgetSheet.swift; sourceTree = "<group>"; };
+		9978B8F12EA811860065A5FE /* LoadingOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingOverlay.swift; sourceTree = "<group>"; };
+		9978B8F22EA811860065A5FE /* SuccessBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuccessBanner.swift; sourceTree = "<group>"; };
+		9978B8F62EA8399C0065A5FE /* AllocationBucket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationBucket.swift; sourceTree = "<group>"; };
+		9978B8F82EA839BB0065A5FE /* AllocationBucketCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationBucketCard.swift; sourceTree = "<group>"; };
+		9978B8F92EA839BB0065A5FE /* AllocationBucketDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationBucketDetailView.swift; sourceTree = "<group>"; };
+		9978B8FA2EA839BB0065A5FE /* AllocationPlannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationPlannerView.swift; sourceTree = "<group>"; };
+		99806AC22E94D1CB00114B52 /* Budget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Budget.swift; sourceTree = "<group>"; };
+		99806AC32E94D1CB00114B52 /* Goal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Goal.swift; sourceTree = "<group>"; };
+		99806AC62E94D20E00114B52 /* AlertRulesEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertRulesEngine.swift; sourceTree = "<group>"; };
+		99806AC72E94D20E00114B52 /* BudgetManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetManager.swift; sourceTree = "<group>"; };
+		99806AC82E94D20E00114B52 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		99806AC92E94D20E00114B52 /* SpendingPatternAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendingPatternAnalyzer.swift; sourceTree = "<group>"; };
+		99806ACD2E94D24F00114B52 /* NotificationNavigationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationNavigationCoordinator.swift; sourceTree = "<group>"; };
+		99806ACE2E94D22C00114B52 /* ProactiveGuidanceDemoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProactiveGuidanceDemoView.swift; sourceTree = "<group>"; };
+		99806ACF2E94D22C00114B52 /* ProactiveGuidanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProactiveGuidanceView.swift; sourceTree = "<group>"; };
+		99CA9B7E2EAC1FA600822E05 /* AccountTagSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountTagSheet.swift; sourceTree = "<group>"; };
+		99CA9B7F2EAC1FA600822E05 /* TransactionValidationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionValidationSheet.swift; sourceTree = "<group>"; };
+		FA000001 /* FinancialAnalyzer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FinancialAnalyzer.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FA001000 /* FinancialAnalyzerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialAnalyzerApp.swift; sourceTree = "<group>"; };
+		FA002000 /* Transaction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Transaction.swift; sourceTree = "<group>"; };
+		FA002001 /* BankAccount.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BankAccount.swift; sourceTree = "<group>"; };
+		FA002002 /* BucketCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BucketCategory.swift; sourceTree = "<group>"; };
+		FA002003 /* FinancialSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialSummary.swift; sourceTree = "<group>"; };
+		FA002005 /* UserJourneyState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserJourneyState.swift; sourceTree = "<group>"; };
+		FA003000 /* PlaidService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaidService.swift; sourceTree = "<group>"; };
+		FA003001 /* TransactionAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionAnalyzer.swift; sourceTree = "<group>"; };
+		FA003003 /* AIInsightService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIInsightService.swift; sourceTree = "<group>"; };
+		FA004000 /* FinancialViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialViewModel.swift; sourceTree = "<group>"; };
+		FA005000 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		FA005001 /* TransactionsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionsListView.swift; sourceTree = "<group>"; };
+		FA005002 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		FA005003 /* AccountsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsView.swift; sourceTree = "<group>"; };
+		FA005005 /* CategoryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryDetailView.swift; sourceTree = "<group>"; };
+		FA005006 /* WelcomePageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomePageView.swift; sourceTree = "<group>"; };
+		FA006000 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		FA000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FA001014 /* LinkKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		991CAD7A2EAD533300000EDB /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				991CAD792EAD533300000EDB /* HealthReportComponents.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		991CAD842EAD537200000EDB /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+				991CAD822EAD537200000EDB /* ColorExtensions.swift */,
+				991CAD832EAD537200000EDB /* HapticFeedback.swift */,
+			);
+			path = Extensions;
+			sourceTree = "<group>";
+		};
+		FA000000 = {
+			isa = PBXGroup;
+			children = (
+				FA000003 /* FinancialAnalyzer */,
+				FA000004 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		FA000003 /* FinancialAnalyzer */ = {
+			isa = PBXGroup;
+			children = (
+				991CAD842EAD537200000EDB /* Extensions */,
+				FA001000 /* FinancialAnalyzerApp.swift */,
+				FA002004 /* Models */,
+				FA003002 /* Services */,
+				FA004001 /* ViewModels */,
+				FA005004 /* Views */,
+				FA006001 /* Utilities */,
+			);
+			path = FinancialAnalyzer;
+			sourceTree = "<group>";
+		};
+		FA000004 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				FA000001 /* FinancialAnalyzer.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		FA002004 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				991CAD612EAD528200000EDB /* FinancialHealthMetrics.swift */,
+				991CAD622EAD528200000EDB /* LoadingStep.swift */,
+				991CAD632EAD528200000EDB /* PersonalFinanceCategory.swift */,
+				FA002000 /* Transaction.swift */,
+				FA002001 /* BankAccount.swift */,
+				99806AC22E94D1CB00114B52 /* Budget.swift */,
+				99806AC32E94D1CB00114B52 /* Goal.swift */,
+				FA002005 /* UserJourneyState.swift */,
+				FA002002 /* BucketCategory.swift */,
+				FA002003 /* FinancialSummary.swift */,
+				9978B8F62EA8399C0065A5FE /* AllocationBucket.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		FA003002 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				991CAD672EAD529E00000EDB /* FinancialHealthCalculator.swift */,
+				FA003000 /* PlaidService.swift */,
+				FA003003 /* AIInsightService.swift */,
+				99806AC62E94D20E00114B52 /* AlertRulesEngine.swift */,
+				99806AC72E94D20E00114B52 /* BudgetManager.swift */,
+				99806AC82E94D20E00114B52 /* NotificationService.swift */,
+				99806ACD2E94D24F00114B52 /* NotificationNavigationCoordinator.swift */,
+				99806AC92E94D20E00114B52 /* SpendingPatternAnalyzer.swift */,
+				FA003001 /* TransactionAnalyzer.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		FA004001 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				991CAD872EAD544300000EDB /* AllocationEditorViewModel.swift */,
+				FA004000 /* FinancialViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		FA005004 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				991CAD7A2EAD533300000EDB /* Components */,
+				9978B8F02EA811860065A5FE /* AddBudgetSheet.swift */,
+				9978B8F12EA811860065A5FE /* LoadingOverlay.swift */,
+				9978B8F22EA811860065A5FE /* SuccessBanner.swift */,
+				991CAD692EAD531400000EDB /* AllocationDetailsSheet.swift */,
+				991CAD6A2EAD531400000EDB /* ConnectedAccountsSheet.swift */,
+				991CAD6B2EAD531400000EDB /* CustomSlider.swift */,
+				991CAD6C2EAD531400000EDB /* DebugView.swift */,
+				991CAD6D2EAD531400000EDB /* FinancialHealthDashboardSection.swift */,
+				991CAD6E2EAD531400000EDB /* FinancialHealthReportView.swift */,
+				991CAD6F2EAD531400000EDB /* HealthReportEmptyStateView.swift */,
+				991CAD702EAD531400000EDB /* HealthReportSetupFlow.swift */,
+				99CA9B7E2EAC1FA600822E05 /* AccountTagSheet.swift */,
+				99CA9B7F2EAC1FA600822E05 /* TransactionValidationSheet.swift */,
+				FA005000 /* DashboardView.swift */,
+				FA005001 /* TransactionsListView.swift */,
+				99806ACE2E94D22C00114B52 /* ProactiveGuidanceDemoView.swift */,
+				99806ACF2E94D22C00114B52 /* ProactiveGuidanceView.swift */,
+				FA005002 /* OnboardingView.swift */,
+				FA005006 /* WelcomePageView.swift */,
+				FA005003 /* AccountsView.swift */,
+				FA005005 /* CategoryDetailView.swift */,
+				9978B8F82EA839BB0065A5FE /* AllocationBucketCard.swift */,
+				9978B8F92EA839BB0065A5FE /* AllocationBucketDetailView.swift */,
+				9978B8FA2EA839BB0065A5FE /* AllocationPlannerView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		FA006001 /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				991CAD7C2EAD535300000EDB /* ColorPalette.swift */,
+				991CAD7D2EAD535300000EDB /* DataResetManager.swift */,
+				991CAD7E2EAD535300000EDB /* UserDefaultsExtension.swift */,
+				FA006000 /* KeychainService.swift */,
+			);
+			path = Utilities;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		FA000005 /* FinancialAnalyzer */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FA000006 /* Build configuration list for PBXNativeTarget "FinancialAnalyzer" */;
+			buildPhases = (
+				FA000007 /* Sources */,
+				FA000002 /* Frameworks */,
+				FA000008 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FinancialAnalyzer;
+			packageProductDependencies = (
+				FA007000 /* LinkKit */,
+			);
+			productName = FinancialAnalyzer;
+			productReference = FA000001 /* FinancialAnalyzer.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		FA000009 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+			};
+			buildConfigurationList = FA000010 /* Build configuration list for PBXProject "FinancialAnalyzer" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = FA000000;
+			packageReferences = (
+				FA007001 /* XCRemoteSwiftPackageReference "plaid-link-ios" */,
+			);
+			productRefGroup = FA000004 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				FA000005 /* FinancialAnalyzer */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		FA000008 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		FA000007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				99806AC42E94D1CB00114B52 /* Budget.swift in Sources */,
+				9978B8F72EA8399C0065A5FE /* AllocationBucket.swift in Sources */,
+				99806AC52E94D1CB00114B52 /* Goal.swift in Sources */,
+				991CAD882EAD544300000EDB /* AllocationEditorViewModel.swift in Sources */,
+				99806AD02E94D22C00114B52 /* ProactiveGuidanceView.swift in Sources */,
+				99806AD12E94D22C00114B52 /* ProactiveGuidanceDemoView.swift in Sources */,
+				FA001001 /* FinancialAnalyzerApp.swift in Sources */,
+				FA001002 /* Transaction.swift in Sources */,
+				FA001003 /* BankAccount.swift in Sources */,
+				FA001004 /* BucketCategory.swift in Sources */,
+				FA001005 /* FinancialSummary.swift in Sources */,
+				99CA9B802EAC1FA600822E05 /* TransactionValidationSheet.swift in Sources */,
+				99CA9B812EAC1FA600822E05 /* AccountTagSheet.swift in Sources */,
+				FA001006 /* PlaidService.swift in Sources */,
+				9978B8F32EA811860065A5FE /* SuccessBanner.swift in Sources */,
+				9978B8F42EA811860065A5FE /* AddBudgetSheet.swift in Sources */,
+				9978B8F52EA811860065A5FE /* LoadingOverlay.swift in Sources */,
+				FA001007 /* TransactionAnalyzer.swift in Sources */,
+				FA001008 /* FinancialViewModel.swift in Sources */,
+				FA001009 /* DashboardView.swift in Sources */,
+				991CAD712EAD531400000EDB /* FinancialHealthReportView.swift in Sources */,
+				991CAD722EAD531400000EDB /* ConnectedAccountsSheet.swift in Sources */,
+				991CAD732EAD531400000EDB /* AllocationDetailsSheet.swift in Sources */,
+				991CAD742EAD531400000EDB /* CustomSlider.swift in Sources */,
+				991CAD752EAD531400000EDB /* HealthReportEmptyStateView.swift in Sources */,
+				991CAD762EAD531400000EDB /* HealthReportSetupFlow.swift in Sources */,
+				991CAD772EAD531400000EDB /* DebugView.swift in Sources */,
+				991CAD782EAD531400000EDB /* FinancialHealthDashboardSection.swift in Sources */,
+				FA001010 /* TransactionsListView.swift in Sources */,
+				FA001011 /* OnboardingView.swift in Sources */,
+				FA001016 /* WelcomePageView.swift in Sources */,
+				FA001012 /* AccountsView.swift in Sources */,
+				99806ACA2E94D20E00114B52 /* NotificationService.swift in Sources */,
+				991CAD852EAD537200000EDB /* ColorExtensions.swift in Sources */,
+				991CAD862EAD537200000EDB /* HapticFeedback.swift in Sources */,
+				99806ACB2E94D20E00114B52 /* AlertRulesEngine.swift in Sources */,
+				99806ACC2E94D20E00114B52 /* SpendingPatternAnalyzer.swift in Sources */,
+				991CAD682EAD529E00000EDB /* FinancialHealthCalculator.swift in Sources */,
+				99806ACD2E94D20E00114B52 /* BudgetManager.swift in Sources */,
+				99806ACE2E94D24F00114B52 /* NotificationNavigationCoordinator.swift in Sources */,
+				FA001013 /* KeychainService.swift in Sources */,
+				991CAD642EAD528200000EDB /* FinancialHealthMetrics.swift in Sources */,
+				991CAD652EAD528200000EDB /* LoadingStep.swift in Sources */,
+				991CAD662EAD528200000EDB /* PersonalFinanceCategory.swift in Sources */,
+				9978B8FB2EA839BB0065A5FE /* AllocationBucketDetailView.swift in Sources */,
+				9978B8FC2EA839BB0065A5FE /* AllocationBucketCard.swift in Sources */,
+				9978B8FD2EA839BB0065A5FE /* AllocationPlannerView.swift in Sources */,
+				FA001015 /* CategoryDetailView.swift in Sources */,
+				FA001017 /* AIInsightService.swift in Sources */,
+				FA001018 /* UserJourneyState.swift in Sources */,
+				991CAD7F2EAD535300000EDB /* DataResetManager.swift in Sources */,
+				991CAD802EAD535300000EDB /* ColorPalette.swift in Sources */,
+				991CAD812EAD535300000EDB /* UserDefaultsExtension.swift in Sources */,
+				991CAD7B2EAD533300000EDB /* HealthReportComponents.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		FA000011 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		FA000012 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		FA000013 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = K47QW2G55A;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Financial Analyzer";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.financialanalyzer.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		FA000014 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = K47QW2G55A;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Financial Analyzer";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.financialanalyzer.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		FA000006 /* Build configuration list for PBXNativeTarget "FinancialAnalyzer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FA000013 /* Debug */,
+				FA000014 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FA000010 /* Build configuration list for PBXProject "FinancialAnalyzer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FA000011 /* Debug */,
+				FA000012 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		FA007001 /* XCRemoteSwiftPackageReference "plaid-link-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/plaid/plaid-link-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		FA007000 /* LinkKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FA007001 /* XCRemoteSwiftPackageReference "plaid-link-ios" */;
+			productName = LinkKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = FA000009 /* Project object */;
+}

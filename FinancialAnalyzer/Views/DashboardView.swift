@@ -4,6 +4,8 @@ struct DashboardView: View {
     @ObservedObject var viewModel: FinancialViewModel
     @State private var selectedBucket: BucketCategory?
     @State private var showAddBudgetSheet = false
+    @State private var showConnectedAccountsSheet = false
+    @State private var showHealthSetupFlow = false
 
     var body: some View {
         ZStack {
@@ -33,6 +35,31 @@ struct DashboardView: View {
             .id(viewModel.userJourneyState) // Reset scroll position when state changes
             .navigationTitle(navigationTitle)
             .toolbar {
+                // Health Report Button (only in planCreated state)
+                if viewModel.userJourneyState == .planCreated {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button {
+                            // Mark as viewed
+                            UserDefaults.standard.set(true, forKey: "has_viewed_health_report")
+                            viewModel.showHealthReport = true
+                        } label: {
+                            ZStack(alignment: .topTrailing) {
+                                Image(systemName: "chart.line.uptrend.xyaxis")
+                                    .imageScale(.large)
+
+                                // "New" badge (red dot)
+                                if !UserDefaults.standard.bool(forKey: "has_viewed_health_report") {
+                                    Circle()
+                                        .fill(Color.red)
+                                        .frame(width: 8, height: 8)
+                                        .offset(x: 6, y: -6)
+                                }
+                            }
+                        }
+                        .accessibilityLabel("Financial Health Report")
+                    }
+                }
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     // Only show + button if we have accounts but not during allocation planning
                     if viewModel.userJourneyState != .noAccountsConnected && viewModel.userJourneyState != .allocationPlanning {
@@ -64,6 +91,37 @@ struct DashboardView: View {
             .sheet(isPresented: $showAddBudgetSheet) {
                 AddBudgetSheet(budgetManager: viewModel.budgetManager)
             }
+            .sheet(isPresented: $viewModel.showHealthReport) {
+                NavigationStack {
+                    FinancialHealthReportView(
+                        healthMetrics: viewModel.healthMetrics,
+                        onSetupHealthReport: {
+                            // Close health report, open setup flow
+                            viewModel.showHealthReport = false
+                            showHealthSetupFlow = true
+                        },
+                        onDismiss: {
+                            viewModel.showHealthReport = false
+                        }
+                    )
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button("Done") {
+                                viewModel.showHealthReport = false
+                            }
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $showHealthSetupFlow) {
+                HealthReportSetupFlow(viewModel: viewModel)
+                    .onDisappear {
+                        // After setup completes, automatically show the health report
+                        if viewModel.healthMetrics != nil {
+                            viewModel.showHealthReport = true
+                        }
+                    }
+            }
             }
 
             // Loading overlay
@@ -89,7 +147,7 @@ struct DashboardView: View {
         case .accountsConnected:
             return "Accounts Connected"
         case .analysisComplete:
-            return "Analysis Report"
+            return "Analysis Complete"
         case .allocationPlanning:
             return "Plan Your Budget"
         case .planCreated:
@@ -142,86 +200,94 @@ struct DashboardView: View {
 
     /// View shown after accounts are connected but before analysis
     private var accountsConnectedView: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 32) {
+            Spacer()
+
             // Success message
-            VStack(spacing: 12) {
+            VStack(spacing: 16) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 60))
+                    .font(.system(size: 80))
                     .foregroundColor(.green)
 
                 Text("Accounts Connected!")
-                    .font(.title2)
+                    .font(.title)
                     .fontWeight(.bold)
 
                 Text("You've connected \(viewModel.accounts.count) account\(viewModel.accounts.count == 1 ? "" : "s")")
-                    .font(.subheadline)
+                    .font(.body)
                     .foregroundColor(.secondary)
-            }
-            .padding(.top, 40)
 
-            // Show connected accounts
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Connected Accounts")
-                    .font(.headline)
-                    .padding(.horizontal)
-
-                ForEach(viewModel.accounts, id: \.id) { account in
+                // View Connected Accounts button
+                Button {
+                    showConnectedAccountsSheet = true
+                } label: {
                     HStack {
-                        Image(systemName: "building.columns.fill")
-                            .foregroundColor(.blue)
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(account.name)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-
-                            Text((account.mask ?? "").isEmpty ? account.id : "**** \(account.mask ?? "")")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-
-                        Spacer()
-
-                        Text(formatCurrency(account.currentBalance ?? 0))
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
+                        Image(systemName: "list.bullet")
+                        Text("View Connected Accounts")
                     }
-                    .padding()
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(12)
+                    .font(.subheadline)
+                    .foregroundColor(.blue)
                 }
-                .padding(.horizontal)
+                .padding(.top, 8)
             }
 
             Spacer()
 
-            // Next step CTA
-            VStack(spacing: 12) {
-                Text("Ready for the next step?")
-                    .font(.headline)
-
-                Text("We'll analyze your transactions and identify spending patterns")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-
-                Button {
-                    Task {
-                        await viewModel.analyzeMyFinances()
-                    }
-                } label: {
-                    Label("Analyze My Transactions", systemImage: "chart.bar.doc.horizontal.fill")
+            // Next step section
+            VStack(spacing: 20) {
+                VStack(spacing: 12) {
+                    Text("Ready for the next step?")
                         .font(.headline)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
+
+                    Text("We'll analyze your transactions and identify spending patterns")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                }
+
+                // Action buttons
+                VStack(spacing: 12) {
+                    // Primary CTA - Analyze Transactions
+                    Button {
+                        Task {
+                            await viewModel.analyzeMyFinances()
+                        }
+                    } label: {
+                        Label("Analyze My Transactions", systemImage: "chart.bar.doc.horizontal.fill")
+                            .font(.headline)
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
+                    }
+
+                    // Secondary CTA - Connect Another Account
+                    Button {
+                        Task {
+                            await viewModel.connectBankAccount(from: nil)
+                        }
+                    } label: {
+                        Label("Connect Another Account", systemImage: "plus.circle")
+                            .font(.headline)
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(Color.clear)
+                            .foregroundColor(.blue)
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.blue, lineWidth: 2)
+                            )
+                    }
                 }
                 .padding(.horizontal, 32)
             }
-            .padding(.bottom, 24)
+            .padding(.bottom, 32)
+        }
+        .sheet(isPresented: $showConnectedAccountsSheet) {
+            ConnectedAccountsSheet(viewModel: viewModel)
         }
     }
 
@@ -264,8 +330,8 @@ struct DashboardView: View {
                                     category: bucket,
                                     amount: summary.bucketValue(for: bucket),
                                     summary: summary,
-                                    transactions: viewModel.transactions,
-                                    accounts: viewModel.accounts
+                                    accounts: viewModel.accounts,
+                                    viewModel: viewModel
                                 )
                             } label: {
                                 BucketCard(
@@ -315,6 +381,17 @@ struct DashboardView: View {
     /// Full dashboard view shown when plan is created (existing functionality)
     private var planActiveView: some View {
         VStack(spacing: 20) {
+            // Financial Health Section (if available)
+            if let healthMetrics = viewModel.healthMetrics {
+                FinancialHealthDashboardSection(
+                    healthMetrics: healthMetrics,
+                    previousMetrics: viewModel.previousHealthMetrics,
+                    onViewFullReport: {
+                        viewModel.showHealthReport = true
+                    }
+                )
+            }
+
             // Allocation Buckets Section (if available)
             if !viewModel.budgetManager.allocationBuckets.isEmpty {
                 allocationBucketsSection
@@ -393,14 +470,15 @@ struct DashboardView: View {
                         category: bucket,
                         amount: summary.bucketValue(for: bucket),
                         summary: summary,
-                        transactions: viewModel.transactions,
-                        accounts: viewModel.accounts
+                        accounts: viewModel.accounts,
+                        viewModel: viewModel
                     )
                 } label: {
                     BucketCard(
                         category: bucket,
                         amount: summary.bucketValue(for: bucket),
-                        isSelected: selectedBucket == bucket
+                        isSelected: selectedBucket == bucket,
+                        needsValidationCount: viewModel.needsValidationCount(for: bucket)
                     )
                 }
             }
@@ -550,6 +628,7 @@ struct BucketCard: View {
     let category: BucketCategory
     let amount: Double
     let isSelected: Bool
+    var needsValidationCount: Int = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -559,6 +638,20 @@ struct BucketCard: View {
                     .foregroundColor(color)
 
                 Spacer()
+
+                // Validation badge
+                if needsValidationCount > 0 {
+                    ZStack {
+                        Circle()
+                            .fill(Color.orange)
+                            .frame(width: 24, height: 24)
+
+                        Text("\(needsValidationCount)")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                    }
+                }
             }
 
             Text(category.rawValue)

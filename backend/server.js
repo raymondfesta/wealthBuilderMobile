@@ -83,6 +83,7 @@ const plaidClient = new PlaidApi(configuration);
 // OpenAI client configuration
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+  timeout: 30000, // 30 second timeout for API calls
 });
 
 // Persistent storage for access tokens
@@ -917,6 +918,7 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
       currentSavings,
       totalDebt,
       categoryBreakdown,
+      healthMetrics,
     } = req.body;
 
     // Validate required fields
@@ -961,7 +963,16 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
     const debt = totalDebt || 0;
     const categories = categoryBreakdown || {};
 
+    // Extract health metrics if provided
+    // During onboarding (before health setup), use conservative defaults
+    const healthScore = healthMetrics?.healthScore || 50; // Default to neutral
+    const savingsRate = healthMetrics?.savingsRate || 0;
+    const emergencyFundMonthsCovered = healthMetrics?.emergencyFundMonthsCovered || 0;
+    const debtToIncomeRatio = healthMetrics?.debtToIncomeRatio || 0;
+    const incomeStability = healthMetrics?.incomeStability || 'variable'; // Conservative: assume variable income without health data
+
     console.log(`🎯 [Allocation] Processing: Income=$${monthlyIncome}, Expenses=$${expenses}, Savings=$${savings}, Debt=$${debt}`);
+    console.log(`🎯 [Allocation] Health Metrics: Score=${healthScore.toFixed(1)}, SavingsRate=${(savingsRate * 100).toFixed(1)}%, EmergencyFund=${emergencyFundMonthsCovered.toFixed(1)} months, DTI=${(debtToIncomeRatio * 100).toFixed(1)}%, Stability=${incomeStability}`);
 
     // Category mappings - define which categories are essential vs discretionary
     const essentialCategoryList = ['Groceries', 'Rent', 'Mortgage', 'Utilities', 'Transportation', 'Insurance', 'Healthcare', 'Childcare'];
@@ -986,13 +997,22 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
 
     console.log(`🎯 [Allocation] Actual spending - Essential: $${actualEssentialSpending}, Discretionary: $${actualDiscretionarySpending}`);
 
-    // Calculate emergency fund target (6 months of ESSENTIAL expenses only)
+    // Calculate emergency fund target (6/9/12 months based on income stability)
     // Use actual essential spending if available, otherwise fall back to a percentage of total expenses
     const essentialSpendingBase = actualEssentialSpending > 0 ? actualEssentialSpending : expenses * 0.6;
-    const emergencyFundTarget = Math.round(essentialSpendingBase * 6);
+
+    // Determine target months based on income stability (using financial planning best practices)
+    let targetMonths = 6; // Default: stable income
+    if (incomeStability === 'variable') {
+      targetMonths = 9; // Variable income needs larger buffer
+    } else if (incomeStability === 'inconsistent') {
+      targetMonths = 12; // Inconsistent income requires maximum safety net
+    }
+
+    const emergencyFundTarget = Math.round(essentialSpendingBase * targetMonths);
     const emergencyFundShortfall = Math.max(0, emergencyFundTarget - savings);
 
-    console.log(`🎯 [Allocation] Emergency Fund - Base: $${essentialSpendingBase}/month, Target: $${emergencyFundTarget} (6 months)`);
+    console.log(`🎯 [Allocation] Emergency Fund - Base: $${essentialSpendingBase}/month, Target: $${emergencyFundTarget} (${targetMonths} months for ${incomeStability} income)`);
 
 
     // Start with 50/30/20 rule baseline, then adjust
@@ -1018,18 +1038,29 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
       }
     }
 
-    // Calculate Emergency Fund monthly allocation using savings-period approach
-    // This matches the frontend manual selection logic (target ÷ 24 months)
-    const SAVINGS_PERIOD_MONTHS = 24; // 2 years to reach emergency fund target
+    // Calculate Emergency Fund monthly allocation using health-aware savings-period approach
+    // This matches the frontend manual selection logic (target ÷ savingsPeriod months)
+    const SAVINGS_PERIOD_MONTHS = 24; // Default: 2 years to reach emergency fund target
     let savingsPeriod = SAVINGS_PERIOD_MONTHS;
 
-    // If high debt, prioritize emergency fund by using a shorter savings period
-    if (debt > monthlyIncome * 3) {
-      // Use 12-month period for faster emergency fund buildup
-      savingsPeriod = 12;
-    } else if (emergencyFundShortfall > monthlyIncome * 0.5) {
-      // Use 18-month period for moderate acceleration
+    // HEALTH-AWARE ADJUSTMENT: Use health score and financial metrics to determine urgency
+    // Health Score ranges: 0-40 (needs improvement), 41-70 (moderate), 71-100 (good)
+
+    if (healthScore < 40 || emergencyFundMonthsCovered < 3) {
+      // Low health score OR insufficient emergency fund: Aggressive savings period
+      savingsPeriod = 12; // 1 year - prioritize financial stability
+      console.log(`🎯 [Allocation] Using aggressive 12-month period (healthScore=${healthScore.toFixed(1)}, emergencyFund=${emergencyFundMonthsCovered.toFixed(1)} months)`);
+    } else if (healthScore < 70 || emergencyFundMonthsCovered < 4.5) {
+      // Moderate health score OR partial emergency fund: Moderate acceleration
+      savingsPeriod = 18; // 1.5 years - balanced approach
+      console.log(`🎯 [Allocation] Using moderate 18-month period (healthScore=${healthScore.toFixed(1)}, emergencyFund=${emergencyFundMonthsCovered.toFixed(1)} months)`);
+    } else if (debt > monthlyIncome * 3) {
+      // Good health score but high debt: Still prioritize emergency fund
       savingsPeriod = 18;
+      console.log(`🎯 [Allocation] Using moderate 18-month period due to high debt (${(debtToIncomeRatio * 100).toFixed(1)}% DTI)`);
+    } else {
+      // Good health score, adequate emergency fund: Standard savings period
+      console.log(`🎯 [Allocation] Using standard 24-month period (healthScore=${healthScore.toFixed(1)}, emergencyFund=${emergencyFundMonthsCovered.toFixed(1)} months)`);
     }
 
     const emergencyFundAmount = Math.round(emergencyFundTarget / savingsPeriod);
@@ -1090,6 +1121,14 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
       savings,
       debt,
       emergencyFundTarget,
+      targetMonths, // Include target months based on income stability
+      healthMetrics: {
+        healthScore,
+        savingsRate,
+        emergencyFundMonthsCovered,
+        debtToIncomeRatio,
+        incomeStability
+      },
       allocations: {
         essential: { amount: adjustedEssentialAmount, percentage: essentialPercentage },
         emergencyFund: { amount: adjustedEmergencyAmount, percentage: emergencyFundPercentage },
@@ -1142,7 +1181,101 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
   }
 });
 
+// Generate AI explanation for allocation change in real-time
+app.post('/api/ai/explain-allocation-change', aiRateLimiter, async (req, res) => {
+  try {
+    console.log('🔄 [AllocationChange] Received explanation request');
+    const {
+      bucketType,
+      oldAmount,
+      newAmount,
+      monthlyIncome,
+      impactedBuckets
+    } = req.body;
+
+    // Validate required fields
+    if (!bucketType || oldAmount === undefined || newAmount === undefined || !monthlyIncome) {
+      return res.status(400).json({ error: 'bucketType, oldAmount, newAmount, and monthlyIncome are required' });
+    }
+
+    if (typeof oldAmount !== 'number' || typeof newAmount !== 'number' || typeof monthlyIncome !== 'number') {
+      return res.status(400).json({ error: 'Amounts must be numbers' });
+    }
+
+    const delta = newAmount - oldAmount;
+    const oldPercentage = (oldAmount / monthlyIncome) * 100;
+    const newPercentage = (newAmount / monthlyIncome) * 100;
+
+    console.log(`🔄 [AllocationChange] ${bucketType}: $${oldAmount} → $${newAmount} (${delta >= 0 ? '+' : ''}$${delta})`);
+
+    // Build context about what changed
+    let impactDescription = '';
+    if (impactedBuckets && Array.isArray(impactedBuckets)) {
+      const impacts = impactedBuckets
+        .filter(b => Math.abs(b.change) > 0.01)
+        .map(b => `${b.name}: ${b.change > 0 ? '+' : ''}$${Math.round(b.change)}`)
+        .join(', ');
+      if (impacts) {
+        impactDescription = ` This change automatically adjusted: ${impacts}.`;
+      }
+    }
+
+    // Generate AI explanation for the change
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a financial advisor. Explain budget allocation changes in 1-2 concise sentences. Be encouraging and focus on the financial impact. Keep it under 40 words.'
+        },
+        {
+          role: 'user',
+          content: `User changed their ${bucketType} allocation from $${oldAmount} (${oldPercentage.toFixed(1)}%) to $${newAmount} (${newPercentage.toFixed(1)}%) of their $${monthlyIncome} monthly income.${impactDescription} Explain the impact of this change.`
+        }
+      ],
+      max_tokens: 80,
+      temperature: 0.7
+    });
+
+    const explanation = completion.choices[0].message.content.trim();
+
+    console.log(`🔄 [AllocationChange] Generated explanation: "${explanation}"`);
+
+    res.json({
+      explanation,
+      usage: {
+        prompt_tokens: completion.usage.prompt_tokens,
+        completion_tokens: completion.usage.completion_tokens,
+        total_tokens: completion.usage.total_tokens
+      }
+    });
+  } catch (error) {
+    console.error('🔄 [AllocationChange] Error generating explanation:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // MARK: - Helper Functions
+
+/**
+ * Wraps a promise with a timeout. If the promise doesn't resolve within timeoutMs,
+ * returns the fallbackValue instead.
+ * @param {Promise} promise - The promise to wrap
+ * @param {number} timeoutMs - Timeout in milliseconds
+ * @param {any} fallbackValue - Value to return if timeout occurs
+ * @returns {Promise} The original promise result or fallback value
+ */
+function withTimeout(promise, timeoutMs, fallbackValue) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) =>
+      setTimeout(() => {
+        console.warn(`⏱️ [Timeout] Promise exceeded ${timeoutMs}ms, using fallback`);
+        resolve(fallbackValue);
+      }, timeoutMs)
+    ),
+  ]);
+}
 
 // Generate AI-powered explanations for each allocation bucket
 async function generateAllocationExplanations({
@@ -1151,75 +1284,108 @@ async function generateAllocationExplanations({
   savings,
   debt,
   emergencyFundTarget,
+  targetMonths,
+  healthMetrics,
   allocations,
 }) {
   try {
-    // Generate explanations for all buckets in parallel
+    // Prepare fallback explanations in OpenAI response format
+    const essentialMonthlyTarget = Math.round(emergencyFundTarget / (targetMonths || 6));
+    const fallbackEssential = {
+      choices: [{ message: { content: `Allocating $${allocations.essential.amount} covers your necessary monthly expenses while leaving room for savings.` } }]
+    };
+    const fallbackEmergency = {
+      choices: [{ message: { content: `Build a ${targetMonths || 6}-month emergency fund covering your essential expenses of $${essentialMonthlyTarget}/month. At $${allocations.emergencyFund.amount}/month, you'll reach your $${emergencyFundTarget} target in ${Math.ceil((emergencyFundTarget - savings) / allocations.emergencyFund.amount)} months.` } }]
+    };
+    const fallbackDiscretionary = {
+      choices: [{ message: { content: `Setting aside $${allocations.discretionary.amount} for discretionary spending allows you to enjoy life while staying financially responsible.` } }]
+    };
+    const fallbackInvestment = {
+      choices: [{ message: { content: `Investing $${allocations.investment.amount} monthly helps build long-term wealth and prepares for retirement.` } }]
+    };
+
+    // Generate explanations for all buckets in parallel with 20-second timeout per call
     const [essentialExplanation, emergencyExplanation, discretionaryExplanation, investmentExplanation] = await Promise.all([
       // Essential Spending explanation
-      openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a financial advisor. Explain budget allocations in 1-2 sentences. Be encouraging and specific.',
-          },
-          {
-            role: 'user',
-            content: `Explain why allocating $${allocations.essential.amount} (${allocations.essential.percentage}% of $${monthlyIncome} monthly income) to essential spending makes sense. Current monthly expenses: $${expenses}.`,
-          },
-        ],
-        max_tokens: 100,
-        temperature: 0.7,
-      }),
+      withTimeout(
+        openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a financial advisor. Explain budget allocations in 1-2 sentences. Be encouraging and specific.',
+            },
+            {
+              role: 'user',
+              content: `Explain why allocating $${allocations.essential.amount} (${allocations.essential.percentage}% of $${monthlyIncome} monthly income) to essential spending makes sense. Current monthly expenses: $${expenses}.`,
+            },
+          ],
+          max_tokens: 100,
+          temperature: 0.7,
+        }),
+        20000,
+        fallbackEssential
+      ),
       // Emergency Fund explanation
-      openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a financial advisor. Explain budget allocations in 1-2 sentences. Be encouraging and specific. For emergency funds, clearly mention it covers 6 months of essential expenses.',
-          },
-          {
-            role: 'user',
-            content: `Explain why allocating $${allocations.emergencyFund.amount} (${allocations.emergencyFund.percentage}% of $${monthlyIncome} monthly income) to emergency fund makes sense. Current savings: $${savings}, Target: $${emergencyFundTarget} (6 months of essential expenses). Essential spending base: $${Math.round(emergencyFundTarget / 6)}/month. ${debt > 0 ? `Current debt: $${debt}.` : ''}`,
-          },
-        ],
-        max_tokens: 120,
-        temperature: 0.7,
-      }),
+      withTimeout(
+        openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a financial advisor. Explain budget allocations in 1-2 sentences. Be encouraging and specific. Focus on opportunity and progress, never discouragement.',
+            },
+            {
+              role: 'user',
+              content: `Explain why allocating $${allocations.emergencyFund.amount} (${allocations.emergencyFund.percentage}% of $${monthlyIncome} monthly income) to emergency fund makes sense. Current savings: $${savings}, Target: $${emergencyFundTarget} (${targetMonths || 6} months of essential expenses, recommended for ${healthMetrics?.incomeStability || 'stable'} income). Essential spending base: $${Math.round(emergencyFundTarget / (targetMonths || 6))}/month. ${debt > 0 ? `Current debt: $${debt}.` : ''} Current emergency fund covers ${healthMetrics?.emergencyFundMonthsCovered?.toFixed(1) || 0} months.`,
+            },
+          ],
+          max_tokens: 120,
+          temperature: 0.7,
+        }),
+        20000,
+        fallbackEmergency
+      ),
       // Discretionary Spending explanation
-      openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a financial advisor. Explain budget allocations in 1-2 sentences. Be encouraging and specific.',
-          },
-          {
-            role: 'user',
-            content: `Explain why allocating $${allocations.discretionary.amount} (${allocations.discretionary.percentage}% of $${monthlyIncome} monthly income) to discretionary spending (entertainment, dining, shopping) makes sense for work-life balance.`,
-          },
-        ],
-        max_tokens: 100,
-        temperature: 0.7,
-      }),
+      withTimeout(
+        openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a financial advisor. Explain budget allocations in 1-2 sentences. Be encouraging and specific.',
+            },
+            {
+              role: 'user',
+              content: `Explain why allocating $${allocations.discretionary.amount} (${allocations.discretionary.percentage}% of $${monthlyIncome} monthly income) to discretionary spending (entertainment, dining, shopping) makes sense for work-life balance.`,
+            },
+          ],
+          max_tokens: 100,
+          temperature: 0.7,
+        }),
+        20000,
+        fallbackDiscretionary
+      ),
       // Investment explanation
-      openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a financial advisor. Explain budget allocations in 1-2 sentences. Be encouraging and specific.',
-          },
-          {
-            role: 'user',
-            content: `Explain why allocating $${allocations.investment.amount} (${allocations.investment.percentage}% of $${monthlyIncome} monthly income) to investments and retirement savings is important for long-term wealth building. ${savings >= emergencyFundTarget ? 'Emergency fund is fully funded.' : 'Building emergency fund alongside investments.'}`,
-          },
-        ],
-        max_tokens: 100,
-        temperature: 0.7,
-      }),
+      withTimeout(
+        openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a financial advisor. Explain budget allocations in 1-2 sentences. Be encouraging and specific.',
+            },
+            {
+              role: 'user',
+              content: `Explain why allocating $${allocations.investment.amount} (${allocations.investment.percentage}% of $${monthlyIncome} monthly income) to investments and retirement savings is important for long-term wealth building. ${savings >= emergencyFundTarget ? 'Emergency fund is fully funded.' : 'Building emergency fund alongside investments.'}`,
+            },
+          ],
+          max_tokens: 100,
+          temperature: 0.7,
+        }),
+        20000,
+        fallbackInvestment
+      ),
     ]);
 
     return {
@@ -1231,10 +1397,10 @@ async function generateAllocationExplanations({
   } catch (error) {
     console.error('🎯 [Allocation] Error generating AI explanations:', error);
     // Return fallback explanations if AI fails
-    const essentialMonthlyTarget = Math.round(emergencyFundTarget / 6);
+    const essentialMonthlyTarget = Math.round(emergencyFundTarget / (targetMonths || 6));
     return {
       essential: `Allocating $${allocations.essential.amount} covers your necessary monthly expenses while leaving room for savings.`,
-      emergencyFund: `Build a 6-month emergency fund covering your essential expenses of $${essentialMonthlyTarget}/month. At $${allocations.emergencyFund.amount}/month, you'll reach your $${emergencyFundTarget} target in ${Math.ceil((emergencyFundTarget - savings) / allocations.emergencyFund.amount)} months.`,
+      emergencyFund: `Build a ${targetMonths || 6}-month emergency fund covering your essential expenses of $${essentialMonthlyTarget}/month. At $${allocations.emergencyFund.amount}/month, you'll reach your $${emergencyFundTarget} target in ${Math.ceil((emergencyFundTarget - savings) / allocations.emergencyFund.amount)} months.`,
       discretionary: `Setting aside $${allocations.discretionary.amount} for discretionary spending allows you to enjoy life while staying financially responsible.`,
       investment: `Investing $${allocations.investment.amount} monthly helps build long-term wealth and prepares for retirement.`,
     };

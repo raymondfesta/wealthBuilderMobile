@@ -16,9 +16,8 @@ extension UserDefaults {
     /// Use this in development to quickly reset the app state
     static func clearAppData() {
         #if DEBUG
-        if let suiteName = "com.financialanalyzer.dev" {
-            UserDefaults().removePersistentDomain(forName: suiteName)
-        }
+        let suiteName = "com.financialanalyzer.dev"
+        UserDefaults().removePersistentDomain(forName: suiteName)
         #endif
 
         // Also clear standard UserDefaults keys used by the app
