@@ -5,20 +5,14 @@ import UserNotifications
 struct FinancialAnalyzerApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @AppStorage("hasSeenWelcome") private var hasSeenWelcome = false
-    @State private var showWelcome = false
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .sheet(isPresented: $showWelcome) {
-                    WelcomePageView(isPresented: $showWelcome)
-                }
-                .onAppear {
-                    if !hasSeenWelcome {
-                        showWelcome = true
-                        hasSeenWelcome = true
-                    }
-                }
+            if !hasSeenWelcome {
+                WelcomePageView(isPresented: $hasSeenWelcome)
+            } else {
+                ContentView()
+            }
         }
     }
 }
@@ -39,12 +33,29 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
+            // Base background
+            Color(UIColor.systemBackground)
+                .ignoresSafeArea()
+
             if isOnboardingComplete {
                 // Show full app with bottom navigation after onboarding
                 TabView {
                     DashboardView(viewModel: viewModel)
                         .tabItem {
                             Label("Dashboard", systemImage: "chart.pie.fill")
+                        }
+
+                    // Health tab - shows badge until first viewed
+                    HealthTabView(viewModel: viewModel)
+                        .tabItem {
+                            Label("Health", systemImage: "heart.text.square.fill")
+                        }
+                        .badge(viewModel.hasViewedHealthTab ? nil : "New")
+
+                    // Schedule tab - allocation schedule and history
+                    ScheduleTabView(viewModel: viewModel)
+                        .tabItem {
+                            Label("Schedule", systemImage: "calendar.badge.clock")
                         }
 
                     if !viewModel.transactions.isEmpty {
@@ -61,11 +72,11 @@ struct ContentView: View {
                             }
                     }
 
-                    // Demo tab for testing proactive guidance
-                    ProactiveGuidanceDemoView(viewModel: viewModel)
-                        .tabItem {
-                            Label("Demo", systemImage: "testtube.2")
-                        }
+                    // Demo tab - temporarily hidden, can be re-enabled later
+                    // ProactiveGuidanceDemoView(viewModel: viewModel)
+                    //     .tabItem {
+                    //         Label("Demo", systemImage: "testtube.2")
+                    //     }
 
                     // Temporarily commented out - re-enable after verifying target membership
                     // #if DEBUG
@@ -81,6 +92,8 @@ struct ContentView: View {
                 DashboardView(viewModel: viewModel)
             }
         }
+        .preferredColorScheme(.dark)
+        .tint(.blue)
         .sheet(isPresented: $viewModel.isShowingGuidance) {
             if let alert = viewModel.currentAlert {
                 ProactiveGuidanceView(alert: alert) { action in
@@ -138,6 +151,11 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                 "cached_budgets",
                 "cached_goals",
                 "cached_allocation_buckets",
+                "cached_health_metrics",
+                "cached_previous_health_metrics",
+                "cached_journey_state",
+                "health_report_setup_completed",
+                "has_viewed_health_tab",
                 "hasSeenWelcome",
                 "hasCompletedOnboarding"
             ]

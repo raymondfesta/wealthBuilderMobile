@@ -7,23 +7,40 @@ struct AllocationBucketCard: View {
     @Binding var editedAmount: Double
     let originalAmount: Double
     let essentialSpendingAmount: Double?
+    let allAccounts: [BankAccount]
     var onAmountChanged: ((Double) -> Void)?
     var onReset: (() -> Void)?
+    var onEmergencyDurationChanged: ((Int) -> Void)?
 
     @State private var showingDetailsSheet: Bool = false
-    @State private var localAmount: Double = 0
-    @State private var debounceTask: Task<Void, Never>? = nil
+    @State private var showingAccountLinkingSheet: Bool = false
+    @State private var selectedPresetTier: PresetTier = .recommended
+    @State private var selectedEmergencyDuration: Int?
 
-    // Initialize local amount from editedAmount
-    init(bucket: AllocationBucket, monthlyIncome: Double, editedAmount: Binding<Double>, originalAmount: Double? = nil, essentialSpendingAmount: Double? = nil, onAmountChanged: ((Double) -> Void)? = nil, onReset: (() -> Void)? = nil) {
+    init(
+        bucket: AllocationBucket,
+        monthlyIncome: Double,
+        editedAmount: Binding<Double>,
+        originalAmount: Double? = nil,
+        essentialSpendingAmount: Double? = nil,
+        allAccounts: [BankAccount] = [],
+        onAmountChanged: ((Double) -> Void)? = nil,
+        onReset: (() -> Void)? = nil,
+        onEmergencyDurationChanged: ((Int) -> Void)? = nil
+    ) {
         self.bucket = bucket
         self.monthlyIncome = monthlyIncome
         self._editedAmount = editedAmount
         self.originalAmount = originalAmount ?? editedAmount.wrappedValue
         self.essentialSpendingAmount = essentialSpendingAmount
+        self.allAccounts = allAccounts
         self.onAmountChanged = onAmountChanged
         self.onReset = onReset
-        self._localAmount = State(initialValue: editedAmount.wrappedValue)
+        self.onEmergencyDurationChanged = onEmergencyDurationChanged
+
+        // Initialize selected tier from bucket
+        self._selectedPresetTier = State(initialValue: bucket.selectedPresetTier)
+        self._selectedEmergencyDuration = State(initialValue: bucket.selectedEmergencyDuration)
     }
 
     var body: some View {
@@ -32,30 +49,29 @@ struct AllocationBucketCard: View {
             compressedHeader
                 .padding(.bottom, 20)
 
-            // Hero number display
-            heroNumberSection
+            // Allocation amount section (varies by bucket type)
+            allocationSection
                 .padding(.bottom, 16)
 
-            // All modifiable buckets: Show custom slider
-            if bucket.isModifiable {
-                customSliderSection
-                    .padding(.bottom, 12)
+            // Account linking section
+            if !allAccounts.isEmpty {
+                accountLinkingSection
+                    .padding(.bottom, 16)
             }
 
-            // Emergency Fund: Show coverage info
-            if bucket.type == .emergencyFund {
-                emergencyFundInfoDisplay
-                    .padding(.bottom, 12)
+            // Investment projections
+            if bucket.type == .investments,
+               let projection = bucket.investmentProjection {
+                InvestmentProjectionView(
+                    projection: projection,
+                    selectedTier: selectedPresetTier
+                )
+                .padding(.bottom, 16)
             }
 
             // Contextual warnings
             if bucket.type == .discretionarySpending {
                 discretionarySpendingWarning
-                    .padding(.bottom, 12)
-            }
-
-            if bucket.type == .emergencyFund {
-                emergencyFundWarning
                     .padding(.bottom, 12)
             }
 
@@ -78,11 +94,25 @@ struct AllocationBucketCard: View {
                 essentialSpendingAmount: essentialSpendingAmount
             )
         }
-        .onChange(of: editedAmount) { newValue in
-            // Sync localAmount when parent updates the binding (e.g., auto-adjustment of other buckets)
-            if abs(localAmount - newValue) > 0.01 {
-                localAmount = newValue
-            }
+        .sheet(isPresented: $showingAccountLinkingSheet) {
+            AccountLinkingDetailSheet(
+                bucketType: bucket.type,
+                allAccounts: allAccounts,
+                linkedAccountIds: Binding(
+                    get: { bucket.linkedAccountIds },
+                    set: { bucket.linkedAccountIds = $0 }
+                ),
+                linkageMethods: Binding(
+                    get: { bucket.accountLinkageMethod },
+                    set: { bucket.accountLinkageMethod = $0 }
+                ),
+                onSave: { ids, methods in
+                    bucket.linkedAccountIds = ids
+                    bucket.accountLinkageMethod = methods
+                    // Recalculate balance
+                    updateAccountBalance()
+                }
+            )
         }
     }
 
@@ -119,24 +149,30 @@ struct AllocationBucketCard: View {
                     .cornerRadius(4)
             }
 
-            Spacer()
+            // Auto-adjusted badge (with dismiss button)
+            if bucket.hasUnacknowledgedChange {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.caption2)
+                    Text("AUTO-ADJUSTED")
+                        .font(.caption2)
+                        .fontWeight(.bold)
 
-            // Lock toggle button (for modifiable buckets)
-            if bucket.isModifiable {
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        bucket.isLocked.toggle()
+                    Button {
+                        bucket.acknowledgeChange()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.caption2)
                     }
-                    let generator = UIImpactFeedbackGenerator(style: .light)
-                    generator.impactOccurred()
-                } label: {
-                    Image(systemName: bucket.isLocked ? "lock.fill" : "lock.open.fill")
-                        .font(.subheadline)
-                        .foregroundColor(bucket.isLocked ? .orange : .secondary)
-                        .rotationEffect(.degrees(bucket.isLocked ? 0 : 15))
                 }
-                .accessibilityLabel(bucket.isLocked ? "Unlock bucket" : "Lock bucket")
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.opportunityOrange.opacity(0.2))
+                .foregroundColor(Color.opportunityOrange)
+                .cornerRadius(4)
             }
+
+            Spacer()
 
             // Info button
             Button {
@@ -152,33 +188,81 @@ struct AllocationBucketCard: View {
         }
     }
 
-    /// Hero number section - makes the amount the visual focal point
-    private var heroNumberSection: some View {
+    /// Allocation amount section - varies by bucket type
+    @ViewBuilder
+    private var allocationSection: some View {
+        switch bucket.type {
+        case .emergencyFund:
+            // Emergency fund uses duration picker
+            if let durationOptions = bucket.emergencyDurationOptions {
+                EmergencyFundDurationPicker(
+                    durationOptions: durationOptions,
+                    selectedDuration: $selectedEmergencyDuration,
+                    selectedPresetTier: $selectedPresetTier,
+                    onSelectionChange: { months, amount in
+                        bucket.selectedEmergencyDuration = months
+                        bucket.selectedPresetTier = selectedPresetTier
+                        editedAmount = amount
+                        onAmountChanged?(amount)
+                        onEmergencyDurationChanged?(months)
+                    }
+                )
+            } else {
+                // Fallback to simple display
+                simpleAmountDisplay
+            }
+
+        case .discretionarySpending, .investments:
+            // These use preset selectors
+            if let presetOptions = bucket.presetOptions {
+                AllocationPresetSelector(
+                    presetOptions: presetOptions,
+                    selectedTier: $selectedPresetTier,
+                    onSelectionChange: { amount in
+                        bucket.selectedPresetTier = selectedPresetTier
+                        editedAmount = amount
+                        onAmountChanged?(amount)
+                    }
+                )
+            } else {
+                // Fallback to simple display
+                simpleAmountDisplay
+            }
+
+        case .essentialSpending:
+            // Essential spending is locked - just show amount
+            lockedAmountDisplay
+
+        case .debtPaydown:
+            // Debt uses preset selector (but should use DebtPaydownCard at planner level)
+            if let presetOptions = bucket.presetOptions {
+                AllocationPresetSelector(
+                    presetOptions: presetOptions,
+                    selectedTier: $selectedPresetTier,
+                    onSelectionChange: { amount in
+                        bucket.selectedPresetTier = selectedPresetTier
+                        editedAmount = amount
+                        onAmountChanged?(amount)
+                    }
+                )
+            } else {
+                simpleAmountDisplay
+            }
+        }
+    }
+
+    /// Simple amount display for non-modifiable or fallback cases
+    private var simpleAmountDisplay: some View {
         VStack(alignment: .leading, spacing: 4) {
-            // Amount - largest element (48pt)
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(formatCurrency(editedAmount))
                     .font(.system(size: 48, weight: .bold, design: .rounded))
                     .foregroundColor(Color(hex: bucket.color))
 
                 // Change indicator (only if changed)
-                if bucket.isModifiable && abs(bucket.changeFromOriginal) > 0.01 {
+                if abs(bucket.changeFromOriginal) > 0.01 {
                     changeIndicatorBadge
                         .transition(.scale.combined(with: .opacity))
-                }
-
-                // Reset button (if changed)
-                if bucket.isModifiable && hasChanged && onReset != nil {
-                    Button {
-                        onReset?()
-                        let generator = UINotificationFeedbackGenerator()
-                        generator.notificationOccurred(.success)
-                    } label: {
-                        Image(systemName: "arrow.counterclockwise.circle.fill")
-                            .font(.title3)
-                            .foregroundColor(.blue)
-                    }
-                    .accessibilityLabel("Reset to suggested amount")
                 }
             }
 
@@ -200,88 +284,139 @@ struct AllocationBucketCard: View {
         }
     }
 
-    /// Custom slider section with color-coded safety zones
-    private var customSliderSection: some View {
+    /// Locked amount display for essential spending
+    private var lockedAmountDisplay: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Custom slider with safety zones
-            CustomSlider(
-                value: $localAmount,
-                in: 0...monthlyIncome,
-                step: 50,
-                recommendedValue: bucket.getRecommendedMinimum(monthlyIncome: monthlyIncome),
-                warningThreshold: bucket.getRecommendedMinimum(monthlyIncome: monthlyIncome) * 0.5,
-                hardLimit: bucket.getMaxSafeAllocation(monthlyIncome: monthlyIncome, otherBuckets: []),
-                color: Color(hex: bucket.color),
-                onEditingChanged: { editing in
-                    if !editing {
-                        updateAmount(localAmount)
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(formatCurrency(editedAmount))
+                        .font(.system(size: 48, weight: .bold, design: .rounded))
+                        .foregroundColor(Color(hex: bucket.color))
+
+                    HStack(spacing: 8) {
+                        Text("\(Int(percentageOfIncome))%")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
+
+                        Text("•")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
+
+                        Text(bucket.description)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
                     }
                 }
-            )
 
-            // Min/Max labels
-            HStack {
-                Text("$0")
+                Spacer()
+            }
+
+            // Locked explanation
+            HStack(spacing: 8) {
+                Image(systemName: "lock.fill")
+                    .font(.caption)
+                    .foregroundColor(.blue)
+                Text("Based on your actual spending")
                     .font(.caption)
                     .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.blue.opacity(0.1))
+            )
+        }
+    }
+
+    /// Account linking section with balance display
+    @ViewBuilder
+    private var accountLinkingSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "link.circle.fill")
+                    .foregroundColor(Color(hex: bucket.color))
+                Text("Linked Accounts")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
 
                 Spacer()
 
-                Text(formatCurrency(monthlyIncome))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-        }
-    }
-
-    /// Emergency Fund information display - shows coverage and time to goal
-    private var emergencyFundInfoDisplay: some View {
-        Group {
-            if let essentialSpending = essentialSpendingAmount, essentialSpending > 0 {
-                VStack(alignment: .leading, spacing: 12) {
-                    // Coverage and Goal metrics
-                    HStack(spacing: 16) {
-                        // Current Coverage
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Current Coverage")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-
-                            let monthsCovered = editedAmount / essentialSpending
-                            Text(String(format: "%.1f months", monthsCovered))
-                                .font(.title3)
-                                .fontWeight(.bold)
-                                .foregroundColor(monthsCovered >= 6 ? .green : .orange)
-                        }
-
-                        Spacer()
-
-                        // Time to 6-month goal
-                        VStack(alignment: .trailing, spacing: 4) {
-                            Text("To 6-Month Goal")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-
-                            let targetAmount = essentialSpending * 6.0
-                            let monthsToGoal = editedAmount > 0 ? Int(ceil(targetAmount / editedAmount)) : 0
-                            Text("\(monthsToGoal) months")
-                                .font(.title3)
-                                .fontWeight(.bold)
-                                .foregroundColor(.blue)
-                        }
+                Button {
+                    showingAccountLinkingSheet = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(bucket.linkedAccountIds.isEmpty ? "Link" : "Manage")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                        Image(systemName: "chevron.right")
+                            .font(.caption2)
                     }
-                    .padding(12)
-                    .background(Color.orange.opacity(0.1))
-                    .cornerRadius(12)
-
-                    // Explanation text
-                    Text("At \(formatCurrency(editedAmount))/month, you're building an emergency fund to cover 6 months of essential expenses (\(formatCurrency(essentialSpending))/month).")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    .foregroundColor(.blue)
                 }
             }
+
+            // Current balance from linked accounts
+            if bucket.currentBalanceFromAccounts > 0 {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Current Balance")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(formatCurrency(bucket.currentBalanceFromAccounts))
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundColor(Color(hex: bucket.color))
+                    }
+
+                    Spacer()
+
+                    // Auto-linked badge if applicable
+                    if bucket.linkedAccountIds.contains(where: { bucket.accountLinkageMethod[$0] == .automatic }) {
+                        Text("AUTO-LINKED")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(Color.protectionMint)
+                            .cornerRadius(4)
+                    }
+                }
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color(hex: bucket.color).opacity(0.1))
+                )
+            } else if !bucket.linkedAccountIds.isEmpty {
+                // Linked but zero balance
+                Text("\(bucket.linkedAccountIds.count) account\(bucket.linkedAccountIds.count == 1 ? "" : "s") linked")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color(.systemGray6))
+                    )
+            } else {
+                // No accounts linked
+                Text("No accounts linked")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color(.systemGray6))
+                    )
+            }
         }
     }
+
 
     /// Button to open details sheet
     private var whyThisAmountButton: some View {
@@ -315,22 +450,6 @@ struct AllocationBucketCard: View {
         .accessibilityLabel("Show allocation details and explanation")
     }
 
-    /// Warning for Emergency Fund below recommended minimum
-    private var emergencyFundWarning: some View {
-        let recommendedMinimum = bucket.getRecommendedMinimum(monthlyIncome: monthlyIncome)
-        let isBelowMinimum = editedAmount < recommendedMinimum
-
-        return Group {
-            if isBelowMinimum {
-                warningBox(
-                    icon: "exclamationmark.triangle.fill",
-                    color: .orange,
-                    title: "Below Recommended Minimum",
-                    message: "Your emergency fund allocation is below the recommended \(Int(bucket.recommendedMinimumPercentage))% (\(formatCurrency(recommendedMinimum))). Consider increasing this for better financial security."
-                )
-            }
-        }
-    }
 
     /// Warning for Investments below recommended minimum
     private var investmentsWarning: some View {
@@ -454,6 +573,15 @@ struct AllocationBucketCard: View {
         formatter.numberStyle = .currency
         formatter.maximumFractionDigits = 0
         return formatter.string(from: NSNumber(value: amount)) ?? "$0"
+    }
+
+    private func updateAccountBalance() {
+        let linkingService = AccountLinkingService()
+        bucket.currentBalanceFromAccounts = linkingService.calculateBucketBalance(
+            for: bucket.type,
+            linkedAccountIds: bucket.linkedAccountIds,
+            accounts: allAccounts
+        )
     }
 }
 

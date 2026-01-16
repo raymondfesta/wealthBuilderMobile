@@ -8,8 +8,9 @@ struct AllocationPlannerView: View {
     @State private var showingValidationError: Bool = false
     @State private var validationMessage: String = ""
     @State private var showingIncomeExplanation: Bool = false
-    @State private var advancedMode: Bool = false
-    @State private var showingAdvancedModeSheet: Bool = false
+    @State private var rebalanceAdjustments: [AllocationAdjustment]? = nil
+    @State private var showRebalanceToast: Bool = false
+    @State private var showingScheduleSetup: Bool = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -19,6 +20,9 @@ struct AllocationPlannerView: View {
                     VStack(spacing: 24) {
                         // Header section
                         headerSection
+
+                        // Edge case warnings
+                        edgeCaseWarnings
 
                         // Allocation bucket cards
                         bucketsSection
@@ -48,24 +52,6 @@ struct AllocationPlannerView: View {
             }
             .navigationTitle("Build Your Plan")
             .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        showingAdvancedModeSheet = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: advancedMode ? "lock.open.fill" : "lock.shield.fill")
-                            Text(advancedMode ? "Advanced" : "Guided")
-                                .font(.caption)
-                        }
-                        .foregroundColor(advancedMode ? .orange : .blue)
-                    }
-                    .accessibilityLabel(advancedMode ? "Disable advanced mode" : "Enable advanced mode")
-                }
-
-                // Close button removed - user should accept or reject plan
-                // No need to go back since healthReportReady state no longer exists
-            }
             .alert("Allocation Error", isPresented: $showingValidationError) {
                 Button("OK", role: .cancel) {
                     showingValidationError = false
@@ -76,12 +62,16 @@ struct AllocationPlannerView: View {
             .sheet(isPresented: $showingIncomeExplanation) {
                 incomeExplanationSheet
             }
-            .sheet(isPresented: $showingAdvancedModeSheet) {
-                advancedModeSheet
+            .sheet(isPresented: $showingScheduleSetup) {
+                PaycheckScheduleSetupView(viewModel: viewModel)
             }
             .onAppear {
                 initializeEditedBuckets()
             }
+            .rebalanceToast(
+                adjustments: $rebalanceAdjustments,
+                isPresented: $showRebalanceToast
+            )
         }
     }
 
@@ -106,6 +96,88 @@ struct AllocationPlannerView: View {
         .cornerRadius(16)
     }
 
+    @ViewBuilder
+    private var edgeCaseWarnings: some View {
+        VStack(spacing: 12) {
+            // High essential spending warning
+            if let essentialBucket = viewModel.budgetManager.allocationBuckets.first(where: { $0.type == .essentialSpending }) {
+                let detection = editorViewModel.detectHighEssentialSpending(
+                    essentialBucketId: essentialBucket.id,
+                    monthlyIncome: monthlyIncome
+                )
+                if detection.isHigh {
+                    warningBanner(
+                        icon: "exclamationmark.triangle.fill",
+                        title: "High Essential Spending",
+                        message: "Your essential expenses are \(Int(detection.percentage))% of income. Consider reviewing your essential categories to find savings opportunities.",
+                        color: .orange
+                    )
+                }
+            }
+
+            // Low discretionary spending warning
+            if let discretionaryBucket = viewModel.budgetManager.allocationBuckets.first(where: { $0.type == .discretionarySpending }) {
+                let detection = editorViewModel.detectLowDiscretionarySpending(
+                    discretionaryBucketId: discretionaryBucket.id,
+                    monthlyIncome: monthlyIncome
+                )
+                if detection.isTooLow {
+                    warningBanner(
+                        icon: "info.circle.fill",
+                        title: "Low Discretionary Spending",
+                        message: "You've allocated only \(Int(detection.percentage))% for discretionary spending. Make sure you have enough flexibility for quality of life.",
+                        color: .blue
+                    )
+                }
+            }
+
+            // Insufficient emergency fund warning
+            if let emergencyBucket = viewModel.budgetManager.allocationBuckets.first(where: { $0.type == .emergencyFund }) {
+                let detection = editorViewModel.detectInsufficientEmergencyFund(
+                    emergencyBucketId: emergencyBucket.id,
+                    monthlyIncome: monthlyIncome
+                )
+                if detection.isInsufficient {
+                    warningBanner(
+                        icon: "exclamationmark.shield.fill",
+                        title: "Low Emergency Fund Allocation",
+                        message: "Your emergency fund allocation is only \(Int(detection.percentage))% of income. Consider increasing this to build financial security faster.",
+                        color: .red
+                    )
+                }
+            }
+        }
+    }
+
+    private func warningBanner(icon: String, title: String, message: String, color: Color) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(color)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+
+                Text(message)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(color.opacity(0.1))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(color.opacity(0.3), lineWidth: 1)
+        )
+    }
+
     private var bucketsSection: some View {
         VStack(spacing: 20) {
             ForEach(viewModel.budgetManager.allocationBuckets) { bucket in
@@ -118,16 +190,28 @@ struct AllocationPlannerView: View {
                     ),
                     originalAmount: editorViewModel.originalAmounts[bucket.id] ?? bucket.allocatedAmount,
                     essentialSpendingAmount: essentialSpendingAmount,
+                    allAccounts: viewModel.accounts,
                     onAmountChanged: { newAmount in
-                        editorViewModel.updateBucket(
+                        let adjustments = editorViewModel.updateBucket(
                             id: bucket.id,
                             newAmount: newAmount,
                             monthlyIncome: monthlyIncome,
                             allBuckets: viewModel.budgetManager.allocationBuckets
                         )
+
+                        // Show toast if there were auto-adjustments
+                        if !adjustments.isEmpty {
+                            rebalanceAdjustments = adjustments
+                            withAnimation {
+                                showRebalanceToast = true
+                            }
+                        }
                     },
                     onReset: {
                         editorViewModel.resetBucket(id: bucket.id)
+                    },
+                    onEmergencyDurationChanged: { newDuration in
+                        handleEmergencyDurationChange(bucket: bucket, newDuration: newDuration)
                     }
                 )
             }
@@ -391,120 +475,39 @@ struct AllocationPlannerView: View {
         .presentationDetents([.medium, .large])
     }
 
-    private var advancedModeSheet: some View {
-        NavigationStack {
-            VStack(spacing: 24) {
-                // Icon
-                ZStack {
-                    Circle()
-                        .fill(advancedMode ? Color.blue.opacity(0.15) : Color.orange.opacity(0.15))
-                        .frame(width: 80, height: 80)
-
-                    Image(systemName: advancedMode ? "lock.shield.fill" : "lock.open.fill")
-                        .font(.system(size: 36))
-                        .foregroundColor(advancedMode ? .blue : .orange)
-                }
-                .padding(.top, 40)
-
-                // Title and description
-                VStack(spacing: 12) {
-                    Text(advancedMode ? "Switch to Guided Mode?" : "Enable Advanced Mode?")
-                        .font(.title2)
-                        .fontWeight(.bold)
-
-                    Text(advancedMode
-                        ? "Return to guided mode with safety limits and recommended minimums."
-                        : "Advanced mode removes safety limits, allowing allocations below recommended minimums. Use with caution."
-                    )
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal)
-                }
-
-                // Warning (only when enabling advanced mode)
-                if !advancedMode {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.title3)
-                                .foregroundColor(.orange)
-
-                            Text("Proceed with Caution")
-                                .font(.headline)
-                        }
-
-                        Text("Advanced mode allows you to create allocations that may not provide adequate financial protection. You'll be responsible for ensuring your plan meets your needs.")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(16)
-                    .background(Color.orange.opacity(0.1))
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.orange.opacity(0.3), lineWidth: 1)
-                    )
-                    .padding(.horizontal)
-                }
-
-                Spacer()
-
-                // Action buttons
-                VStack(spacing: 12) {
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            advancedMode.toggle()
-                        }
-                        let generator = UINotificationFeedbackGenerator()
-                        generator.notificationOccurred(.success)
-                        showingAdvancedModeSheet = false
-                    } label: {
-                        Text(advancedMode ? "Switch to Guided Mode" : "Enable Advanced Mode")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(advancedMode ? Color.blue : Color.orange)
-                            .cornerRadius(12)
-                    }
-
-                    Button {
-                        showingAdvancedModeSheet = false
-                    } label: {
-                        Text("Cancel")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color(.secondarySystemBackground))
-                            .cornerRadius(12)
-                    }
-                }
-                .padding()
-            }
-            .navigationTitle(advancedMode ? "Guided Mode" : "Advanced Mode")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showingAdvancedModeSheet = false
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                    }
-                }
-            }
-        }
-        .presentationDetents([.medium])
-    }
-
     // MARK: - Helper Methods
 
     private func initializeEditedBuckets() {
         editorViewModel.initialize(buckets: viewModel.budgetManager.allocationBuckets)
+    }
+
+    private func handleEmergencyDurationChange(bucket: AllocationBucket, newDuration: Int) {
+        // Update the bucket's selected emergency duration
+        bucket.selectedEmergencyDuration = newDuration
+
+        // Find the selected duration option to get the recommended target amount
+        if let selectedOption = bucket.emergencyDurationOptions?.first(where: { $0.months == newDuration }) {
+            // Get the recommended preset for this duration
+            let recommendedAmount = selectedOption.monthlyContribution.value(for: .recommended).amount
+
+            // Update the bucket allocation
+            let adjustments = editorViewModel.updateBucket(
+                id: bucket.id,
+                newAmount: recommendedAmount,
+                monthlyIncome: monthlyIncome,
+                allBuckets: viewModel.budgetManager.allocationBuckets
+            )
+
+            // Show toast if there were auto-adjustments
+            if !adjustments.isEmpty {
+                rebalanceAdjustments = adjustments
+                withAnimation {
+                    showRebalanceToast = true
+                }
+            }
+
+            print("🎯 [AllocationPlanner] Emergency duration changed to \(newDuration) months, new target: $\(Int(recommendedAmount))")
+        }
     }
 
 
@@ -559,6 +562,11 @@ struct AllocationPlannerView: View {
         // Call confirm method
         Task {
             await viewModel.confirmAllocationPlan()
+
+            // After successful plan creation, present schedule setup
+            await MainActor.run {
+                showingScheduleSetup = true
+            }
         }
     }
 

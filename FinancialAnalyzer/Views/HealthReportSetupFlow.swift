@@ -5,10 +5,17 @@ struct HealthReportSetupFlow: View {
     @ObservedObject var viewModel: FinancialViewModel
     @Environment(\.dismiss) private var dismiss
 
+    let onComplete: (() -> Void)?
+
     @State private var currentStep: SetupStep = .tagEmergencyFund
     @State private var selectedEmergencyFundId: String?
     @State private var selectedPrimaryCheckingId: String?
     @State private var isProcessing = false
+
+    init(viewModel: FinancialViewModel, onComplete: (() -> Void)? = nil) {
+        self.viewModel = viewModel
+        self.onComplete = onComplete
+    }
 
     enum SetupStep {
         case tagEmergencyFund
@@ -368,6 +375,7 @@ struct HealthReportSetupFlow: View {
                 // Auto-dismiss after a brief delay
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                     dismiss()
+                    onComplete?()
                 }
             }
         }

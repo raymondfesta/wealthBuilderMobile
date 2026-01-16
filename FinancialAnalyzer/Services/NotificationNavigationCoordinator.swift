@@ -33,6 +33,15 @@ class NotificationNavigationCoordinator: ObservableObject {
         case "weekly_review":
             handleWeeklyReview()
 
+        case "pre_payday_reminder":
+            handlePrePaydayReminder(userInfo: userInfo)
+
+        case "allocation_day":
+            handleAllocationDay(userInfo: userInfo)
+
+        case "allocation_follow_up":
+            handleAllocationFollowUp(userInfo: userInfo)
+
         default:
             break
         }
@@ -218,6 +227,38 @@ class NotificationNavigationCoordinator: ObservableObject {
         shouldNavigate = true
     }
 
+    private func handlePrePaydayReminder(userInfo: [AnyHashable: Any]) {
+        // Navigate to schedule tab
+        activeNotification = .scheduleTab
+        shouldNavigate = true
+    }
+
+    private func handleAllocationDay(userInfo: [AnyHashable: Any]) {
+        guard let paycheckTimestamp = userInfo["paycheckDate"] as? Double,
+              let allocationIds = userInfo["allocationIds"] as? [String],
+              let viewModel = viewModel else {
+            return
+        }
+
+        // Find allocations for this payday
+        let paycheckDate = Date(timeIntervalSince1970: paycheckTimestamp)
+        let allocations = viewModel.scheduledAllocations.filter { allocation in
+            allocationIds.contains(allocation.id) &&
+            Calendar.current.isDate(allocation.paycheckDate, inSameDayAs: paycheckDate)
+        }
+
+        if !allocations.isEmpty {
+            // Show allocation reminder sheet
+            activeNotification = .allocationReminder(allocations)
+            shouldNavigate = true
+        }
+    }
+
+    private func handleAllocationFollowUp(userInfo: [AnyHashable: Any]) {
+        // Same as allocation day handler
+        handleAllocationDay(userInfo: userInfo)
+    }
+
     // MARK: - Helper Methods
 
     private func createPurchaseActions(budget: Budget, amount: Double) -> [AlertAction] {
@@ -286,6 +327,8 @@ enum NotificationNavigation: Identifiable {
     case cashFlowWarning(ProactiveAlert)
     case goalMilestone(ProactiveAlert)
     case dashboard
+    case scheduleTab
+    case allocationReminder([ScheduledAllocation])
 
     var id: String {
         switch self {
@@ -294,6 +337,8 @@ enum NotificationNavigation: Identifiable {
         case .cashFlowWarning: return "cash_flow_warning"
         case .goalMilestone: return "goal_milestone"
         case .dashboard: return "dashboard"
+        case .scheduleTab: return "schedule_tab"
+        case .allocationReminder: return "allocation_reminder"
         }
     }
 }

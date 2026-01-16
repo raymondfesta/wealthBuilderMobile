@@ -16,6 +16,14 @@ final class AllocationBucket: Identifiable, ObservableObject {
     @Published var updatedAt: Date
     @Published var changeFromOriginal: Double = 0 // Track change for visual indicators
     @Published var isLocked: Bool = false // Whether this bucket is protected from auto-adjustment
+    @Published var selectedPresetTier: PresetTier = .recommended // Selected preset tier
+    @Published var selectedEmergencyDuration: Int = 6 // Selected emergency fund duration in months
+    @Published var linkedAccountIds: [String] = [] // IDs of linked bank accounts
+    @Published var accountLinkageMethod: [String: BucketLinkageMethod] = [:] // How each account was linked
+    @Published var investmentProjection: InvestmentProjection? // Investment growth projections
+    @Published var emergencyDurationOptions: [EmergencyFundDurationOption]? // Available duration options
+    @Published var hasUnacknowledgedChange: Bool = false // Whether user has seen auto-adjustment
+    @Published var presetOptions: PresetOptions? // Backend-provided preset options for Low/Rec/High
 
     /// Recommended minimum allocation as a percentage of income
     var recommendedMinimumPercentage: Double {
@@ -28,6 +36,8 @@ final class AllocationBucket: Identifiable, ObservableObject {
             return 0 // Can be zero if needed
         case .investments:
             return 5 // Minimum 5% for wealth building
+        case .debtPaydown:
+            return 0 // Optional bucket
         }
     }
 
@@ -38,6 +48,10 @@ final class AllocationBucket: Identifiable, ObservableObject {
         // For now, return 0 - the ViewModel will need to calculate this
         return 0
     }
+
+    /// Current balance from linked bank accounts
+    /// This should be set by the view model based on account linkings
+    var currentBalanceFromAccounts: Double = 0
 
     var displayName: String {
         type.displayName
@@ -122,7 +136,7 @@ final class AllocationBucket: Identifiable, ObservableObject {
         case .essentialSpending:
             // Essential spending is locked and calculated, but return current value
             return allocatedAmount
-        case .emergencyFund, .investments:
+        case .emergencyFund, .investments, .debtPaydown:
             // No hard upper limit beyond what's left after minimums
             return max(0, maximum)
         }
@@ -174,6 +188,17 @@ final class AllocationBucket: Identifiable, ObservableObject {
     /// Updates the change indicator
     func updateChange(from originalAmount: Double) {
         self.changeFromOriginal = self.allocatedAmount - originalAmount
+    }
+
+    /// Records an auto-adjustment for badge display
+    func recordAutoAdjustment(amountChanged: Double) {
+        self.changeFromOriginal = amountChanged
+        self.hasUnacknowledgedChange = true
+    }
+
+    /// Acknowledges the auto-adjustment (clears the badge)
+    func acknowledgeChange() {
+        self.hasUnacknowledgedChange = false
     }
 }
 
@@ -270,11 +295,26 @@ extension AllocationBucket: Codable {
 
 // MARK: - Allocation Bucket Type
 
+/// Preset tier for allocation selection (Low/Recommended/High)
+enum PresetTier: String, Codable, CaseIterable {
+    case low = "Low"
+    case recommended = "Recommended"
+    case high = "High"
+}
+
+/// Method used to link an account to a bucket
+enum BucketLinkageMethod: String, Codable {
+    case auto = "auto"
+    case automatic = "automatic"
+    case manual = "manual"
+}
+
 enum AllocationBucketType: String, Codable, CaseIterable {
     case essentialSpending = "Essential Spending"
     case emergencyFund = "Emergency Fund"
     case discretionarySpending = "Discretionary Spending"
     case investments = "Investments"
+    case debtPaydown = "Debt Paydown"
 
     var displayName: String {
         self.rawValue
@@ -290,6 +330,8 @@ enum AllocationBucketType: String, Codable, CaseIterable {
             return "cart.fill"
         case .investments:
             return "chart.line.uptrend.xyaxis"
+        case .debtPaydown:
+            return "creditcard.fill"
         }
     }
 
@@ -303,6 +345,8 @@ enum AllocationBucketType: String, Codable, CaseIterable {
             return "#FF9500" // Orange
         case .investments:
             return "#34C759" // Green
+        case .debtPaydown:
+            return "#AF52DE" // Purple
         }
     }
 
@@ -316,6 +360,8 @@ enum AllocationBucketType: String, Codable, CaseIterable {
             return "Non-essential spending on entertainment, dining out, shopping, and hobbies"
         case .investments:
             return "Long-term wealth building through retirement accounts, stocks, and other investments"
+        case .debtPaydown:
+            return "Extra payments toward debt to accelerate payoff and reduce interest"
         }
     }
 
@@ -346,6 +392,8 @@ enum AllocationBucketType: String, Codable, CaseIterable {
             ]
         case .investments:
             return [] // Virtual bucket - not tied to spending categories
+        case .debtPaydown:
+            return [] // Virtual bucket - tracks extra debt payments
         }
     }
 }

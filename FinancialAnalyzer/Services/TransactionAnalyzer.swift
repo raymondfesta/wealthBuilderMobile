@@ -130,6 +130,7 @@ struct TransactionAnalyzer {
         // Group transactions by bucket category
         var incomeTotal: Double = 0
         var expensesTotal: Double = 0
+        var investmentContributionsTotal: Double = 0
         var incomeCount = 0
         var expenseCount = 0
         var debtCount = 0
@@ -151,7 +152,9 @@ struct TransactionAnalyzer {
                 expensesTotal += transaction.amount
                 debtCount += 1
             case .invested:
-                expensesTotal += transaction.amount
+                // Track investment contributions separately - NOT as expenses
+                // These are wealth-building transfers, not spending
+                investmentContributionsTotal += transaction.amount
                 investedCount += 1
             default:
                 otherCount += 1
@@ -161,6 +164,7 @@ struct TransactionAnalyzer {
         // Calculate averages
         let avgMonthlyIncome = incomeTotal / Double(monthsAnalyzed)
         let avgMonthlyExpenses = expensesTotal / Double(monthsAnalyzed)
+        let monthlyInvestmentContributions = investmentContributionsTotal / Double(monthsAnalyzed)
 
         // Debug logging
         print("📊 Transaction Analysis:")
@@ -169,10 +173,12 @@ struct TransactionAnalyzer {
         print("   Debt txns: \(debtCount), Investment txns: \(investedCount), Other: \(otherCount)")
         print("   Months analyzed: \(monthsAnalyzed)")
         print("   Income total: $\(incomeTotal)")
-        print("   Expenses total: $\(expensesTotal)")
+        print("   Expenses total: $\(expensesTotal) (excludes investments)")
+        print("   Investment contributions: $\(investmentContributionsTotal)")
         print("   Avg Monthly Income: $\(avgMonthlyIncome)")
         print("   Avg Monthly Expenses: $\(avgMonthlyExpenses)")
-        print("   Available to Spend: $\(avgMonthlyIncome - avgMonthlyExpenses)")
+        print("   Monthly Investment Contributions: $\(monthlyInvestmentContributions)")
+        print("   Discretionary Income: $\(avgMonthlyIncome - avgMonthlyExpenses)")
 
         // Calculate debt from credit/loan accounts
         let totalDebt = accounts
@@ -223,12 +229,119 @@ struct TransactionAnalyzer {
             totalDebt: totalDebt,
             totalInvested: totalInvested,
             totalCashAvailable: totalCashAvailable,
-            availableToSpend: availableToSpend, // Show actual value (can be negative)
+            availableToSpend: availableToSpend,
+            monthlyInvestmentContributions: monthlyInvestmentContributions,
             analysisStartDate: analysisStartDate,
             analysisEndDate: analysisEndDate,
             monthsAnalyzed: monthsAnalyzed,
             totalTransactions: filteredTransactions.count,
             lastUpdated: Date()
+        )
+    }
+
+    // MARK: - Analysis Snapshot Generation
+
+    /// Generates a complete analysis snapshot with MonthlyFlow and FinancialPosition
+    /// This is the primary output for the Analysis Complete screen
+    static func generateAnalysisSnapshot(
+        transactions: [Transaction],
+        accounts: [BankAccount]
+    ) -> AnalysisSnapshot {
+        // Filter last 6 months of transactions
+        let sixMonthsAgo = Calendar.current.date(byAdding: .month, value: -6, to: Date()) ?? Date()
+        let filteredTransactions = transactions.filter { $0.date >= sixMonthsAgo }
+
+        // Calculate date range
+        let analysisStartDate = filteredTransactions.map { $0.date }.min() ?? Date()
+        let analysisEndDate = filteredTransactions.map { $0.date }.max() ?? Date()
+        let monthsAnalyzed = max(
+            Calendar.current.dateComponents([.month], from: analysisStartDate, to: analysisEndDate).month ?? 6,
+            1
+        )
+
+        // Aggregate transaction data
+        var incomeTotal: Double = 0
+        var expensesTotal: Double = 0
+        var investmentContributionsTotal: Double = 0
+
+        for transaction in filteredTransactions where !transaction.pending {
+            switch transaction.bucketCategory {
+            case .income:
+                incomeTotal += abs(transaction.amount)
+            case .expenses:
+                expensesTotal += transaction.amount
+            case .debt:
+                expensesTotal += transaction.amount
+            case .invested:
+                investmentContributionsTotal += transaction.amount
+            default:
+                break
+            }
+        }
+
+        // Calculate monthly averages
+        let monthDivisor = Double(monthsAnalyzed)
+        let avgMonthlyIncome = incomeTotal / monthDivisor
+        let avgMonthlyExpenses = expensesTotal / monthDivisor
+        let monthlyInvestmentContributions = investmentContributionsTotal / monthDivisor
+
+        // Calculate debt minimums from accounts
+        let debtMinimums = calculateDebtMinimums(accounts: accounts)
+
+        // Calculate position from accounts
+        let totalDebt = accounts
+            .filter { $0.isCredit || $0.isLoan }
+            .compactMap { $0.currentBalance }
+            .reduce(0, +)
+
+        let totalInvested = accounts
+            .filter { $0.isInvestment }
+            .compactMap { $0.currentBalance }
+            .reduce(0, +)
+
+        let emergencyCash = accounts
+            .filter { $0.isDepository }
+            .compactMap { $0.availableBalance ?? $0.currentBalance }
+            .reduce(0, +)
+
+        // Count transactions needing validation
+        let transactionsNeedingValidation = filteredTransactions.filter { $0.needsValidation }.count
+
+        // Build the snapshot
+        let monthlyFlow = MonthlyFlow(
+            income: avgMonthlyIncome,
+            essentialExpenses: avgMonthlyExpenses,
+            debtMinimums: debtMinimums
+        )
+
+        let position = FinancialPosition(
+            emergencyCash: emergencyCash,
+            totalDebt: totalDebt,
+            investmentBalances: totalInvested,
+            monthlyInvestmentContributions: monthlyInvestmentContributions
+        )
+
+        let metadata = AnalysisMetadata(
+            monthsAnalyzed: monthsAnalyzed,
+            accountsConnected: Set(accounts.map { $0.itemId }).count,
+            transactionsAnalyzed: filteredTransactions.count,
+            transactionsNeedingValidation: transactionsNeedingValidation,
+            lastUpdated: Date()
+        )
+
+        print("📊 [AnalysisSnapshot] Generated:")
+        print("   Income: $\(Int(avgMonthlyIncome))/mo")
+        print("   Expenses: $\(Int(avgMonthlyExpenses))/mo")
+        print("   Debt Minimums: $\(Int(debtMinimums))/mo")
+        print("   Discretionary: $\(Int(monthlyFlow.discretionaryIncome))/mo")
+        print("   Emergency Fund: $\(Int(emergencyCash))")
+        print("   Investment Contributions: $\(Int(monthlyInvestmentContributions))/mo")
+        print("   Needs Validation: \(transactionsNeedingValidation) txns")
+
+        return AnalysisSnapshot(
+            monthlyFlow: monthlyFlow,
+            position: position,
+            metadata: metadata
         )
     }
 
@@ -326,6 +439,52 @@ struct TransactionAnalyzer {
             return "Sum of available balances in all checking and savings accounts"
         case .disposable:
             return "Cash Available - Estimated Remaining Expenses (based on your spending patterns)"
+        }
+    }
+
+    // MARK: - Debt Minimums Calculation
+
+    /// Calculates estimated minimum debt payments from account balances
+    /// Credit cards: ~2.5% of balance (minimum $25)
+    /// Loans: Based on typical payment schedules
+    static func calculateDebtMinimums(accounts: [BankAccount]) -> Double {
+        let debtAccounts = accounts.filter { $0.isCredit || $0.isLoan }
+
+        return debtAccounts.reduce(0) { total, account in
+            let balance = account.currentBalance ?? 0
+            guard balance > 0 else { return total }
+
+            if account.isCredit {
+                // Credit cards: typically 2-3% of balance, minimum $25
+                let minimumPayment = max(25, balance * 0.025)
+                return total + minimumPayment
+            } else if account.isLoan {
+                // Estimate loan minimums based on subtype
+                let subtype = account.subtype?.lowercased() ?? ""
+                let estimatedPayment: Double
+
+                switch subtype {
+                case _ where subtype.contains("student"):
+                    // Student loans: ~1% of balance monthly
+                    estimatedPayment = balance * 0.01
+                case _ where subtype.contains("auto"):
+                    // Auto loans: ~1.5-2% of balance monthly
+                    estimatedPayment = balance * 0.018
+                case _ where subtype.contains("mortgage"):
+                    // Mortgage: ~0.4-0.5% of balance monthly
+                    estimatedPayment = balance * 0.005
+                case _ where subtype.contains("personal"):
+                    // Personal loans: ~2-3% of balance monthly
+                    estimatedPayment = balance * 0.025
+                default:
+                    // Conservative estimate for unknown loan types
+                    estimatedPayment = balance * 0.015
+                }
+
+                return total + estimatedPayment
+            }
+
+            return total
         }
     }
 }

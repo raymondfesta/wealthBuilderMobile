@@ -9,6 +9,9 @@ struct FinancialSummary: Codable {
     var totalCashAvailable: Double
     var availableToSpend: Double
 
+    // Investment contributions (tracked separately from expenses)
+    var monthlyInvestmentContributions: Double
+
     // Supporting data
     var analysisStartDate: Date
     var analysisEndDate: Date
@@ -23,6 +26,7 @@ struct FinancialSummary: Codable {
         totalInvested: Double = 0,
         totalCashAvailable: Double = 0,
         availableToSpend: Double = 0,
+        monthlyInvestmentContributions: Double = 0,
         analysisStartDate: Date = Date(),
         analysisEndDate: Date = Date(),
         monthsAnalyzed: Int = 0,
@@ -35,6 +39,7 @@ struct FinancialSummary: Codable {
         self.totalInvested = totalInvested
         self.totalCashAvailable = totalCashAvailable
         self.availableToSpend = availableToSpend
+        self.monthlyInvestmentContributions = monthlyInvestmentContributions
         self.analysisStartDate = analysisStartDate
         self.analysisEndDate = analysisEndDate
         self.monthsAnalyzed = monthsAnalyzed

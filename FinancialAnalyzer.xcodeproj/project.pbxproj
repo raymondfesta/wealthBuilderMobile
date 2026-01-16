@@ -7,6 +7,40 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AA001001 /* AllocationExecution.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA002001 /* AllocationExecution.swift */; };
+		AA001002 /* AllocationScheduleConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA002002 /* AllocationScheduleConfig.swift */; };
+		AA001003 /* AnalysisSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA002003 /* AnalysisSnapshot.swift */; };
+		AA001004 /* EmergencyFundDurationOption.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA002004 /* EmergencyFundDurationOption.swift */; };
+		AA001005 /* FinancialPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA002005 /* FinancialPosition.swift */; };
+		AA001006 /* InvestmentProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA002006 /* InvestmentProjection.swift */; };
+		AA001007 /* MonthlyFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA002007 /* MonthlyFlow.swift */; };
+		AA001008 /* PaycheckSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA002008 /* PaycheckSchedule.swift */; };
+		AA001009 /* PresetOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA002009 /* PresetOptions.swift */; };
+		AA001010 /* ScheduledAllocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA002010 /* ScheduledAllocation.swift */; };
+		AA001011 /* AccountLinkingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA003001 /* AccountLinkingService.swift */; };
+		AA001012 /* AllocationExecutionTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA003002 /* AllocationExecutionTracker.swift */; };
+		AA001013 /* AllocationPlanStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA003003 /* AllocationPlanStorage.swift */; };
+		AA001014 /* AllocationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA003004 /* AllocationScheduler.swift */; };
+		AA001015 /* PaycheckDetectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA003005 /* PaycheckDetectionService.swift */; };
+		AA001016 /* AllocationHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA004001 /* AllocationHistoryView.swift */; };
+		AA001017 /* AllocationReminderSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA004002 /* AllocationReminderSheet.swift */; };
+		AA001018 /* AnalysisCompleteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA004003 /* AnalysisCompleteView.swift */; };
+		AA001019 /* AnalysisDrillDownSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA004004 /* AnalysisDrillDownSheets.swift */; };
+		AA001020 /* CurrencyTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA004005 /* CurrencyTextField.swift */; };
+		AA001021 /* HealthTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA004006 /* HealthTabView.swift */; };
+		AA001022 /* PaycheckScheduleEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA004007 /* PaycheckScheduleEditorView.swift */; };
+		AA001023 /* PaycheckScheduleSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA004008 /* PaycheckScheduleSetupView.swift */; };
+		AA001024 /* PrivacyPolicyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA004009 /* PrivacyPolicyView.swift */; };
+		AA001025 /* ScheduleTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA004010 /* ScheduleTabView.swift */; };
+		AA001026 /* UpcomingAllocationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA004011 /* UpcomingAllocationsView.swift */; };
+		AA001027 /* UserConsentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA004012 /* UserConsentView.swift */; };
+		AA001028 /* AccountLinkingDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA005001 /* AccountLinkingDetailSheet.swift */; };
+		AA001029 /* AllocationChecklistItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA005002 /* AllocationChecklistItem.swift */; };
+		AA001030 /* AllocationPresetSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA005003 /* AllocationPresetSelector.swift */; };
+		AA001031 /* DebtPaydownCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA005004 /* DebtPaydownCard.swift */; };
+		AA001032 /* EmergencyFundDurationPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA005005 /* EmergencyFundDurationPicker.swift */; };
+		AA001033 /* InvestmentProjectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA005006 /* InvestmentProjectionView.swift */; };
+		AA001034 /* RebalanceToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA005007 /* RebalanceToast.swift */; };
 		991CAD642EAD528200000EDB /* FinancialHealthMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD612EAD528200000EDB /* FinancialHealthMetrics.swift */; };
 		991CAD652EAD528200000EDB /* LoadingStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD622EAD528200000EDB /* LoadingStep.swift */; };
 		991CAD662EAD528200000EDB /* PersonalFinanceCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD632EAD528200000EDB /* PersonalFinanceCategory.swift */; };
@@ -65,6 +99,40 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		AA002001 /* AllocationExecution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationExecution.swift; sourceTree = "<group>"; };
+		AA002002 /* AllocationScheduleConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationScheduleConfig.swift; sourceTree = "<group>"; };
+		AA002003 /* AnalysisSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalysisSnapshot.swift; sourceTree = "<group>"; };
+		AA002004 /* EmergencyFundDurationOption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmergencyFundDurationOption.swift; sourceTree = "<group>"; };
+		AA002005 /* FinancialPosition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialPosition.swift; sourceTree = "<group>"; };
+		AA002006 /* InvestmentProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvestmentProjection.swift; sourceTree = "<group>"; };
+		AA002007 /* MonthlyFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthlyFlow.swift; sourceTree = "<group>"; };
+		AA002008 /* PaycheckSchedule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaycheckSchedule.swift; sourceTree = "<group>"; };
+		AA002009 /* PresetOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresetOptions.swift; sourceTree = "<group>"; };
+		AA002010 /* ScheduledAllocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduledAllocation.swift; sourceTree = "<group>"; };
+		AA003001 /* AccountLinkingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountLinkingService.swift; sourceTree = "<group>"; };
+		AA003002 /* AllocationExecutionTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationExecutionTracker.swift; sourceTree = "<group>"; };
+		AA003003 /* AllocationPlanStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationPlanStorage.swift; sourceTree = "<group>"; };
+		AA003004 /* AllocationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationScheduler.swift; sourceTree = "<group>"; };
+		AA003005 /* PaycheckDetectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaycheckDetectionService.swift; sourceTree = "<group>"; };
+		AA004001 /* AllocationHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationHistoryView.swift; sourceTree = "<group>"; };
+		AA004002 /* AllocationReminderSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationReminderSheet.swift; sourceTree = "<group>"; };
+		AA004003 /* AnalysisCompleteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalysisCompleteView.swift; sourceTree = "<group>"; };
+		AA004004 /* AnalysisDrillDownSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalysisDrillDownSheets.swift; sourceTree = "<group>"; };
+		AA004005 /* CurrencyTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrencyTextField.swift; sourceTree = "<group>"; };
+		AA004006 /* HealthTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthTabView.swift; sourceTree = "<group>"; };
+		AA004007 /* PaycheckScheduleEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaycheckScheduleEditorView.swift; sourceTree = "<group>"; };
+		AA004008 /* PaycheckScheduleSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaycheckScheduleSetupView.swift; sourceTree = "<group>"; };
+		AA004009 /* PrivacyPolicyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyPolicyView.swift; sourceTree = "<group>"; };
+		AA004010 /* ScheduleTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleTabView.swift; sourceTree = "<group>"; };
+		AA004011 /* UpcomingAllocationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpcomingAllocationsView.swift; sourceTree = "<group>"; };
+		AA004012 /* UserConsentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserConsentView.swift; sourceTree = "<group>"; };
+		AA005001 /* AccountLinkingDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountLinkingDetailSheet.swift; sourceTree = "<group>"; };
+		AA005002 /* AllocationChecklistItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationChecklistItem.swift; sourceTree = "<group>"; };
+		AA005003 /* AllocationPresetSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationPresetSelector.swift; sourceTree = "<group>"; };
+		AA005004 /* DebtPaydownCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebtPaydownCard.swift; sourceTree = "<group>"; };
+		AA005005 /* EmergencyFundDurationPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmergencyFundDurationPicker.swift; sourceTree = "<group>"; };
+		AA005006 /* InvestmentProjectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvestmentProjectionView.swift; sourceTree = "<group>"; };
+		AA005007 /* RebalanceToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RebalanceToast.swift; sourceTree = "<group>"; };
 		991CAD612EAD528200000EDB /* FinancialHealthMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialHealthMetrics.swift; sourceTree = "<group>"; };
 		991CAD622EAD528200000EDB /* LoadingStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingStep.swift; sourceTree = "<group>"; };
 		991CAD632EAD528200000EDB /* PersonalFinanceCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalFinanceCategory.swift; sourceTree = "<group>"; };
@@ -138,6 +206,13 @@
 			isa = PBXGroup;
 			children = (
 				991CAD792EAD533300000EDB /* HealthReportComponents.swift */,
+				AA005001 /* AccountLinkingDetailSheet.swift */,
+				AA005002 /* AllocationChecklistItem.swift */,
+				AA005003 /* AllocationPresetSelector.swift */,
+				AA005004 /* DebtPaydownCard.swift */,
+				AA005005 /* EmergencyFundDurationPicker.swift */,
+				AA005006 /* InvestmentProjectionView.swift */,
+				AA005007 /* RebalanceToast.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -195,6 +270,16 @@
 				FA002002 /* BucketCategory.swift */,
 				FA002003 /* FinancialSummary.swift */,
 				9978B8F62EA8399C0065A5FE /* AllocationBucket.swift */,
+				AA002001 /* AllocationExecution.swift */,
+				AA002002 /* AllocationScheduleConfig.swift */,
+				AA002003 /* AnalysisSnapshot.swift */,
+				AA002004 /* EmergencyFundDurationOption.swift */,
+				AA002005 /* FinancialPosition.swift */,
+				AA002006 /* InvestmentProjection.swift */,
+				AA002007 /* MonthlyFlow.swift */,
+				AA002008 /* PaycheckSchedule.swift */,
+				AA002009 /* PresetOptions.swift */,
+				AA002010 /* ScheduledAllocation.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -211,6 +296,11 @@
 				99806ACD2E94D24F00114B52 /* NotificationNavigationCoordinator.swift */,
 				99806AC92E94D20E00114B52 /* SpendingPatternAnalyzer.swift */,
 				FA003001 /* TransactionAnalyzer.swift */,
+				AA003001 /* AccountLinkingService.swift */,
+				AA003002 /* AllocationExecutionTracker.swift */,
+				AA003003 /* AllocationPlanStorage.swift */,
+				AA003004 /* AllocationScheduler.swift */,
+				AA003005 /* PaycheckDetectionService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -252,6 +342,18 @@
 				9978B8F82EA839BB0065A5FE /* AllocationBucketCard.swift */,
 				9978B8F92EA839BB0065A5FE /* AllocationBucketDetailView.swift */,
 				9978B8FA2EA839BB0065A5FE /* AllocationPlannerView.swift */,
+				AA004001 /* AllocationHistoryView.swift */,
+				AA004002 /* AllocationReminderSheet.swift */,
+				AA004003 /* AnalysisCompleteView.swift */,
+				AA004004 /* AnalysisDrillDownSheets.swift */,
+				AA004005 /* CurrencyTextField.swift */,
+				AA004006 /* HealthTabView.swift */,
+				AA004007 /* PaycheckScheduleEditorView.swift */,
+				AA004008 /* PaycheckScheduleSetupView.swift */,
+				AA004009 /* PrivacyPolicyView.swift */,
+				AA004010 /* ScheduleTabView.swift */,
+				AA004011 /* UpcomingAllocationsView.swift */,
+				AA004012 /* UserConsentView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -336,6 +438,40 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA001001 /* AllocationExecution.swift in Sources */,
+				AA001002 /* AllocationScheduleConfig.swift in Sources */,
+				AA001003 /* AnalysisSnapshot.swift in Sources */,
+				AA001004 /* EmergencyFundDurationOption.swift in Sources */,
+				AA001005 /* FinancialPosition.swift in Sources */,
+				AA001006 /* InvestmentProjection.swift in Sources */,
+				AA001007 /* MonthlyFlow.swift in Sources */,
+				AA001008 /* PaycheckSchedule.swift in Sources */,
+				AA001009 /* PresetOptions.swift in Sources */,
+				AA001010 /* ScheduledAllocation.swift in Sources */,
+				AA001011 /* AccountLinkingService.swift in Sources */,
+				AA001012 /* AllocationExecutionTracker.swift in Sources */,
+				AA001013 /* AllocationPlanStorage.swift in Sources */,
+				AA001014 /* AllocationScheduler.swift in Sources */,
+				AA001015 /* PaycheckDetectionService.swift in Sources */,
+				AA001016 /* AllocationHistoryView.swift in Sources */,
+				AA001017 /* AllocationReminderSheet.swift in Sources */,
+				AA001018 /* AnalysisCompleteView.swift in Sources */,
+				AA001019 /* AnalysisDrillDownSheets.swift in Sources */,
+				AA001020 /* CurrencyTextField.swift in Sources */,
+				AA001021 /* HealthTabView.swift in Sources */,
+				AA001022 /* PaycheckScheduleEditorView.swift in Sources */,
+				AA001023 /* PaycheckScheduleSetupView.swift in Sources */,
+				AA001024 /* PrivacyPolicyView.swift in Sources */,
+				AA001025 /* ScheduleTabView.swift in Sources */,
+				AA001026 /* UpcomingAllocationsView.swift in Sources */,
+				AA001027 /* UserConsentView.swift in Sources */,
+				AA001028 /* AccountLinkingDetailSheet.swift in Sources */,
+				AA001029 /* AllocationChecklistItem.swift in Sources */,
+				AA001030 /* AllocationPresetSelector.swift in Sources */,
+				AA001031 /* DebtPaydownCard.swift in Sources */,
+				AA001032 /* EmergencyFundDurationPicker.swift in Sources */,
+				AA001033 /* InvestmentProjectionView.swift in Sources */,
+				AA001034 /* RebalanceToast.swift in Sources */,
 				99806AC42E94D1CB00114B52 /* Budget.swift in Sources */,
 				9978B8F72EA8399C0065A5FE /* AllocationBucket.swift in Sources */,
 				99806AC52E94D1CB00114B52 /* Goal.swift in Sources */,

@@ -57,7 +57,7 @@ struct WelcomePageView: View {
 
                 // Call to action button
                 Button {
-                    isPresented = false
+                    isPresented = true  // Mark as seen to proceed to main app
                 } label: {
                     HStack(spacing: 12) {
                         Text("Join for free")
