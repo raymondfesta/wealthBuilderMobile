@@ -258,10 +258,3 @@ struct PaycheckSchedule: Codable, Identifiable {
     }
 }
 
-// MARK: - Helper Extensions
-
-extension DateComponents: Comparable {
-    public static func < (lhs: DateComponents, rhs: DateComponents) -> Bool {
-        return (lhs.day ?? 0) < (rhs.day ?? 0)
-    }
-}

@@ -27,6 +27,14 @@ class FinancialViewModel: ObservableObject {
     @Published var previousHealthMetrics: FinancialHealthMetrics?
     @Published var showHealthReport = false
 
+    // Analysis snapshot for Analysis Complete screen
+    @Published var analysisSnapshot: AnalysisSnapshot?
+
+    // Allocation schedule
+    @Published var allocationScheduleConfig: AllocationScheduleConfig?
+    @Published var scheduledAllocations: [ScheduledAllocation] = []
+    @Published var allocationHistory: [AllocationExecution] = []
+
     // Notification navigation
     var navigationCoordinator: NotificationNavigationCoordinator?
 
@@ -359,6 +367,13 @@ class FinancialViewModel: ObservableObject {
             cacheHealthMetrics()
             print("📊 [Analyze Finances] ✅ Health metrics calculated and cached")
 
+            // Generate analysis snapshot for the Analysis Complete screen
+            self.analysisSnapshot = TransactionAnalyzer.generateAnalysisSnapshot(
+                transactions: allTransactions,
+                accounts: accounts
+            )
+            print("📊 [Analyze Finances] ✅ Analysis snapshot generated")
+
             // Save to cache
             saveToCache()
 
@@ -440,7 +455,12 @@ class FinancialViewModel: ObservableObject {
             }
 
             let monthlyIncome = summary.avgMonthlyIncome
-            let monthlyExpenses = summary.avgMonthlyExpenses
+            var monthlyExpenses = summary.avgMonthlyExpenses
+
+            // Guard against NaN or negative values
+            if monthlyExpenses.isNaN || monthlyExpenses.isInfinite || monthlyExpenses < 0 {
+                monthlyExpenses = 0
+            }
 
             print("🎯 [Create Plan] Income: \(monthlyIncome), Expenses: \(monthlyExpenses)")
 
@@ -989,6 +1009,33 @@ class FinancialViewModel: ObservableObject {
 
     // MARK: - Health Report Setup
 
+    // UserDefaults keys for health report state
+    private let healthReportSetupCompletedKey = "health_report_setup_completed"
+    private let hasViewedHealthTabKey = "has_viewed_health_tab"
+
+    /// Whether the health report setup has been completed (account tagging done)
+    var healthReportSetupCompleted: Bool {
+        UserDefaults.standard.bool(forKey: healthReportSetupCompletedKey)
+    }
+
+    /// Whether the user has viewed the Health tab (controls badge visibility)
+    var hasViewedHealthTab: Bool {
+        UserDefaults.standard.bool(forKey: hasViewedHealthTabKey)
+    }
+
+    /// Marks the Health tab as viewed (removes badge)
+    func markHealthTabViewed() {
+        UserDefaults.standard.set(true, forKey: hasViewedHealthTabKey)
+        print("🏥 [Health] Health tab marked as viewed")
+    }
+
+    /// Marks health report setup as complete
+    func completeHealthReportSetup() {
+        UserDefaults.standard.set(true, forKey: healthReportSetupCompletedKey)
+        print("🏥 [Health] Health report setup marked as complete")
+        objectWillChange.send() // Trigger UI refresh
+    }
+
     /// Sets up health report after user completes account tagging
     /// Calculates health metrics and recalculates allocation with health-aware logic
     func setupHealthReport() async {
@@ -1022,8 +1069,7 @@ class FinancialViewModel: ObservableObject {
         cacheHealthMetrics()
 
         // Save setup completion flag
-        UserDefaults.standard.set(true, forKey: "health_report_setup_completed")
-        print("🏥 [Health Setup] Setup completion saved to UserDefaults")
+        completeHealthReportSetup()
 
         // Recalculate allocation with health-aware logic
         guard let healthMetrics = self.healthMetrics else {
@@ -1386,6 +1432,11 @@ class FinancialViewModel: ObservableObject {
             print("💾 [Cache] Saved journey state: \(userJourneyState.rawValue)")
         }
 
+        // Save allocation schedule
+        allocationScheduleConfig?.save()
+        scheduledAllocations.save()
+        allocationHistory.save()
+
         print("💾 [Cache Save] Cache save complete")
     }
 
@@ -1455,6 +1506,11 @@ class FinancialViewModel: ObservableObject {
 
         // Load health metrics
         loadCachedHealthMetrics()
+
+        // Load allocation schedule
+        allocationScheduleConfig = AllocationScheduleConfig.load()
+        scheduledAllocations = [ScheduledAllocation].load()
+        allocationHistory = [AllocationExecution].load()
 
         print("💾 [Cache Load] Cache load complete - Accounts: \(accounts.count), Transactions: \(transactions.count)")
     }
@@ -1565,5 +1621,147 @@ class FinancialViewModel: ObservableObject {
             }
         }
         #endif
+    }
+
+    // MARK: - Allocation Schedule Management
+
+    /// Sets up allocation schedule after paycheck detection
+    func setupAllocationSchedule(paycheckSchedule: PaycheckSchedule) async {
+        print("📅 [AllocationSchedule] Setting up schedule...")
+
+        isLoading = true
+        defer { isLoading = false }
+
+        // Create configuration
+        let config = AllocationScheduleConfig(paycheckSchedule: paycheckSchedule)
+        allocationScheduleConfig = config
+
+        // Generate scheduled allocations
+        let scheduler = AllocationScheduler()
+        scheduledAllocations = scheduler.generateSchedule(
+            paycheckSchedule: paycheckSchedule,
+            allocationBuckets: budgetManager.allocationBuckets,
+            monthsAhead: config.upcomingMonthsToShow
+        )
+
+        // Schedule notifications
+        do {
+            try await NotificationService.shared.scheduleAllocationNotifications(
+                scheduledAllocations: scheduledAllocations,
+                config: config
+            )
+        } catch {
+            print("❌ [AllocationSchedule] Failed to schedule notifications: \(error)")
+        }
+
+        // Save to cache
+        saveToCache()
+
+        print("✅ [AllocationSchedule] Schedule setup complete with \(scheduledAllocations.count) allocations")
+    }
+
+    /// Updates allocation schedule configuration
+    func updateAllocationSchedule(config: AllocationScheduleConfig) async {
+        print("📅 [AllocationSchedule] Updating schedule...")
+
+        isLoading = true
+        defer { isLoading = false }
+
+        // Update configuration
+        allocationScheduleConfig = config
+
+        // Regenerate scheduled allocations
+        let scheduler = AllocationScheduler()
+        scheduledAllocations = scheduler.regenerateSchedule(
+            paycheckSchedule: config.paycheckSchedule,
+            allocationBuckets: budgetManager.allocationBuckets,
+            existingAllocations: scheduledAllocations,
+            monthsAhead: config.upcomingMonthsToShow
+        )
+
+        // Reschedule notifications
+        await NotificationService.shared.cancelAllAllocationNotifications()
+        do {
+            try await NotificationService.shared.scheduleAllocationNotifications(
+                scheduledAllocations: scheduledAllocations,
+                config: config
+            )
+        } catch {
+            print("❌ [AllocationSchedule] Failed to reschedule notifications: \(error)")
+        }
+
+        // Save to cache
+        saveToCache()
+
+        print("✅ [AllocationSchedule] Schedule updated")
+    }
+
+    /// Completes allocations (marks as done and logs to history)
+    func completeAllocations(_ completedItems: [(ScheduledAllocation, Double)]) async {
+        print("✅ [AllocationSchedule] Completing \(completedItems.count) allocation(s)...")
+
+        let tracker = AllocationExecutionTracker()
+
+        // Record executions to history
+        for (allocation, actualAmount) in completedItems {
+            let execution = tracker.recordExecution(
+                scheduledAllocation: allocation,
+                actualAmount: actualAmount,
+                wasAutomatic: false
+            )
+            allocationHistory.append(execution)
+
+            // Update scheduled allocation status
+            if let index = scheduledAllocations.firstIndex(where: { $0.id == allocation.id }) {
+                scheduledAllocations[index].markCompleted(executionId: execution.id)
+            }
+        }
+
+        // Cancel notifications for this payday
+        if let firstAllocation = completedItems.first {
+            NotificationService.shared.cancelAllocationNotifications(for: firstAllocation.0.paycheckDate)
+        }
+
+        // Show completion notification
+        let totalAmount = completedItems.reduce(0) { $0 + $1.1 }
+        do {
+            try await NotificationService.shared.showCompletionConfirmation(
+                allocatedAmount: totalAmount,
+                bucketCount: completedItems.count
+            )
+        } catch {
+            print("❌ [AllocationSchedule] Failed to show completion notification: \(error)")
+        }
+
+        // Prune old history
+        allocationHistory = tracker.pruneOldExecutions(
+            executions: allocationHistory,
+            retentionMonths: allocationScheduleConfig?.historyMonthsToKeep ?? 12
+        )
+
+        // Save to cache
+        saveToCache()
+
+        print("✅ [AllocationSchedule] Completed \(completedItems.count) allocation(s)")
+    }
+
+    /// Skips allocations for a specific payday
+    func skipAllocation(paycheckDate: Date) async {
+        print("⏭️ [AllocationSchedule] Skipping allocations for \(paycheckDate)...")
+
+        // Mark all allocations for this payday as skipped
+        for index in scheduledAllocations.indices {
+            if Calendar.current.isDate(scheduledAllocations[index].paycheckDate, inSameDayAs: paycheckDate) {
+                scheduledAllocations[index].markSkipped()
+            }
+        }
+
+        // Cancel notifications
+        NotificationService.shared.cancelAllocationNotifications(for: paycheckDate)
+
+        // Save to cache
+        saveToCache()
+
+        print("✅ [AllocationSchedule] Skipped allocations for \(paycheckDate)")
     }
 }

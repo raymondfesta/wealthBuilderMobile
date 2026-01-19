@@ -919,6 +919,7 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
       totalDebt,
       categoryBreakdown,
       healthMetrics,
+      accountBalances, // NEW: { emergency: 10000, investments: 25000, discretionary: 1200, essential: 2500, debt: 5000 }
     } = req.body;
 
     // Validate required fields
@@ -962,6 +963,16 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
     const savings = currentSavings || 0;
     const debt = totalDebt || 0;
     const categories = categoryBreakdown || {};
+
+    // Extract account balances (new feature for linked accounts)
+    const balances = accountBalances || {};
+    const emergencyBalance = balances.emergency || savings; // Fall back to currentSavings if not provided
+    const investmentBalance = balances.investments || 0;
+    const discretionaryBalance = balances.discretionary || 0;
+    const essentialBalance = balances.essential || 0;
+    const debtBalance = balances.debt || debt; // Use linked debt accounts balance, fall back to totalDebt
+
+    console.log(`🎯 [Allocation] Account Balances: Emergency=$${emergencyBalance}, Investments=$${investmentBalance}, Discretionary=$${discretionaryBalance}, Essential=$${essentialBalance}, Debt=$${debtBalance}`);
 
     // Extract health metrics if provided
     // During onboarding (before health setup), use conservative defaults
@@ -1010,9 +1021,9 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
     }
 
     const emergencyFundTarget = Math.round(essentialSpendingBase * targetMonths);
-    const emergencyFundShortfall = Math.max(0, emergencyFundTarget - savings);
+    const emergencyFundShortfall = Math.max(0, emergencyFundTarget - emergencyBalance);
 
-    console.log(`🎯 [Allocation] Emergency Fund - Base: $${essentialSpendingBase}/month, Target: $${emergencyFundTarget} (${targetMonths} months for ${incomeStability} income)`);
+    console.log(`🎯 [Allocation] Emergency Fund - Base: $${essentialSpendingBase}/month, Target: $${emergencyFundTarget} (${targetMonths} months for ${incomeStability} income), Current Balance: $${emergencyBalance}, Shortfall: $${emergencyFundShortfall}`);
 
 
     // Start with 50/30/20 rule baseline, then adjust
@@ -1066,20 +1077,32 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
     const emergencyFundAmount = Math.round(emergencyFundTarget / savingsPeriod);
     console.log(`🎯 [Allocation] Emergency Fund monthly allocation: $${emergencyFundAmount} (based on ${savingsPeriod}-month savings period)`);
 
+    // Determine if we need debt allocation FIRST (affects other bucket calculations)
+    const shouldIncludeDebt = debtBalance > 1000;
+    const debtPercentage = shouldIncludeDebt ? 15 : 0; // 15% recommended for debt paydown
+    const debtAmount = shouldIncludeDebt ? Math.round((monthlyIncome * debtPercentage) / 100) : 0;
+
     // Calculate dollar amounts for other buckets
+    // When debt exists, reduce discretionary to make room
     const essentialAmount = Math.round((monthlyIncome * essentialPercentage) / 100);
-    const discretionaryAmount = Math.round((monthlyIncome * discretionaryPercentage) / 100);
-    const investmentAmount = Math.round((monthlyIncome * investmentPercentage) / 100);
+    let discretionaryAmount = Math.round((monthlyIncome * discretionaryPercentage) / 100);
+    let investmentAmount = Math.round((monthlyIncome * investmentPercentage) / 100);
+
+    // If debt paydown is included, reduce discretionary spending to make room
+    if (shouldIncludeDebt) {
+      // Reduce discretionary by the debt amount (debt takes priority)
+      discretionaryAmount = Math.max(0, discretionaryAmount - debtAmount);
+      console.log(`🎯 [Allocation] Reduced discretionary by $${debtAmount} to make room for debt paydown`);
+    }
 
     // Calculate percentage for emergency fund based on the amount (for display purposes)
     const emergencyFundPercentage = Math.round((emergencyFundAmount / monthlyIncome) * 100);
 
     // Ensure amounts sum exactly to monthlyIncome (handle rounding)
-    const totalAllocated = essentialAmount + emergencyFundAmount + discretionaryAmount + investmentAmount;
+    const totalAllocated = essentialAmount + emergencyFundAmount + discretionaryAmount + investmentAmount + debtAmount;
     const roundingAdjustment = monthlyIncome - totalAllocated;
 
-    // Apply rounding adjustment to the LARGEST modifiable bucket (not Essential Spending)
-    // This ensures Essential Spending stays at the calculated value based on actual data
+    // Apply rounding adjustment to the LARGEST modifiable bucket (not Essential Spending or Debt)
     const modifiableBuckets = [
       { name: 'emergency', amount: emergencyFundAmount },
       { name: 'discretionary', amount: discretionaryAmount },
@@ -1094,6 +1117,7 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
     let adjustedEmergencyAmount = emergencyFundAmount;
     let adjustedDiscretionaryAmount = discretionaryAmount;
     let adjustedInvestmentAmount = investmentAmount;
+    let adjustedDebtAmount = debtAmount;
 
     if (largestBucket.name === 'emergency') {
       adjustedEmergencyAmount += roundingAdjustment;
@@ -1104,7 +1128,7 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
     }
 
     console.log(`🎯 [Allocation] Applied rounding adjustment of $${roundingAdjustment} to ${largestBucket.name}`);
-    console.log(`🎯 [Allocation] Final amounts - Essential: $${adjustedEssentialAmount} (${essentialPercentage}%), Emergency: $${adjustedEmergencyAmount} (${emergencyFundPercentage}%), Discretionary: $${adjustedDiscretionaryAmount} (${discretionaryPercentage}%), Investment: $${adjustedInvestmentAmount} (${investmentPercentage}%)`);
+    console.log(`🎯 [Allocation] Final amounts - Essential: $${adjustedEssentialAmount}, Emergency: $${adjustedEmergencyAmount}, Discretionary: $${adjustedDiscretionaryAmount}, Investment: $${adjustedInvestmentAmount}, Debt: $${adjustedDebtAmount}`);
 
     // Calculate months to reach emergency fund target
     let monthsToTarget = 0;
@@ -1115,11 +1139,29 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
     // Generate AI explanations for each allocation
     console.log('🎯 [Allocation] Generating AI explanations...');
 
+    // Prepare allocations object for explanation generation
+    const allocationsForExplanations = {
+      essential: { amount: adjustedEssentialAmount, percentage: essentialPercentage },
+      emergencyFund: { amount: adjustedEmergencyAmount, percentage: emergencyFundPercentage },
+      discretionary: { amount: adjustedDiscretionaryAmount, percentage: discretionaryPercentage },
+      investment: { amount: adjustedInvestmentAmount, percentage: investmentPercentage },
+    };
+
+    // Add debt allocation for explanation if needed
+    if (shouldIncludeDebt) {
+      // Calculate debt preset to get recommended amount for explanation
+      const tempDebtPresets = calculatePresetOptions(monthlyIncome, 10, 15, 20);
+      allocationsForExplanations.debt = {
+        amount: tempDebtPresets.recommended.amount,
+        percentage: tempDebtPresets.recommended.percentage
+      };
+    }
+
     const explanations = await generateAllocationExplanations({
       monthlyIncome,
       expenses,
       savings,
-      debt,
+      debt: debtBalance,
       emergencyFundTarget,
       targetMonths, // Include target months based on income stability
       healthMetrics: {
@@ -1129,19 +1171,80 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
         debtToIncomeRatio,
         incomeStability
       },
-      allocations: {
-        essential: { amount: adjustedEssentialAmount, percentage: essentialPercentage },
-        emergencyFund: { amount: adjustedEmergencyAmount, percentage: emergencyFundPercentage },
-        discretionary: { amount: adjustedDiscretionaryAmount, percentage: discretionaryPercentage },
-        investment: { amount: adjustedInvestmentAmount, percentage: investmentPercentage },
-      },
+      allocations: allocationsForExplanations,
+      includeDebt: shouldIncludeDebt,
     });
+
+    // Generate preset options for discretionary and investments
+    // Fixed percentages: Discretionary (10/16/20), Investments (5/10/15)
+    const discretionaryPresets = calculatePresetOptions(monthlyIncome, 10, discretionaryPercentage, 20);
+    const investmentPresets = calculatePresetOptions(monthlyIncome, 5, investmentPercentage, 15);
+
+    // Generate emergency fund duration options (3/6/12 months)
+    const emergencyDurationOptions = generateEmergencyFundOptions(
+      essentialSpendingBase,
+      emergencyBalance,
+      incomeStability,
+      monthlyIncome
+    );
+
+    // Generate investment projections (10/20/30 year growth)
+    const investmentProjections = calculateInvestmentProjections(
+      investmentBalance,
+      monthlyIncome,
+      5, // Low: 5%
+      investmentPercentage, // Recommended: calculated percentage
+      15 // High: 15%
+    );
+
+    // Build debt allocation if needed (shouldIncludeDebt already determined above)
+    let debtAllocation = null;
+
+    if (shouldIncludeDebt) {
+      // Calculate debt preset options (10/15/20% when debt exists)
+      const debtPresets = calculatePresetOptions(monthlyIncome, 10, 15, 20);
+
+      // Calculate payoff timelines for each tier
+      const lowPayoff = calculateDebtPayoff(debtBalance, debtPresets.low.amount);
+      const recommendedPayoff = calculateDebtPayoff(debtBalance, adjustedDebtAmount);
+      const highPayoff = calculateDebtPayoff(debtBalance, debtPresets.high.amount);
+
+      // Determine if high-interest debt exists (simplified: assume 18% APR for credit cards)
+      const estimatedAPR = 0.18; // TODO: Get actual APR from Plaid if available
+
+      debtAllocation = {
+        amount: adjustedDebtAmount,
+        percentage: Math.round((adjustedDebtAmount / monthlyIncome) * 100),
+        totalDebt: debtBalance,
+        highInterestDebt: debtBalance, // Assume all is high-interest for now
+        averageAPR: estimatedAPR * 100, // Convert to percentage for display
+        presetOptions: debtPresets,
+        payoffTimeline: {
+          low: {
+            months: lowPayoff.months,
+            interestSaved: lowPayoff.interestSaved
+          },
+          recommended: {
+            months: recommendedPayoff.months,
+            interestSaved: recommendedPayoff.interestSaved
+          },
+          high: {
+            months: highPayoff.months,
+            interestSaved: highPayoff.interestSaved
+          }
+        },
+        explanation: explanations.debt || 'Paying down high-interest debt saves money on interest charges and improves financial flexibility.'
+      };
+
+      console.log(`🎯 [Allocation] Debt Paydown included - Total: $${debtBalance}, Recommended payment: $${debtPresets.recommended.amount}/month, Payoff: ${recommendedPayoff.months} months`);
+    }
 
     const response = {
       allocations: {
         essentialSpending: {
           amount: adjustedEssentialAmount,
           percentage: essentialPercentage,
+          currentBalance: essentialBalance,
           categories: userEssentialCategories.length > 0 ? userEssentialCategories : essentialCategoryList,
           explanation: explanations.essential,
         },
@@ -1149,19 +1252,25 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
           amount: adjustedEmergencyAmount,
           percentage: emergencyFundPercentage,
           targetAmount: emergencyFundTarget,
-          currentSavings: savings,
+          currentBalance: emergencyBalance,
           monthsToTarget: monthsToTarget,
+          durationOptions: emergencyDurationOptions,
           explanation: explanations.emergencyFund,
         },
         discretionarySpending: {
           amount: adjustedDiscretionaryAmount,
-          percentage: discretionaryPercentage,
+          percentage: Math.round((adjustedDiscretionaryAmount / monthlyIncome) * 100),
+          currentBalance: discretionaryBalance,
+          presetOptions: discretionaryPresets,
           categories: userDiscretionaryCategories.length > 0 ? userDiscretionaryCategories : discretionaryCategoryList,
           explanation: explanations.discretionary,
         },
         investments: {
           amount: adjustedInvestmentAmount,
           percentage: investmentPercentage,
+          currentBalance: investmentBalance,
+          presetOptions: investmentPresets,
+          projection: investmentProjections,
           explanation: explanations.investment,
         },
       },
@@ -1170,8 +1279,14 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
         basedOn: emergencyFundShortfall > 0
           ? '50/30/20 rule adjusted for emergency fund priority'
           : '50/30/20 rule adjusted for your spending patterns',
+        includesDebtPaydown: shouldIncludeDebt,
       },
     };
+
+    // Add debt paydown bucket if debt > $1000
+    if (shouldIncludeDebt) {
+      response.allocations.debtPaydown = debtAllocation;
+    }
 
     console.log('🎯 [Allocation] Successfully generated allocation recommendation');
     res.json(response);
@@ -1267,7 +1382,10 @@ app.post('/api/ai/explain-allocation-change', aiRateLimiter, async (req, res) =>
  */
 function withTimeout(promise, timeoutMs, fallbackValue) {
   return Promise.race([
-    promise,
+    promise.catch(error => {
+      console.warn(`⚠️ [Fallback] Promise failed: ${error.message}`);
+      return fallbackValue;
+    }),
     new Promise((resolve) =>
       setTimeout(() => {
         console.warn(`⏱️ [Timeout] Promise exceeded ${timeoutMs}ms, using fallback`);
@@ -1287,6 +1405,7 @@ async function generateAllocationExplanations({
   targetMonths,
   healthMetrics,
   allocations,
+  includeDebt = false, // NEW: whether to generate debt explanation
 }) {
   try {
     // Prepare fallback explanations in OpenAI response format
@@ -1303,9 +1422,12 @@ async function generateAllocationExplanations({
     const fallbackInvestment = {
       choices: [{ message: { content: `Investing $${allocations.investment.amount} monthly helps build long-term wealth and prepares for retirement.` } }]
     };
+    const fallbackDebt = {
+      choices: [{ message: { content: `Paying down debt saves money on interest charges and improves financial flexibility.` } }]
+    };
 
-    // Generate explanations for all buckets in parallel with 20-second timeout per call
-    const [essentialExplanation, emergencyExplanation, discretionaryExplanation, investmentExplanation] = await Promise.all([
+    // Build promises array based on whether debt is included
+    const promises = [
       // Essential Spending explanation
       withTimeout(
         openai.chat.completions.create({
@@ -1386,24 +1508,63 @@ async function generateAllocationExplanations({
         20000,
         fallbackInvestment
       ),
-    ]);
+    ];
 
-    return {
-      essential: essentialExplanation.choices[0].message.content.trim(),
-      emergencyFund: emergencyExplanation.choices[0].message.content.trim(),
-      discretionary: discretionaryExplanation.choices[0].message.content.trim(),
-      investment: investmentExplanation.choices[0].message.content.trim(),
+    // Add debt explanation if needed
+    if (includeDebt && allocations.debt) {
+      promises.push(
+        withTimeout(
+          openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a financial advisor. Explain budget allocations in 1-2 sentences. Be encouraging and specific.',
+              },
+              {
+                role: 'user',
+                content: `Explain why allocating $${allocations.debt.amount} (${allocations.debt.percentage}% of $${monthlyIncome} monthly income) to debt paydown is important. Total debt: $${debt}. This payment will help pay off the debt faster and save on interest charges.`,
+              },
+            ],
+            max_tokens: 100,
+            temperature: 0.7,
+          }),
+          20000,
+          fallbackDebt
+        )
+      );
+    }
+
+    const explanations = await Promise.all(promises);
+
+    const result = {
+      essential: explanations[0].choices[0].message.content.trim(),
+      emergencyFund: explanations[1].choices[0].message.content.trim(),
+      discretionary: explanations[2].choices[0].message.content.trim(),
+      investment: explanations[3].choices[0].message.content.trim(),
     };
+
+    if (includeDebt && explanations[4]) {
+      result.debt = explanations[4].choices[0].message.content.trim();
+    }
+
+    return result;
   } catch (error) {
     console.error('🎯 [Allocation] Error generating AI explanations:', error);
     // Return fallback explanations if AI fails
     const essentialMonthlyTarget = Math.round(emergencyFundTarget / (targetMonths || 6));
-    return {
+    const result = {
       essential: `Allocating $${allocations.essential.amount} covers your necessary monthly expenses while leaving room for savings.`,
       emergencyFund: `Build a ${targetMonths || 6}-month emergency fund covering your essential expenses of $${essentialMonthlyTarget}/month. At $${allocations.emergencyFund.amount}/month, you'll reach your $${emergencyFundTarget} target in ${Math.ceil((emergencyFundTarget - savings) / allocations.emergencyFund.amount)} months.`,
       discretionary: `Setting aside $${allocations.discretionary.amount} for discretionary spending allows you to enjoy life while staying financially responsible.`,
       investment: `Investing $${allocations.investment.amount} monthly helps build long-term wealth and prepares for retirement.`,
     };
+
+    if (includeDebt && allocations.debt) {
+      result.debt = `Paying down $${debt} in debt with $${allocations.debt.amount}/month saves on interest charges and improves financial flexibility.`;
+    }
+
+    return result;
   }
 }
 
@@ -1475,6 +1636,198 @@ function buildSavingsContext({
   context += `\nRecommend how to allocate this $${surplusAmount} surplus.`;
 
   return context;
+}
+
+// MARK: - Allocation Helper Functions
+
+/**
+ * Calculate preset values (Low/Rec/High) for a bucket based on fixed percentages
+ * @param {number} monthlyIncome - Monthly income
+ * @param {number} recommendedPercentage - Recommended percentage (e.g., 10 for 10%)
+ * @param {number} lowPercentage - Low tier percentage
+ * @param {number} highPercentage - High tier percentage
+ * @returns {object} Preset options with low, recommended, and high values
+ */
+function calculatePresetOptions(monthlyIncome, lowPercentage, recommendedPercentage, highPercentage) {
+  return {
+    low: {
+      amount: Math.round((monthlyIncome * lowPercentage) / 100),
+      percentage: lowPercentage
+    },
+    recommended: {
+      amount: Math.round((monthlyIncome * recommendedPercentage) / 100),
+      percentage: recommendedPercentage
+    },
+    high: {
+      amount: Math.round((monthlyIncome * highPercentage) / 100),
+      percentage: highPercentage
+    }
+  };
+}
+
+/**
+ * Generate emergency fund duration options (3/6/12 months)
+ * @param {number} essentialSpending - Monthly essential spending
+ * @param {number} currentBalance - Current emergency fund balance from linked accounts
+ * @param {string} incomeStability - 'stable', 'variable', or 'inconsistent'
+ * @param {number} monthlyIncome - Monthly income for percentage calculations
+ * @returns {Array} Array of duration options with monthly contribution presets
+ */
+function generateEmergencyFundOptions(essentialSpending, currentBalance, incomeStability, monthlyIncome) {
+  // Determine recommended duration based on income stability
+  let recommendedMonths = 6;
+  if (incomeStability === 'variable') {
+    recommendedMonths = 9;
+  } else if (incomeStability === 'inconsistent') {
+    recommendedMonths = 12;
+  }
+
+  const options = [3, 6, 12].map(months => {
+    const targetAmount = Math.round(essentialSpending * months);
+    const shortfall = Math.max(0, targetAmount - currentBalance);
+
+    // Calculate monthly contribution options for different savings periods
+    // Low: 24 months, Recommended: 18 months (moderate) or 12 months (aggressive), High: 8 months
+    const lowMonthly = shortfall > 0 ? Math.round(shortfall / 24) : 0;
+    const recommendedMonthly = shortfall > 0 ? Math.round(shortfall / (shortfall > targetAmount * 0.5 ? 12 : 18)) : 0;
+    const highMonthly = shortfall > 0 ? Math.round(shortfall / 8) : 0;
+
+    return {
+      months,
+      targetAmount,
+      shortfall,
+      monthlyContribution: {
+        low: {
+          amount: lowMonthly,
+          percentage: monthlyIncome > 0 ? Math.round((lowMonthly / monthlyIncome) * 100) : 0
+        },
+        recommended: {
+          amount: recommendedMonthly,
+          percentage: monthlyIncome > 0 ? Math.round((recommendedMonthly / monthlyIncome) * 100) : 0
+        },
+        high: {
+          amount: highMonthly,
+          percentage: monthlyIncome > 0 ? Math.round((highMonthly / monthlyIncome) * 100) : 0
+        }
+      },
+      isRecommended: months === recommendedMonths
+    };
+  });
+
+  return options;
+}
+
+/**
+ * Calculate investment growth projections using compound interest
+ * Assumes 7% annual return (conservative market average)
+ * @param {number} currentBalance - Current investment balance
+ * @param {number} monthlyIncome - Monthly income for percentage calculations
+ * @param {number} lowPercentage - Low tier percentage
+ * @param {number} recommendedPercentage - Recommended percentage
+ * @param {number} highPercentage - High tier percentage
+ * @returns {object} Investment projections for low/rec/high tiers
+ */
+function calculateInvestmentProjections(currentBalance, monthlyIncome, lowPercentage, recommendedPercentage, highPercentage) {
+  const ANNUAL_RETURN_RATE = 0.07; // 7% annual return
+  const MONTHLY_RATE = ANNUAL_RETURN_RATE / 12;
+
+  function projectGrowth(monthlyContribution, years) {
+    const months = years * 12;
+    let balance = currentBalance;
+
+    // Compound interest formula with monthly contributions
+    // Future Value = P(1+r)^n + PMT × [((1+r)^n - 1) / r]
+    const principalGrowth = currentBalance * Math.pow(1 + MONTHLY_RATE, months);
+    const contributionGrowth = monthlyContribution * ((Math.pow(1 + MONTHLY_RATE, months) - 1) / MONTHLY_RATE);
+
+    return Math.round(principalGrowth + contributionGrowth);
+  }
+
+  const lowContribution = Math.round((monthlyIncome * lowPercentage) / 100);
+  const recommendedContribution = Math.round((monthlyIncome * recommendedPercentage) / 100);
+  const highContribution = Math.round((monthlyIncome * highPercentage) / 100);
+
+  return {
+    currentBalance,
+    lowProjection: {
+      monthlyContribution: lowContribution,
+      year10: projectGrowth(lowContribution, 10),
+      year20: projectGrowth(lowContribution, 20),
+      year30: projectGrowth(lowContribution, 30)
+    },
+    recommendedProjection: {
+      monthlyContribution: recommendedContribution,
+      year10: projectGrowth(recommendedContribution, 10),
+      year20: projectGrowth(recommendedContribution, 20),
+      year30: projectGrowth(recommendedContribution, 30)
+    },
+    highProjection: {
+      monthlyContribution: highContribution,
+      year10: projectGrowth(highContribution, 10),
+      year20: projectGrowth(highContribution, 20),
+      year30: projectGrowth(highContribution, 30)
+    }
+  };
+}
+
+/**
+ * Calculate debt paydown timeline and interest saved
+ * Simplified calculation - assumes average APR across all debts
+ * @param {number} totalDebt - Total debt balance
+ * @param {number} monthlyPayment - Monthly payment amount
+ * @param {number} averageAPR - Average APR (e.g., 0.18 for 18%)
+ * @returns {object} Timeline with months to payoff and interest saved
+ */
+function calculateDebtPayoff(totalDebt, monthlyPayment, averageAPR = 0.18) {
+  if (totalDebt === 0 || monthlyPayment === 0) {
+    return { months: 0, totalPaid: 0, interestPaid: 0, interestSaved: 0 };
+  }
+
+  const monthlyRate = averageAPR / 12;
+  let balance = totalDebt;
+  let months = 0;
+  let totalInterest = 0;
+
+  // Calculate payoff with given payment
+  while (balance > 0 && months < 600) { // Cap at 50 years to prevent infinite loops
+    const interestCharge = balance * monthlyRate;
+    const principalPayment = monthlyPayment - interestCharge;
+
+    if (principalPayment <= 0) {
+      // Payment doesn't cover interest - would never pay off
+      return { months: 600, totalPaid: monthlyPayment * 600, interestPaid: monthlyPayment * 600 - totalDebt, interestSaved: 0 };
+    }
+
+    totalInterest += interestCharge;
+    balance -= principalPayment;
+    months++;
+  }
+
+  // Calculate minimum payment (3% of balance or $25, whichever is greater)
+  const minimumPayment = Math.max(totalDebt * 0.03, 25);
+  let minBalance = totalDebt;
+  let minMonths = 0;
+  let minInterest = 0;
+
+  while (minBalance > 0 && minMonths < 600) {
+    const interestCharge = minBalance * monthlyRate;
+    const principalPayment = minimumPayment - interestCharge;
+
+    if (principalPayment <= 0) break;
+
+    minInterest += interestCharge;
+    minBalance -= principalPayment;
+    minMonths++;
+  }
+
+  const interestSaved = Math.max(0, minInterest - totalInterest);
+
+  return {
+    months: Math.round(months),
+    totalPaid: Math.round(totalDebt + totalInterest),
+    interestPaid: Math.round(totalInterest),
+    interestSaved: Math.round(interestSaved)
+  };
 }
 
 // Start server

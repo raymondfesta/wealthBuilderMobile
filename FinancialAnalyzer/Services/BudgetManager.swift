@@ -11,7 +11,7 @@ class BudgetManager: ObservableObject {
 
     private let baseURL: String
 
-    init(baseURL: String = "http://192.168.1.8:3000") {
+    init(baseURL: String = "http://localhost:3000") {
         self.baseURL = baseURL
         loadFromCache()
     }
@@ -227,9 +227,7 @@ class BudgetManager: ObservableObject {
     /// Deletes a goal
     func deleteGoal(_ goal: Goal) {
         if let index = goals.firstIndex(where: { $0.id == goal.id }) {
-            let goalToDelete = goals[index]
             goals.remove(at: index)
-
             saveContext()
         }
     }
@@ -391,6 +389,7 @@ class BudgetManager: ObservableObject {
                 targetAmount: emergency.targetAmount,
                 monthsToTarget: emergency.monthsToTarget
             )
+            bucket.emergencyDurationOptions = emergency.durationOptions
             newBuckets.append(bucket)
             print("💰 [BudgetManager] Created Emergency Fund bucket: $\(emergency.amount) (\(emergency.percentage)%), target=$\(emergency.targetAmount ?? 0)")
         }
@@ -404,6 +403,7 @@ class BudgetManager: ObservableObject {
                 linkedCategories: discretionary.categories ?? [],
                 explanation: discretionary.explanation
             )
+            bucket.presetOptions = discretionary.presetOptions
             newBuckets.append(bucket)
             print("💰 [BudgetManager] Created Discretionary Spending bucket: $\(discretionary.amount) (\(discretionary.percentage)%)")
         }
@@ -417,8 +417,24 @@ class BudgetManager: ObservableObject {
                 linkedCategories: [], // Virtual bucket
                 explanation: investments.explanation
             )
+            bucket.presetOptions = investments.presetOptions
+            bucket.investmentProjection = investments.projection
             newBuckets.append(bucket)
             print("💰 [BudgetManager] Created Investments bucket: $\(investments.amount) (\(investments.percentage)%)")
+        }
+
+        // Debt Paydown (only if debt > $1000)
+        if let debtPaydown = allocationResponse.allocations.debtPaydown {
+            let bucket = AllocationBucket(
+                type: .debtPaydown,
+                allocatedAmount: debtPaydown.amount,
+                percentageOfIncome: debtPaydown.percentage,
+                linkedCategories: [],
+                explanation: debtPaydown.explanation
+            )
+            bucket.presetOptions = debtPaydown.presetOptions
+            newBuckets.append(bucket)
+            print("💰 [BudgetManager] Created Debt Paydown bucket: $\(debtPaydown.amount) (\(debtPaydown.percentage)%)")
         }
 
         // Update published property
@@ -604,9 +620,10 @@ private struct AllocationResponse: Codable {
 
 private struct AllocationsData: Codable {
     let essentialSpending: AllocationDetail?
-    let emergencyFund: EmergencyFundDetail?
+    let emergencyFund: EmergencyFundAPIDetail?
     let discretionarySpending: AllocationDetail?
-    let investments: AllocationDetail?
+    let investments: InvestmentAPIDetail?
+    let debtPaydown: DebtPaydownDetail?
 }
 
 private struct AllocationDetail: Codable {
@@ -614,17 +631,53 @@ private struct AllocationDetail: Codable {
     let percentage: Double
     let categories: [String]?
     let explanation: String
+    let currentBalance: Double?
+    let presetOptions: PresetOptions?
 }
 
-private struct EmergencyFundDetail: Codable {
+private struct EmergencyFundAPIDetail: Codable {
     let amount: Double
     let percentage: Double
     let targetAmount: Double?
     let monthsToTarget: Int?
     let explanation: String
+    let currentBalance: Double?
+    let durationOptions: [EmergencyFundDurationOption]?
+}
+
+private struct InvestmentAPIDetail: Codable {
+    let amount: Double
+    let percentage: Double
+    let explanation: String
+    let currentBalance: Double?
+    let presetOptions: PresetOptions?
+    let projection: InvestmentProjection?
+}
+
+private struct DebtPaydownDetail: Codable {
+    let amount: Double
+    let percentage: Double
+    let totalDebt: Double?
+    let highInterestDebt: Double?
+    let averageAPR: Double?
+    let explanation: String
+    let presetOptions: PresetOptions?
+    let payoffTimeline: PayoffTimeline?
+}
+
+private struct PayoffTimeline: Codable {
+    let low: PayoffInfo
+    let recommended: PayoffInfo
+    let high: PayoffInfo
+}
+
+private struct PayoffInfo: Codable {
+    let months: Int
+    let interestSaved: Double
 }
 
 private struct AllocationSummary: Codable {
     let totalAllocated: Double
     let basedOn: String
+    let includesDebtPaydown: Bool?
 }

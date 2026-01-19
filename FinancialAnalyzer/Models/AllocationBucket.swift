@@ -2,8 +2,7 @@ import Foundation
 import Combine
 
 /// Represents an allocation bucket for distributing income across financial priorities
-@MainActor
-final class AllocationBucket: Identifiable, ObservableObject {
+final class AllocationBucket: Identifiable, ObservableObject, @unchecked Sendable {
     @Published var id: String
     @Published var type: AllocationBucketType
     @Published var allocatedAmount: Double // Dollar amount allocated
