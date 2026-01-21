@@ -17,10 +17,10 @@ struct ProactiveGuidanceDemoView: View {
                     if let summary = viewModel.summary {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
-                                Text("Available to Spend")
+                                Text("To Allocate")
                                     .foregroundColor(.secondary)
                                 Spacer()
-                                Text(formatCurrency(summary.availableToSpend))
+                                Text(formatCurrency(summary.toAllocate))
                                     .fontWeight(.bold)
                             }
 

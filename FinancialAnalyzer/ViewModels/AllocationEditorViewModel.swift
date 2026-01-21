@@ -63,21 +63,22 @@ class AllocationEditorViewModel: ObservableObject {
     }
 
     /// Update a bucket amount and rebalance others
+    /// Returns list of auto-adjustments made to other buckets (for toast notification)
     func updateBucket(
         id: String,
         newAmount: Double,
         monthlyIncome: Double,
         allBuckets: [AllocationBucket]
-    ) {
+    ) -> [AllocationAdjustment] {
         guard let changedBucket = allBuckets.first(where: { $0.id == id }) else {
             print("⚠️ [AllocationEditor] Bucket \(id) not found")
-            return
+            return []
         }
 
         // Prevent modification of non-modifiable buckets
         guard changedBucket.isModifiable else {
             print("⚠️ [AllocationEditor] Cannot modify locked bucket: \(changedBucket.displayName)")
-            return
+            return []
         }
 
         let oldAmount = bucketAmounts[id] ?? changedBucket.allocatedAmount
@@ -96,27 +97,28 @@ class AllocationEditorViewModel: ObservableObject {
         // If delta is negligible, no rebalancing needed
         guard abs(delta) > 0.01 else {
             print("   ↳ No rebalancing needed (delta too small)")
-            return
+            return []
         }
 
-        // Get other modifiable, unlocked buckets for rebalancing
+        // Get other modifiable buckets for rebalancing
         let otherModifiableBuckets = allBuckets.filter { bucket in
-            bucket.id != id && bucket.isModifiable && !bucket.isLocked
+            bucket.id != id && bucket.isModifiable
         }
 
         guard !otherModifiableBuckets.isEmpty else {
-            print("   ↳ No other unlocked buckets to adjust")
-            return
+            print("   ↳ No other modifiable buckets to adjust")
+            return []
         }
 
-        print("   ↳ Rebalancing \(otherModifiableBuckets.count) unlocked bucket(s):")
+        print("   ↳ Rebalancing \(otherModifiableBuckets.count) modifiable bucket(s):")
 
         // Smart priority-based rebalancing
-        // Priority: Discretionary → Investments → Emergency Fund
+        // Priority: Discretionary → Investments → Debt Paydown → Emergency Fund
+        // Rationale: Preserve emergency fund as last resort, adjust flexible spending first
         var remainingDelta = -delta // Amount to distribute to other buckets
         var adjustedBuckets: [(bucket: AllocationBucket, oldAmount: Double, newAmount: Double)] = []
 
-        let priorityOrder: [AllocationBucketType] = [.discretionarySpending, .investments, .emergencyFund]
+        let priorityOrder: [AllocationBucketType] = [.discretionarySpending, .investments, .debtPaydown, .emergencyFund]
 
         for priorityType in priorityOrder {
             guard abs(remainingDelta) > 0.01 else { break }
@@ -216,6 +218,31 @@ class AllocationEditorViewModel: ObservableObject {
         }
 
         print("   ✅ Total allocation: $\(Int(totalAllocated)) (\(Int(allocationPercentage(monthlyIncome: monthlyIncome)))%)")
+
+        // Convert adjusted buckets into AllocationAdjustment instances
+        var adjustmentsList: [AllocationAdjustment] = []
+
+        for (bucket, previousAmount, newAmount) in adjustedBuckets {
+            let amountChanged = newAmount - previousAmount
+
+            // Only include if change is significant
+            if abs(amountChanged) > 0.01 {
+                let adjustment = AllocationAdjustment(
+                    bucketType: bucket.type,
+                    amountChanged: amountChanged,
+                    previousAmount: previousAmount,
+                    newAmount: newAmount
+                )
+                adjustmentsList.append(adjustment)
+
+                // Record auto-adjustment on the bucket for badge display
+                bucket.recordAutoAdjustment(amountChanged: amountChanged)
+            }
+        }
+
+        print("   📊 Recorded \(adjustmentsList.count) auto-adjustment(s)")
+
+        return adjustmentsList
     }
 
     /// Get binding for a specific bucket
@@ -224,5 +251,58 @@ class AllocationEditorViewModel: ObservableObject {
             get: { self.bucketAmounts[bucketId] ?? defaultValue },
             set: { self.bucketAmounts[bucketId] = $0 }
         )
+    }
+
+    // MARK: - Edge Case Detection
+
+    /// Detects if essential spending exceeds safe threshold (>80% of income)
+    func detectHighEssentialSpending(
+        essentialBucketId: String,
+        monthlyIncome: Double
+    ) -> (isHigh: Bool, percentage: Double) {
+        guard let essentialAmount = bucketAmounts[essentialBucketId], monthlyIncome > 0 else {
+            return (false, 0)
+        }
+
+        let percentage = (essentialAmount / monthlyIncome) * 100
+        return (percentage > 80, percentage)
+    }
+
+    /// Detects if discretionary spending is below minimum healthy level (<5% of income)
+    func detectLowDiscretionarySpending(
+        discretionaryBucketId: String,
+        monthlyIncome: Double
+    ) -> (isTooLow: Bool, percentage: Double) {
+        guard let discretionaryAmount = bucketAmounts[discretionaryBucketId], monthlyIncome > 0 else {
+            return (false, 0)
+        }
+
+        let percentage = (discretionaryAmount / monthlyIncome) * 100
+        return (percentage < 5, percentage)
+    }
+
+    /// Detects if emergency fund allocation is insufficient (<3% of income)
+    func detectInsufficientEmergencyFund(
+        emergencyBucketId: String,
+        monthlyIncome: Double
+    ) -> (isInsufficient: Bool, percentage: Double) {
+        guard let emergencyAmount = bucketAmounts[emergencyBucketId], monthlyIncome > 0 else {
+            return (false, 0)
+        }
+
+        let percentage = (emergencyAmount / monthlyIncome) * 100
+        return (percentage < 3, percentage)
+    }
+
+    /// Detects budget overflow (total allocation > income)
+    func detectBudgetOverflow(monthlyIncome: Double) -> (hasOverflow: Bool, overflowAmount: Double) {
+        let overflow = totalAllocated - monthlyIncome
+        return (overflow > 0.01, overflow)
+    }
+
+    /// Detects unallocated income (total allocation < income)
+    func detectUnallocatedIncome(monthlyIncome: Double) -> (hasUnallocated: Bool, unallocatedAmount: Double) {
+        let unallocated = monthlyIncome - totalAllocated
+        return (unallocated > 0.01, unallocated)
     }
 }

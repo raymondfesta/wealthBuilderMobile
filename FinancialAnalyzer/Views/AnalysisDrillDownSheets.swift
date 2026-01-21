@@ -62,39 +62,52 @@ struct IncomeDetailSheet: View {
 struct ExpenseDetailSheet: View {
     let transactions: [Transaction]
     let monthlyAverage: Double
+    let expenseBreakdown: ExpenseBreakdown?
     let onValidateTransaction: (Transaction) -> Void
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             List {
-                // Summary section
-                Section {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Monthly Average")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            Text(formatCurrency(monthlyAverage))
-                                .font(.title2)
-                                .fontWeight(.bold)
-                        }
-                        Spacer()
-                        Image(systemName: "cart.fill")
-                            .font(.largeTitle)
-                            .foregroundColor(.opportunityOrange)
-                    }
-                    .padding(.vertical, 8)
-                }
+                // Summary section with confidence indicator
+                summarySection
 
-                // Category breakdown
-                Section("By Category") {
-                    ForEach(categoryBreakdown, id: \.category) { item in
-                        HStack {
-                            Text(item.category)
-                            Spacer()
-                            Text(formatCurrency(item.total))
-                                .foregroundColor(.secondary)
+                // Category breakdown - use new 7-category if available
+                if let breakdown = expenseBreakdown {
+                    Section("Breakdown by Category") {
+                        ForEach(breakdown.categories) { category in
+                            HStack(spacing: 12) {
+                                Image(systemName: category.icon)
+                                    .font(.title3)
+                                    .foregroundColor(Color(category.color))
+                                    .frame(width: 24)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(category.name)
+                                        .font(.subheadline)
+                                    Text("\(Int(category.percentage(of: breakdown.total)))%")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+
+                                Spacer()
+
+                                Text(formatCurrency(category.amount))
+                                    .monospacedDigit()
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                } else {
+                    // Legacy category breakdown (Plaid categories)
+                    Section("By Category") {
+                        ForEach(categoryBreakdown, id: \.category) { item in
+                            HStack {
+                                Text(item.category)
+                                Spacer()
+                                Text(formatCurrency(item.total))
+                                    .foregroundColor(.secondary)
+                            }
                         }
                     }
                 }
@@ -147,6 +160,49 @@ struct ExpenseDetailSheet: View {
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
     }
+
+    // MARK: - Summary Section
+
+    private var summarySection: some View {
+        Section {
+            VStack(spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Monthly Average")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Text(formatCurrency(monthlyAverage))
+                            .font(.title2)
+                            .fontWeight(.bold)
+                    }
+                    Spacer()
+                    Image(systemName: "cart.fill")
+                        .font(.largeTitle)
+                        .foregroundColor(.opportunityOrange)
+                }
+
+                // Confidence badge (if breakdown available)
+                if let breakdown = expenseBreakdown {
+                    let level = breakdown.confidenceLevel
+                    HStack(spacing: 8) {
+                        Image(systemName: level.iconName)
+                            .foregroundColor(Color(level.systemColor))
+                        Text("\(Int(breakdown.confidence * 100))% confident")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color(level.systemColor).opacity(0.1))
+                    .cornerRadius(8)
+                }
+            }
+            .padding(.vertical, 8)
+        }
+    }
+
+    // MARK: - Computed Properties
 
     private var expenseTransactions: [Transaction] {
         transactions

@@ -92,7 +92,7 @@ struct ContentView: View {
                 DashboardView(viewModel: viewModel)
             }
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(.light)
         .tint(.blue)
         .sheet(isPresented: $viewModel.isShowingGuidance) {
             if let alert = viewModel.currentAlert {

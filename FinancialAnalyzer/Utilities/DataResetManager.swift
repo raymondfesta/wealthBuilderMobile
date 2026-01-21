@@ -77,7 +77,7 @@ class DataResetManager {
     private static func resetBackend() async {
         print("🗑️ [Reset] Attempting to clear backend tokens...")
 
-        guard let url = URL(string: "http://192.168.1.8:3000/api/dev/reset-all") else {
+        guard let url = URL(string: "http://localhost:3000/api/dev/reset-all") else {
             print("⚠️ [Reset] Invalid backend URL")
             return
         }
@@ -134,6 +134,11 @@ class DataResetManager {
             "cached_budgets",
             "cached_goals",
             "cached_allocation_buckets",
+            "cached_health_metrics",
+            "cached_previous_health_metrics",
+            "cached_journey_state",
+            "health_report_setup_completed",
+            "has_viewed_health_tab",
             "hasSeenWelcome",
             "hasCompletedOnboarding"
         ]
@@ -142,6 +147,10 @@ class DataResetManager {
             UserDefaults.standard.removeObject(forKey: key)
             print("🗑️ [Reset] ✅ Removed UserDefaults key: \(key)")
         }
+
+        // Clear allocation plan storage
+        AllocationPlanStorage.shared.clearAllData()
+
         UserDefaults.standard.synchronize()
         print("🗑️ [Reset] UserDefaults cleared (\(keysToRemove.count) keys removed)")
     }

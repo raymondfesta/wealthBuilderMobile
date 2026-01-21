@@ -282,11 +282,13 @@ struct TransactionAnalyzer {
         // Calculate monthly averages
         let monthDivisor = Double(monthsAnalyzed)
         let avgMonthlyIncome = incomeTotal / monthDivisor
-        let avgMonthlyExpenses = expensesTotal / monthDivisor
         let monthlyInvestmentContributions = investmentContributionsTotal / monthDivisor
 
         // Calculate debt minimums from accounts
         let debtMinimums = calculateDebtMinimums(accounts: accounts)
+
+        // Generate detailed expense breakdown with confidence scoring
+        let expenseBreakdown = categorizeExpenses(from: filteredTransactions, months: monthsAnalyzed)
 
         // Calculate position from accounts
         let totalDebt = accounts
@@ -307,10 +309,10 @@ struct TransactionAnalyzer {
         // Count transactions needing validation
         let transactionsNeedingValidation = filteredTransactions.filter { $0.needsValidation }.count
 
-        // Build the snapshot
+        // Build the snapshot with expense breakdown
         let monthlyFlow = MonthlyFlow(
             income: avgMonthlyIncome,
-            essentialExpenses: avgMonthlyExpenses,
+            expenseBreakdown: expenseBreakdown,
             debtMinimums: debtMinimums
         )
 
@@ -331,9 +333,10 @@ struct TransactionAnalyzer {
 
         print("📊 [AnalysisSnapshot] Generated:")
         print("   Income: $\(Int(avgMonthlyIncome))/mo")
-        print("   Expenses: $\(Int(avgMonthlyExpenses))/mo")
+        print("   Expenses: $\(Int(expenseBreakdown.total))/mo (\(expenseBreakdown.categoryCount) categories)")
+        print("   Expense Confidence: \(Int(expenseBreakdown.confidence * 100))%")
         print("   Debt Minimums: $\(Int(debtMinimums))/mo")
-        print("   Discretionary: $\(Int(monthlyFlow.discretionaryIncome))/mo")
+        print("   To Allocate: $\(Int(monthlyFlow.discretionaryIncome))/mo")
         print("   Emergency Fund: $\(Int(emergencyCash))")
         print("   Investment Contributions: $\(Int(monthlyInvestmentContributions))/mo")
         print("   Needs Validation: \(transactionsNeedingValidation) txns")
@@ -345,7 +348,162 @@ struct TransactionAnalyzer {
         )
     }
 
-    // MARK: - Category Breakdown
+    // MARK: - Expense Breakdown by Category
+
+    /// Categorizes expense transactions into 7 essential categories with confidence scoring
+    /// Uses Plaid PFC for categorization, falling back to keyword matching
+    /// - Parameters:
+    ///   - transactions: Expense transactions to categorize
+    ///   - months: Number of months for averaging (default 1 for totals)
+    /// - Returns: ExpenseBreakdown with 7 categories and confidence score
+    static func categorizeExpenses(
+        from transactions: [Transaction],
+        months: Int = 1
+    ) -> ExpenseBreakdown {
+        var housing: Double = 0
+        var food: Double = 0
+        var transportation: Double = 0
+        var utilities: Double = 0
+        var insurance: Double = 0
+        var subscriptions: Double = 0
+        var other: Double = 0
+
+        var highConfidenceCount = 0
+        var totalExpenseCount = 0
+
+        // Filter to expense and debt transactions only (debt payments are still expenses)
+        let expenseTransactions = transactions.filter { transaction in
+            let bucket = transaction.bucketCategory
+            return (bucket == .expenses || bucket == .debt) && !transaction.pending
+        }
+
+        for transaction in expenseTransactions {
+            let amount = transaction.amount
+            totalExpenseCount += 1
+
+            if let pfc = transaction.personalFinanceCategory {
+                // Track high confidence for overall score
+                if pfc.confidenceLevel == .high || pfc.confidenceLevel == .veryHigh {
+                    highConfidenceCount += 1
+                }
+
+                // Map PFC primary category to our 7 expense categories
+                let primary = pfc.primary.uppercased()
+                let detailed = pfc.detailed.uppercased()
+
+                switch primary {
+                case "RENT_AND_UTILITIES":
+                    // Split rent vs utilities based on detailed category
+                    if detailed.contains("RENT") || detailed.contains("MORTGAGE") {
+                        housing += amount
+                    } else {
+                        utilities += amount
+                    }
+
+                case "FOOD_AND_DRINK":
+                    food += amount
+
+                case "TRANSPORTATION":
+                    transportation += amount
+
+                case "HOME_IMPROVEMENT":
+                    housing += amount
+
+                case "MEDICAL":
+                    // Check if it's insurance or general medical
+                    if detailed.contains("INSURANCE") {
+                        insurance += amount
+                    } else {
+                        other += amount
+                    }
+
+                case "PERSONAL_CARE":
+                    other += amount
+
+                case "ENTERTAINMENT":
+                    // Check for streaming/subscription services
+                    if detailed.contains("SUBSCRIPTION") || detailed.contains("STREAMING") ||
+                       detailed.contains("MUSIC") || detailed.contains("VIDEO") {
+                        subscriptions += amount
+                    } else {
+                        other += amount
+                    }
+
+                case "GENERAL_SERVICES":
+                    // Check for subscription-type services
+                    if detailed.contains("SUBSCRIPTION") || detailed.contains("MEMBERSHIP") ||
+                       detailed.contains("GYM") || detailed.contains("FITNESS") {
+                        subscriptions += amount
+                    } else {
+                        other += amount
+                    }
+
+                case "LOAN_PAYMENTS":
+                    // Loan payments go to other (debt minimums tracked separately)
+                    other += amount
+
+                case "BANK_FEES", "GOVERNMENT_AND_NON_PROFIT":
+                    other += amount
+
+                case "GENERAL_MERCHANDISE":
+                    other += amount
+
+                case "TRAVEL":
+                    transportation += amount
+
+                default:
+                    other += amount
+                }
+            } else {
+                // Fallback: use legacy category keywords
+                let categoryString = transaction.category.joined(separator: " ").lowercased()
+
+                if categoryString.contains("rent") || categoryString.contains("mortgage") ||
+                   categoryString.contains("housing") {
+                    housing += amount
+                } else if categoryString.contains("groceries") || categoryString.contains("food") ||
+                          categoryString.contains("restaurant") || categoryString.contains("dining") {
+                    food += amount
+                } else if categoryString.contains("gas") || categoryString.contains("uber") ||
+                          categoryString.contains("lyft") || categoryString.contains("transit") ||
+                          categoryString.contains("parking") || categoryString.contains("auto") {
+                    transportation += amount
+                } else if categoryString.contains("electric") || categoryString.contains("utility") ||
+                          categoryString.contains("water") || categoryString.contains("internet") ||
+                          categoryString.contains("phone") {
+                    utilities += amount
+                } else if categoryString.contains("insurance") {
+                    insurance += amount
+                } else if categoryString.contains("subscription") || categoryString.contains("netflix") ||
+                          categoryString.contains("spotify") || categoryString.contains("gym") {
+                    subscriptions += amount
+                } else {
+                    other += amount
+                }
+            }
+        }
+
+        // Calculate confidence score (percentage of high-confidence categorizations)
+        let confidence = totalExpenseCount > 0
+            ? Double(highConfidenceCount) / Double(totalExpenseCount)
+            : 0.0
+
+        // Convert to monthly averages if months > 1
+        let divisor = Double(max(months, 1))
+
+        return ExpenseBreakdown(
+            housing: housing / divisor,
+            food: food / divisor,
+            transportation: transportation / divisor,
+            utilities: utilities / divisor,
+            insurance: insurance / divisor,
+            subscriptions: subscriptions / divisor,
+            other: other / divisor,
+            confidence: confidence
+        )
+    }
+
+    // MARK: - Category Breakdown (Legacy)
 
     static func expensesByCategory(
         from transactions: [Transaction]
@@ -438,7 +596,7 @@ struct TransactionAnalyzer {
         case .cash:
             return "Sum of available balances in all checking and savings accounts"
         case .disposable:
-            return "Cash Available - Estimated Remaining Expenses (based on your spending patterns)"
+            return "Monthly income minus essential expenses and minimum debt payments"
         }
     }
 

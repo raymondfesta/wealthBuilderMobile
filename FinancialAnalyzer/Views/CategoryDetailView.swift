@@ -132,8 +132,8 @@ struct CategoryDetailView: View {
                             .padding(.vertical, 4)
 
                         breakdownRow(
-                            label: "Available to Spend",
-                            value: summary.availableToSpend,
+                            label: "To Allocate",
+                            value: summary.toAllocate,
                             color: .purple,
                             isBold: true
                         )

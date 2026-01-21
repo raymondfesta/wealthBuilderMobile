@@ -9,6 +9,12 @@ struct FinancialSummary: Codable {
     var totalCashAvailable: Double
     var availableToSpend: Double
 
+    /// Alias for availableToSpend - renamed for clarity
+    /// This is the income available to allocate, not "spend"
+    var toAllocate: Double {
+        availableToSpend
+    }
+
     // Investment contributions (tracked separately from expenses)
     var monthlyInvestmentContributions: Double
 
@@ -60,7 +66,7 @@ struct FinancialSummary: Codable {
         case .cash:
             return totalCashAvailable
         case .disposable:
-            return availableToSpend
+            return toAllocate
         }
     }
 

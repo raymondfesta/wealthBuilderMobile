@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		DS001001 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = DS002001 /* DesignTokens.swift */; };
+		DS001002 /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = DS002002 /* Typography.swift */; };
+		DS001003 /* GlassmorphicCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DS002003 /* GlassmorphicCard.swift */; };
+		DS001004 /* FinancialMetricRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = DS002004 /* FinancialMetricRow.swift */; };
+		DS001005 /* PrimaryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = DS002005 /* PrimaryButton.swift */; };
 		AA001001 /* AllocationExecution.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA002001 /* AllocationExecution.swift */; };
 		AA001002 /* AllocationScheduleConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA002002 /* AllocationScheduleConfig.swift */; };
 		AA001003 /* AnalysisSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA002003 /* AnalysisSnapshot.swift */; };
@@ -41,6 +46,8 @@
 		AA001032 /* EmergencyFundDurationPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA005005 /* EmergencyFundDurationPicker.swift */; };
 		AA001033 /* InvestmentProjectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA005006 /* InvestmentProjectionView.swift */; };
 		AA001034 /* RebalanceToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA005007 /* RebalanceToast.swift */; };
+		AA006001 /* ExpenseBreakdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA006002 /* ExpenseBreakdown.swift */; };
+		AA006003 /* ExpenseBreakdownSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA006004 /* ExpenseBreakdownSheet.swift */; };
 		991CAD642EAD528200000EDB /* FinancialHealthMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD612EAD528200000EDB /* FinancialHealthMetrics.swift */; };
 		991CAD652EAD528200000EDB /* LoadingStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD622EAD528200000EDB /* LoadingStep.swift */; };
 		991CAD662EAD528200000EDB /* PersonalFinanceCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD632EAD528200000EDB /* PersonalFinanceCategory.swift */; };
@@ -99,6 +106,11 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		DS002001 /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
+		DS002002 /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typography.swift; sourceTree = "<group>"; };
+		DS002003 /* GlassmorphicCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassmorphicCard.swift; sourceTree = "<group>"; };
+		DS002004 /* FinancialMetricRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialMetricRow.swift; sourceTree = "<group>"; };
+		DS002005 /* PrimaryButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrimaryButton.swift; sourceTree = "<group>"; };
 		AA002001 /* AllocationExecution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationExecution.swift; sourceTree = "<group>"; };
 		AA002002 /* AllocationScheduleConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationScheduleConfig.swift; sourceTree = "<group>"; };
 		AA002003 /* AnalysisSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalysisSnapshot.swift; sourceTree = "<group>"; };
@@ -133,6 +145,8 @@
 		AA005005 /* EmergencyFundDurationPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmergencyFundDurationPicker.swift; sourceTree = "<group>"; };
 		AA005006 /* InvestmentProjectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvestmentProjectionView.swift; sourceTree = "<group>"; };
 		AA005007 /* RebalanceToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RebalanceToast.swift; sourceTree = "<group>"; };
+		AA006002 /* ExpenseBreakdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpenseBreakdown.swift; sourceTree = "<group>"; };
+		AA006004 /* ExpenseBreakdownSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpenseBreakdownSheet.swift; sourceTree = "<group>"; };
 		991CAD612EAD528200000EDB /* FinancialHealthMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialHealthMetrics.swift; sourceTree = "<group>"; };
 		991CAD622EAD528200000EDB /* LoadingStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingStep.swift; sourceTree = "<group>"; };
 		991CAD632EAD528200000EDB /* PersonalFinanceCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalFinanceCategory.swift; sourceTree = "<group>"; };
@@ -202,6 +216,26 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		DS003000 /* DesignSystem */ = {
+			isa = PBXGroup;
+			children = (
+				DS002001 /* DesignTokens.swift */,
+				DS002002 /* Typography.swift */,
+				DS003001 /* Components */,
+			);
+			path = DesignSystem;
+			sourceTree = "<group>";
+		};
+		DS003001 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				DS002003 /* GlassmorphicCard.swift */,
+				DS002004 /* FinancialMetricRow.swift */,
+				DS002005 /* PrimaryButton.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
 		991CAD7A2EAD533300000EDB /* Components */ = {
 			isa = PBXGroup;
 			children = (
@@ -238,6 +272,7 @@
 			isa = PBXGroup;
 			children = (
 				991CAD842EAD537200000EDB /* Extensions */,
+				DS003000 /* DesignSystem */,
 				FA001000 /* FinancialAnalyzerApp.swift */,
 				FA002004 /* Models */,
 				FA003002 /* Services */,
@@ -280,6 +315,7 @@
 				AA002008 /* PaycheckSchedule.swift */,
 				AA002009 /* PresetOptions.swift */,
 				AA002010 /* ScheduledAllocation.swift */,
+				AA006002 /* ExpenseBreakdown.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -354,6 +390,7 @@
 				AA004010 /* ScheduleTabView.swift */,
 				AA004011 /* UpcomingAllocationsView.swift */,
 				AA004012 /* UserConsentView.swift */,
+				AA006004 /* ExpenseBreakdownSheet.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -438,6 +475,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DS001001 /* DesignTokens.swift in Sources */,
+				DS001002 /* Typography.swift in Sources */,
+				DS001003 /* GlassmorphicCard.swift in Sources */,
+				DS001004 /* FinancialMetricRow.swift in Sources */,
+				DS001005 /* PrimaryButton.swift in Sources */,
 				AA001001 /* AllocationExecution.swift in Sources */,
 				AA001002 /* AllocationScheduleConfig.swift in Sources */,
 				AA001003 /* AnalysisSnapshot.swift in Sources */,
@@ -526,6 +568,8 @@
 				991CAD802EAD535300000EDB /* ColorPalette.swift in Sources */,
 				991CAD812EAD535300000EDB /* UserDefaultsExtension.swift in Sources */,
 				991CAD7B2EAD533300000EDB /* HealthReportComponents.swift in Sources */,
+				AA006001 /* ExpenseBreakdown.swift in Sources */,
+				AA006003 /* ExpenseBreakdownSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

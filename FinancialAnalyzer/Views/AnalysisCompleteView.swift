@@ -18,307 +18,171 @@ struct AnalysisCompleteView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xl) {
                 // Header
-                VStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 48))
-                        .foregroundColor(.progressGreen)
+                headerSection
 
-                    Text("Analysis Complete")
-                        .font(.title2)
-                        .fontWeight(.bold)
+                // Card 1: Financial Position (FIRST per mockup)
+                financialPositionCard
 
-                    Text("Based on \(snapshot.metadata.monthsAnalyzed) months of data")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.top, 24)
-
-                // Card 1: Monthly Money Flow
-                MonthlyFlowCard(
-                    flow: snapshot.monthlyFlow,
-                    onDrillDown: onDrillDown
-                )
-
-                // Card 2: Financial Position
-                FinancialPositionCard(
-                    position: snapshot.position,
-                    monthlyExpenses: snapshot.monthlyFlow.essentialExpenses,
-                    onDrillDown: onDrillDown
-                )
+                // Card 2: Monthly Money Flow (SECOND per mockup)
+                monthlyFlowCard
 
                 // Validation indicator if needed
                 if snapshot.metadata.transactionsNeedingValidation > 0 {
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.circle")
-                            .foregroundColor(.opportunityOrange)
-                        Text("\(snapshot.metadata.transactionsNeedingValidation) transactions need review")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(12)
+                    validationIndicator
                 }
 
                 Spacer(minLength: 100)
             }
-            .padding(.horizontal)
+            .padding(.top, DesignTokens.Spacing.md)
         }
         .safeAreaInset(edge: .bottom) {
-            // CTA Button - Green pill with glow (Figma)
-            Button(action: onSeePlan) {
-                Text("Create my allocation plan")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(Color(hex: "#0B0D10"))
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.green)
-                    .clipShape(Capsule())
-                    .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 6)
-                    .shadow(color: Color.green.opacity(0.35), radius: 12, x: 0, y: 0)
-            }
-            .padding()
-            .background(.ultraThinMaterial)
+            PrimaryButton(title: "Create my allocation plan", action: onSeePlan)
+                .padding(.horizontal, DesignTokens.Spacing.md)
+                .padding(.bottom, DesignTokens.Spacing.xs)
+                .background(
+                    DesignTokens.Colors.backgroundPrimary
+                        .opacity(0.95)
+                        .blur(radius: 10)
+                )
         }
     }
-}
 
-// MARK: - Monthly Flow Card
+    // MARK: - Header Section
 
-private struct MonthlyFlowCard: View {
-    let flow: MonthlyFlow
-    let onDrillDown: (AnalysisCompleteView.DrillDownType) -> Void
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+            Text("Analysis complete")
+                .displayStyle()
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Your Monthly Money Flow")
-                .font(.headline)
-
-            VStack(spacing: 0) {
-                // Income row
-                FlowRow(
-                    label: "Income",
-                    value: flow.income,
-                    isPositive: true,
-                    showChevron: true
-                ) {
-                    onDrillDown(.income)
-                }
-
-                Divider()
-
-                // Essential Expenses row
-                FlowRow(
-                    label: "Essential Expenses",
-                    value: -flow.essentialExpenses,
-                    isPositive: false,
-                    showChevron: true
-                ) {
-                    onDrillDown(.expenses)
-                }
-
-                Divider()
-
-                // Debt Minimums row
-                FlowRow(
-                    label: "Debt Minimums",
-                    value: -flow.debtMinimums,
-                    isPositive: false,
-                    showChevron: true
-                ) {
-                    onDrillDown(.debtMinimums)
-                }
-
-                // To Allocate row (highlighted with top border)
-                VStack(spacing: 0) {
-                    Rectangle()
-                        .fill(Color.green.opacity(0.3))
-                        .frame(height: 1)
-                        .padding(.top, 8)
-
-                    HStack {
-                        Text("To Allocate")
-                            .font(.headline)
-                            .foregroundColor(.green)
-
-                        Spacer()
-
-                        Text(formatCurrency(flow.discretionaryIncome))
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.green)
-                    }
-                    .padding(.vertical, 12)
-                }
-            }
+            Text("Analyzed \(snapshot.metadata.transactionsAnalyzed) transactions over \(snapshot.metadata.monthsAnalyzed) months.")
+                .subheadlineStyle()
         }
-        .padding()
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(16)
     }
-}
 
-// MARK: - Financial Position Card
+    // MARK: - Financial Position Card
 
-private struct FinancialPositionCard: View {
-    let position: FinancialPosition
-    let monthlyExpenses: Double
-    let onDrillDown: (AnalysisCompleteView.DrillDownType) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Your Financial Position")
-                .font(.headline)
-
+    private var financialPositionCard: some View {
+        GlassmorphicCard(
+            title: "Your Financial Position",
+            subtitle: "A real-time snapshot of where your money stands today."
+        ) {
             VStack(spacing: 0) {
                 // Emergency Fund row
-                PositionRow(
-                    icon: "shield.fill",
-                    iconColor: .stableBlue,
+                FinancialMetricRow(
                     label: "Emergency Fund",
-                    value: position.emergencyCash,
-                    subtitle: "\(formattedMonths) months coverage",
-                    showChevron: true
+                    value: snapshot.position.emergencyCash
                 ) {
                     onDrillDown(.emergencyFund)
                 }
 
-                Divider()
+                cardDivider
 
                 // Total Debt row
-                PositionRow(
-                    icon: "creditcard.fill",
-                    iconColor: .opportunityOrange,
-                    label: "Total Debt",
-                    value: position.totalDebt,
-                    subtitle: nil,
-                    showChevron: true
+                FinancialMetricRow(
+                    label: "Total Debt:",
+                    value: snapshot.position.totalDebt
                 ) {
                     onDrillDown(.debt)
                 }
 
-                Divider()
+                cardDivider
 
                 // Investments row
-                PositionRow(
-                    icon: "chart.line.uptrend.xyaxis",
-                    iconColor: .wealthPurple,
-                    label: "Investments",
-                    value: position.investmentBalances,
-                    subtitle: contributionsSubtitle,
+                FinancialMetricRow(
+                    label: "Investments:",
+                    value: snapshot.position.investmentBalances,
                     showChevron: true
                 ) {
                     onDrillDown(.investments)
                 }
             }
         }
-        .padding()
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(16)
     }
 
-    private var formattedMonths: String {
-        let months = position.emergencyFundMonths(monthlyExpenses: monthlyExpenses)
-        if months >= 1 {
-            return String(format: "%.1f", months)
-        } else {
-            return "< 1"
-        }
-    }
+    // MARK: - Monthly Flow Card
 
-    private var contributionsSubtitle: String? {
-        guard position.monthlyInvestmentContributions > 0 else { return nil }
-        return "Contributing \(formatCurrency(position.monthlyInvestmentContributions))/mo"
-    }
-}
-
-// MARK: - Row Components
-
-private struct FlowRow: View {
-    let label: String
-    let value: Double
-    let isPositive: Bool
-    let showChevron: Bool
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack {
-                Text(label)
-                    .foregroundColor(.primary)
-
-                Spacer()
-
-                Text(formatCurrency(value))
-                    .foregroundColor(isPositive ? .primary : .secondary)
-
-                if showChevron {
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+    private var monthlyFlowCard: some View {
+        GlassmorphicCard(
+            title: "Your monthly money flow",
+            subtitle: "A clear picture of your monthly inflows and outflows."
+        ) {
+            VStack(spacing: 0) {
+                // Income row
+                FinancialMetricRow(
+                    label: "Income:",
+                    value: snapshot.monthlyFlow.income,
+                    valueColor: DesignTokens.Colors.progressGreen
+                ) {
+                    onDrillDown(.income)
                 }
+
+                cardDivider
+
+                // Essential Expenses row
+                FinancialMetricRow(
+                    label: "Essential Expenses:",
+                    value: -snapshot.monthlyFlow.essentialExpenses
+                ) {
+                    onDrillDown(.expenses)
+                }
+
+                cardDivider
+
+                // Debt Minimums row
+                FinancialMetricRow(
+                    label: "Debt Minimums:",
+                    value: -snapshot.monthlyFlow.debtMinimums
+                ) {
+                    onDrillDown(.debtMinimums)
+                }
+
+                // To Allocate row (highlighted)
+                HStack {
+                    Text("To Allocate:")
+                        .headlineStyle(color: DesignTokens.Colors.accentPrimary)
+
+                    Spacer()
+
+                    Text(formatCurrency(snapshot.monthlyFlow.discretionaryIncome))
+                        .title3Style(color: DesignTokens.Colors.accentPrimary)
+                }
+                .padding(.top, DesignTokens.Spacing.md)
             }
-            .padding(.vertical, 12)
         }
-        .buttonStyle(.plain)
     }
-}
 
-private struct PositionRow: View {
-    let icon: String
-    let iconColor: Color
-    let label: String
-    let value: Double
-    let subtitle: String?
-    let showChevron: Bool
-    let onTap: () -> Void
+    // MARK: - Validation Indicator
 
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.title3)
-                    .foregroundColor(iconColor)
-                    .frame(width: 24)
+    private var validationIndicator: some View {
+        HStack(spacing: DesignTokens.Spacing.xs) {
+            Image(systemName: "exclamationmark.circle")
+                .foregroundColor(DesignTokens.Colors.opportunityOrange)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(label)
-                        .foregroundColor(.primary)
-
-                    if let subtitle = subtitle {
-                        Text(subtitle)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-
-                Spacer()
-
-                Text(formatCurrency(abs(value)))
-                    .foregroundColor(.primary)
-
-                if showChevron {
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding(.vertical, 12)
+            Text("\(snapshot.metadata.transactionsNeedingValidation) transactions need review")
+                .subheadlineStyle()
         }
-        .buttonStyle(.plain)
+        .padding(DesignTokens.Spacing.md)
+        .frame(maxWidth: .infinity)
+        .primaryCardStyle()
     }
-}
 
-// MARK: - Helpers
+    // MARK: - Helpers
 
-private func formatCurrency(_ value: Double) -> String {
-    let formatter = NumberFormatter()
-    formatter.numberStyle = .currency
-    formatter.maximumFractionDigits = 0
-    return formatter.string(from: NSNumber(value: value)) ?? "$0"
+    private var cardDivider: some View {
+        Rectangle()
+            .fill(DesignTokens.Colors.divider)
+            .frame(height: 1)
+            .padding(.vertical, DesignTokens.Spacing.sm)
+    }
+
+    private func formatCurrency(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.maximumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: value)) ?? "$0"
+    }
 }
 
 // MARK: - Preview
@@ -329,27 +193,37 @@ struct AnalysisCompleteView_Previews: PreviewProvider {
         AnalysisCompleteView(
             snapshot: AnalysisSnapshot(
                 monthlyFlow: MonthlyFlow(
-                    income: 5000,
-                    essentialExpenses: 3000,
-                    debtMinimums: 200
+                    income: 2542,
+                    expenseBreakdown: ExpenseBreakdown(
+                        housing: 1200,
+                        food: 400,
+                        transportation: 200,
+                        utilities: 100,
+                        insurance: 50,
+                        subscriptions: 30,
+                        other: 12,
+                        confidence: 0.85
+                    ),
+                    debtMinimums: 35
                 ),
                 position: FinancialPosition(
-                    emergencyCash: 12000,
-                    totalDebt: 5000,
-                    investmentBalances: 45000,
+                    emergencyCash: 22800,
+                    totalDebt: 1850,
+                    investmentBalances: 81250,
                     monthlyInvestmentContributions: 500
                 ),
                 metadata: AnalysisMetadata(
                     monthsAnalyzed: 6,
                     accountsConnected: 3,
-                    transactionsAnalyzed: 245,
-                    transactionsNeedingValidation: 5,
+                    transactionsAnalyzed: 1000,
+                    transactionsNeedingValidation: 0,
                     lastUpdated: Date()
                 )
             ),
             onSeePlan: {},
             onDrillDown: { _ in }
         )
+        .preferredColorScheme(.dark)
     }
 }
 #endif

@@ -4,7 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A native iOS financial app (SwiftUI) with Node.js backend that connects to bank accounts via Plaid API and provides proactive AI-powered financial guidance. The app analyzes transactions, categorizes spending into 6 high-level buckets, and uses GPT-4 to provide decision-point guidance before purchases happen.
+A native iOS financial app (SwiftUI) with Node.js backend that connects to bank accounts via Plaid API and provides proactive AI-powered financial guidance. The app analyzes transactions, calculates financial health metrics, and helps users allocate income across 4-5 smart buckets (Essential, Emergency Fund, Discretionary, Investments, and conditional Debt Paydown). Features include:
+
+- **Financial Health Report**: Customer-friendly metrics (savings, emergency fund coverage, income stability) with AI-generated allocation recommendations
+- **Interactive Allocation Planner**: Preset selectors (Low/Rec/High), emergency fund duration picker (3/6/12 months), smart account linking with confidence scoring, auto-adjustment feedback via toast notifications
+- **Allocation Schedule & Execution**: Paycheck detection, income-based scheduling, individual bucket checkboxes, 4 notification types, historical tracking with variance analysis
+- **Proactive Guidance**: GPT-4 provides decision-point insights before purchases happen, with budget alerts and goal milestone notifications
 
 ## Development Commands
 
@@ -106,32 +111,58 @@ FinancialAnalyzer/
 │   ├── Budget.swift           # Monthly spending limits per category
 │   ├── Goal.swift             # Financial goals (emergency fund, etc)
 │   ├── FinancialHealthMetrics.swift # Health metrics (customer + backend)
-│   ├── AllocationBucket.swift # 4 allocation buckets (essential, emergency, discretionary, investment)
+│   ├── AllocationBucket.swift # 4-5 allocation buckets with account linking
+│   ├── PresetOptions.swift    # Low/Rec/High tier values for allocations
+│   ├── EmergencyFundDurationOption.swift # 3/6/12 month options with shortfall
+│   ├── InvestmentProjection.swift # Growth projections (10/20/30 year)
+│   ├── PaycheckSchedule.swift # Income frequency and dates
+│   ├── ScheduledAllocation.swift # Future allocation records
+│   ├── AllocationExecution.swift # Historical allocation records
 │   └── UserJourneyState.swift # User onboarding state machine
 ├── Services/                  # Business logic
 │   ├── PlaidService.swift     # Plaid API integration + link token caching
 │   ├── BudgetManager.swift    # Budget/goal CRUD + health-aware allocation
 │   ├── FinancialHealthCalculator.swift # Calculates health score & metrics
+│   ├── AccountLinkingService.swift # Smart account auto-detection with confidence scoring
+│   ├── AllocationPlanStorage.swift # Persistent allocation preferences
+│   ├── PaycheckDetectionService.swift # Income pattern analysis
+│   ├── AllocationScheduler.swift # Schedule generation
+│   ├── AllocationExecutionTracker.swift # Metrics & history tracking
 │   ├── AlertRulesEngine.swift # Evaluates purchases, generates alerts
 │   ├── SpendingPatternAnalyzer.swift # Pattern detection from history
 │   └── NotificationService.swift # Push notifications + actions
 ├── ViewModels/
-│   └── FinancialViewModel.swift # Main app state + data flow coordination
+│   ├── FinancialViewModel.swift # Main app state + data flow coordination
+│   └── AllocationEditorViewModel.swift # Allocation rebalancing logic
 ├── Views/
 │   ├── DashboardView.swift    # Shows health section + allocation buckets
+│   ├── HealthTabView.swift    # Health monitoring (with "New" badge)
+│   ├── ScheduleTabView.swift  # Allocation schedule & history
 │   ├── FinancialHealthReportView.swift # Comprehensive health report (onboarding)
 │   ├── FinancialHealthDashboardSection.swift # Compact health monitoring
-│   ├── AllocationPlannerView.swift # 4-bucket allocation interface
+│   ├── AllocationPlannerView.swift # 4-5 bucket allocation interface
+│   ├── UpcomingAllocationsView.swift # Timeline of scheduled allocations
+│   ├── AllocationHistoryView.swift # Historical allocation records
+│   ├── AllocationReminderSheet.swift # Completion checklist
+│   ├── PaycheckScheduleSetupView.swift # Initial paycheck setup
+│   ├── PaycheckScheduleEditorView.swift # Schedule settings editor
 │   ├── ProactiveGuidanceView.swift # Alert UI with AI insights
 │   ├── ProactiveGuidanceDemoView.swift # Testing interface
 │   └── Components/
-│       └── HealthReportComponents.swift # Reusable metric cards, progress bars
+│       ├── HealthReportComponents.swift # Reusable metric cards, progress bars
+│       ├── AllocationPresetSelector.swift # Tier selector (Low/Rec/High)
+│       ├── EmergencyFundDurationPicker.swift # Duration picker UI
+│       ├── InvestmentProjectionView.swift # Growth projection table
+│       ├── AccountLinkingDetailSheet.swift # Account management modal
+│       ├── DebtPaydownCard.swift # Specialized debt bucket card
+│       ├── RebalanceToast.swift # Auto-adjustment notification
+│       └── AllocationChecklistItem.swift # Individual bucket checkbox
 └── Utilities/
     ├── ColorPalette.swift     # Encouraging color design system
     └── DataResetManager.swift # Centralized data reset for testing
 
 backend/
-├── server.js                  # Express server with Plaid + OpenAI routes + health-aware allocation
+├── server.js                  # Express server with Plaid + OpenAI routes + health-aware allocation + preset generation
 └── plaid_tokens.json         # Persistent token storage (gitignored)
 ```
 
@@ -245,6 +276,155 @@ let trend: TrendIndicator = savingsChange > 0 ? .up : savingsChange < 0 ? .down 
 - `protectionMint` (#00C7BE): Cash flow, liquidity
 - `wealthPurple` (#AF52DE): Investments, long-term wealth
 
+### Data Flow: Allocation Planner Redesign
+
+The allocation planner provides an interactive, intelligent system for allocating income across financial buckets.
+
+#### Features
+- **Preset Selectors**: Low/Recommended/High tiers for each bucket based on financial health
+- **Emergency Fund Duration Picker**: Choose between 3/6/12 month targets with shortfall calculations
+- **Smart Account Linking**: Auto-detects appropriate accounts per bucket with confidence scoring (HIGH/GOOD/POSSIBLE)
+- **Auto-Adjustment Feedback**: Toast notifications + persistent badges when rebalancing occurs
+- **5-Bucket Support**: Essential, Emergency Fund, Discretionary, Investments, and conditional Debt Paydown
+- **Investment Projections**: 10/20/30 year growth estimates using 7% annual return assumption
+
+#### Rebalancing Logic
+
+When user adjusts one bucket, others auto-rebalance using priority order:
+1. **Discretionary Spending** (most flexible - adjusted first)
+2. **Investments** (moderately flexible)
+3. **Debt Paydown** (if present)
+4. **Emergency Fund** (last resort - preserved as much as possible)
+
+The `AllocationEditorViewModel` handles rebalancing and returns adjustment list for toast notification. Adjusted buckets show persistent "AUTO-ADJUSTED" badge until user acknowledges.
+
+#### Backend Integration
+
+The `/api/ai/allocation-recommendation` endpoint generates preset options:
+- **Low tier**: Conservative allocation (e.g., 10% discretionary)
+- **Recommended tier**: Backend-calculated optimal allocation
+- **High tier**: Aggressive allocation (e.g., 24% discretionary)
+
+Emergency fund presets are generated for each duration option (3/6/12 months) based on:
+- Income stability (stable → 6 months, variable → 9 months, inconsistent → 12 months)
+- Current emergency fund coverage
+- Essential expenses calculation
+
+Investment projections use 7% annual return with compound growth formula.
+
+#### User Flow
+1. Complete health report → Tap "Create My Financial Plan"
+2. Backend generates 4-5 buckets with preset options
+3. User selects tier (Low/Rec/High) for flexible buckets using native segmented control
+4. For emergency fund, select duration (3/6/12 months) → auto-recalculates monthly allocation
+5. Link accounts to buckets (auto-suggested with confidence badges)
+6. Adjust any bucket → Toast appears showing which buckets auto-adjusted
+7. Tap "Save My Plan" → Preferences persist to UserDefaults
+8. App prompts for paycheck schedule setup
+
+**Testing**: See [ALLOCATION_PLANNER_TESTING_GUIDE.md](ALLOCATION_PLANNER_TESTING_GUIDE.md) for comprehensive test scenarios.
+**Implementation Details**: See [ALLOCATION_PLANNER_IMPLEMENTATION_SUMMARY.md](ALLOCATION_PLANNER_IMPLEMENTATION_SUMMARY.md)
+
+### Data Flow: Allocation Schedule & Execution
+
+The allocation schedule system helps users see **when and how** their income will be allocated.
+
+#### Features
+- **Paycheck Detection**: Smart algorithm analyzes transaction history to detect recurring income (weekly, bi-weekly, semi-monthly, monthly)
+- **Allocation Schedule**: Generates scheduled allocations for next 1-6 months tied to paycheck dates
+- **Interactive Completion**: Individual checkboxes per bucket with editable amounts (supports partial allocations)
+- **Notification System**: 4 notification types with deep linking
+  - Pre-Payday Reminder (1 day before at 6 PM)
+  - Allocation Day (morning of payday at 9 AM) → Opens checklist
+  - Completion Confirmation (immediate)
+  - Follow-Up Reminder (2 days after if incomplete)
+- **Historical Tracking**: Logs all completed allocations with variance tracking and monthly summaries
+
+#### Paycheck Detection Algorithm
+
+`PaycheckDetectionService` analyzes 6 months of transaction history:
+1. Filters income transactions (negative amounts from Plaid)
+2. Groups by similar amounts (±10% tolerance)
+3. Detects frequency patterns (weekly, bi-weekly, semi-monthly, monthly)
+4. Calculates confidence score (high/medium/low) based on consistency
+5. Returns detected schedule or defaults to monthly if no pattern found
+
+**Minimum Requirements**:
+- Amount threshold: $500
+- Minimum occurrences: 2 paychecks
+- Amount consistency: Within ±10%
+
+#### Schedule Generation
+
+`AllocationScheduler` generates future allocations:
+1. Takes paycheck schedule (frequency + next payday)
+2. Generates 1-6 months of scheduled allocations (configurable, default 3 months)
+3. Each allocation contains:
+   - Date (tied to payday)
+   - Breakdown by bucket with amounts
+   - Status: upcoming → reminderSent → completed / skipped
+4. Auto-regenerates when schedule or buckets change
+
+#### Completion Flow
+
+1. User receives notification on payday → Taps to open
+2. `AllocationReminderSheet` displays checklist with all buckets
+3. User checks off completed buckets individually
+4. User can edit amounts if allocated differently than planned
+5. Progress bar shows completion percentage
+6. "Complete Allocations" button logs to history
+7. Confirmation notification sent
+8. **Alternative**: "Skip This Payday" button (no judgment)
+
+#### Historical Tracking
+
+`AllocationExecutionTracker` maintains history:
+- Logs completed allocations with actual amounts
+- Groups by month with summary stats (total allocated, on-time completion)
+- Tracks variance from planned amounts
+- Calculates all-time statistics
+- Automatic pruning (12-month retention, configurable)
+
+**Metrics Tracked**:
+- Total allocated per bucket
+- Number of completions
+- On-time completion rate
+- Average variance from plan
+- Most/least consistent buckets
+
+#### Tab Navigation
+
+**Schedule Tab** (calendar icon) contains:
+- **Upcoming View** (default): Timeline of next 3-6 paydays with days-until countdown
+- **History View**: Monthly groups with expandable executions
+- **Settings Icon**: Opens `PaycheckScheduleEditorView`
+
+#### User Flow
+1. After saving allocation plan, app presents `PaycheckScheduleSetupView`
+2. Paycheck detection runs automatically
+3. User confirms/edits detected schedule (frequency, amount, next date)
+4. User grants notification permission (optional but recommended)
+5. Schedule generated for next 3 months
+6. Navigate to Schedule tab to view upcoming allocations
+7. On payday, receive notification → Mark buckets complete
+8. View History to see past allocations and trends
+
+**Implementation Details**: See [ALLOCATION_SCHEDULE_IMPLEMENTATION.md](ALLOCATION_SCHEDULE_IMPLEMENTATION.md)
+
+### App Tab Structure
+
+After completing onboarding (journey state = `.planCreated`), the app shows these tabs:
+
+1. **Dashboard** (chart.pie.fill) - Financial health overview + allocation buckets
+2. **Health** (heart.text.square.fill) - Comprehensive health report (shows "New" badge until first viewed)
+3. **Schedule** (calendar.badge.clock) - Upcoming allocations + historical tracking
+4. **Transactions** (list.bullet) - Transaction history and search (conditional - only shows if transactions exist)
+5. **Accounts** (building.columns.fill) - Connected bank accounts (conditional - only shows if accounts exist)
+6. **Demo** (testtube.2) - Testing interface (commented out in production builds)
+7. **Debug** (wrench.and.screwdriver.fill) - Development tools (DEBUG builds only, currently disabled)
+
+**During onboarding** (before plan creation), only Dashboard is shown without bottom tab navigation.
+
 ### Key Architectural Patterns
 
 #### Link Token Preloading
@@ -311,6 +491,63 @@ Account removal is complex due to multiple storage locations:
 4. Tap notification to test navigation flow
 5. Check logs for `[NotificationService]` and `[NotificationCoordinator]` prefixes
 
+### Managing Allocations and Schedule
+
+#### Creating Initial Allocation Plan
+1. Connect bank account and analyze finances
+2. Complete financial health report
+3. Tap "Create My Financial Plan"
+4. Backend generates 4-5 buckets with AI recommendations
+5. Review preset options (Low/Rec/High) for each flexible bucket
+6. Select emergency fund duration (3/6/12 months)
+7. Link accounts to buckets (auto-suggested with confidence scoring)
+8. Adjust allocations as needed (watch for auto-adjustment toast)
+9. Tap "Save My Plan" → All preferences auto-persist
+10. Set up paycheck schedule (auto-detected from transaction history)
+
+#### Adjusting Existing Allocations
+1. Navigate to Dashboard → Tap allocation bucket
+2. Change amount or select different preset tier
+3. Watch for toast notification showing which buckets auto-adjusted
+4. Orange "AUTO-ADJUSTED" badge appears on affected buckets
+5. Changes save automatically to UserDefaults
+6. Schedule regenerates automatically with new amounts
+
+**Rebalancing Priority Order**:
+- Discretionary Spending adjusted first (most flexible)
+- Then Investments (moderately flexible)
+- Then Debt Paydown (if present)
+- Emergency Fund preserved as much as possible (last resort)
+
+#### Using Allocation Schedule
+1. Navigate to Schedule tab
+2. **Upcoming View**: See next 3-6 paydays with allocation breakdown
+3. Days-until countdown with color coding (green → yellow → orange as payday approaches)
+4. Tap "Mark as Complete" when payday arrives
+5. Check off each bucket individually (flexible completion)
+6. Edit amounts if you allocated differently than planned
+7. Tap "Complete Allocations" → Logs to history
+8. **Alternative**: Tap "Skip This Payday" if needed (no judgment)
+9. **History View**: See past allocations grouped by month with stats
+
+#### Editing Paycheck Schedule
+1. Navigate to Schedule tab → Tap settings icon (gear)
+2. Modify frequency (weekly/bi-weekly/semi-monthly/monthly)
+3. Update paycheck amount (if income changed)
+4. Adjust next payday date
+5. Save → Schedule auto-regenerates for next 3 months
+6. Notifications reschedule automatically
+
+#### Testing Allocation Notifications
+1. Use allocation schedule with near-term payday
+2. Four notification types to test:
+   - **Pre-payday**: 1 day before at 6 PM ("Payday tomorrow")
+   - **Allocation day**: Morning of payday at 9 AM ("Time to allocate")
+   - **Completion**: Immediate after marking complete ("Allocation complete ✓")
+   - **Follow-up**: 2 days after if incomplete ("Don't forget to allocate")
+3. Tap notification → Should open `AllocationReminderSheet` with relevant allocations
+4. Check logs for `[AllocationScheduler]` and `[NotificationCoordinator]` prefixes
+
 ### Automated Testing Reset (Recommended)
 
 **Problem:** Every time you update the app, you must manually navigate to Demo tab, tap "Clear All Data & Restart", confirm, wait for exit, and relaunch. This wastes 2-3 minutes per test cycle.
@@ -332,9 +569,9 @@ Account removal is complex due to multiple storage locations:
 #### What Gets Cleared:
 - **Backend tokens** (if backend is running at localhost:3000)
 - **Keychain** (all Plaid access tokens)
-- **UserDefaults** (cached accounts, transactions, budgets, goals, allocation buckets, onboarding state)
+- **UserDefaults** (cached accounts, transactions, budgets, goals, allocation buckets, allocation preferences, paycheck schedule, scheduled allocations, allocation history, health metrics, onboarding state)
 - **ViewModel state** (all in-memory data)
-- **Notifications** (all pending alerts)
+- **Notifications** (all pending alerts including allocation reminders)
 
 #### Console Output:
 Look for logs prefixed with `🔄 [Launch]` to verify auto-reset is working:
@@ -387,6 +624,35 @@ Request notification permission early in app lifecycle (`AppDelegate.application
 
 ### Transaction Date Format
 Plaid expects dates as `YYYY-MM-DD` strings. Use `DateFormatter` with that format when calling `/api/plaid/transactions`.
+
+### Allocation Persistence
+All allocation preferences auto-save to UserDefaults immediately when changed:
+- Preset tier selections per bucket (stored by bucket type)
+- Emergency fund duration selection
+- Account linkings per bucket (JSON encoded)
+- Custom allocation amounts
+
+This means users never lose their choices, even if they navigate away before tapping "Save My Plan". The "Save My Plan" button finalizes the allocation buckets, but preferences are already persisted.
+
+Storage managed by `AllocationPlanStorage.swift`.
+
+### Account Linking Confidence Scores
+`AccountLinkingService` calculates confidence for auto-suggestions:
+- **HIGH (90%+)**: Account type exactly matches bucket + name keywords match
+- **GOOD (60-89%)**: Account type matches OR name keywords match
+- **POSSIBLE (30-59%)**: Account could theoretically work
+
+**Examples**:
+- Emergency Fund bucket + "Emergency" HYSA → HIGH confidence
+- Discretionary bucket + checking account named "Spending" → GOOD confidence
+- Investment bucket + 401k account → HIGH confidence
+
+Users can always override suggestions or unlink accounts.
+
+### Paycheck Schedule Auto-Detection
+Only call `PaycheckDetectionService.detectPaycheckSchedule()` after you have at least 2 months of transaction history with recurring income. With insufficient data, it will return `nil` and the app will prompt for manual entry with monthly frequency as default.
+
+The detection algorithm looks for consistency (±10% amount variance), so highly variable income (freelancers, gig economy) may not be auto-detected. This is intentional - manual entry is more accurate for irregular income.
 
 ## Security Considerations
 
@@ -741,4 +1007,15 @@ Verify itemId matches between Keychain and backend. Check logs for orphaned toke
 
 ## Feature Documentation
 
-See `PROACTIVE_GUIDANCE_FEATURE.md` for comprehensive documentation on the proactive guidance system including customer flows, testing scenarios, and architecture decisions.
+### Comprehensive Guides
+- **Proactive Guidance System**: See [PROACTIVE_GUIDANCE_FEATURE.md](PROACTIVE_GUIDANCE_FEATURE.md) for AI-powered purchase insights, budget alerts, and notification flows
+- **Allocation Planner**: See [ALLOCATION_PLANNER_IMPLEMENTATION_SUMMARY.md](ALLOCATION_PLANNER_IMPLEMENTATION_SUMMARY.md) for preset selectors, auto-adjustment feedback, and account linking
+- **Allocation Schedule**: See [ALLOCATION_SCHEDULE_IMPLEMENTATION.md](ALLOCATION_SCHEDULE_IMPLEMENTATION.md) for paycheck detection, schedule generation, and execution tracking
+
+### Testing Guides
+- **Allocation Planner Testing**: [ALLOCATION_PLANNER_TESTING_GUIDE.md](ALLOCATION_PLANNER_TESTING_GUIDE.md) - 10 comprehensive test scenarios
+- **Plaid Sandbox Testing**: [PLAID_SANDBOX_TESTING_GUIDE.md](PLAID_SANDBOX_TESTING_GUIDE.md) - Custom user configuration and edge cases
+
+### Quick References
+- **Adding Files to Xcode**: [ADD_NEW_FILES_TO_XCODE.md](ADD_NEW_FILES_TO_XCODE.md) - Step-by-step guide for adding new Swift files to the project
+- **Data Reset Feature**: [CLEAR_DATA_FEATURE.md](CLEAR_DATA_FEATURE.md) - Manual and automatic reset workflows

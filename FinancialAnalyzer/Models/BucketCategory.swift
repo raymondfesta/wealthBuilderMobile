@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 enum BucketCategory: String, Codable, CaseIterable {
     case income = "Avg Monthly Income"
@@ -6,7 +7,7 @@ enum BucketCategory: String, Codable, CaseIterable {
     case debt = "Total Debt"
     case invested = "Total Invested"
     case cash = "Total Cash Available"
-    case disposable = "Available to Spend"
+    case disposable = "To Allocate"
 
     var description: String {
         switch self {
@@ -21,7 +22,7 @@ enum BucketCategory: String, Codable, CaseIterable {
         case .cash:
             return "Available cash in checking and savings accounts"
         case .disposable:
-            return "Income minus expenses and debt obligations"
+            return "Income available to allocate after essential expenses and debt minimums"
         }
     }
 
@@ -56,6 +57,24 @@ enum BucketCategory: String, Codable, CaseIterable {
             return "mint"
         case .disposable:
             return "purple"
+        }
+    }
+
+    /// Design system color for dark theme
+    var designColor: Color {
+        switch self {
+        case .income:
+            return DesignTokens.Colors.progressGreen
+        case .expenses:
+            return DesignTokens.Colors.opportunityOrange  // Encouraging, not punishing
+        case .debt:
+            return DesignTokens.Colors.opportunityOrange
+        case .invested:
+            return DesignTokens.Colors.wealthPurple
+        case .cash:
+            return DesignTokens.Colors.protectionMint
+        case .disposable:
+            return DesignTokens.Colors.accentPrimary
         }
     }
 }

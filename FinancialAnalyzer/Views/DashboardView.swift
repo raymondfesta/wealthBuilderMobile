@@ -7,11 +7,19 @@ struct DashboardView: View {
     @State private var showConnectedAccountsSheet = false
     @State private var showHealthSetupFlow = false
 
+    // Drill-down sheet states for AnalysisCompleteView
+    @State private var showIncomeSheet = false
+    @State private var showExpensesSheet = false
+    @State private var showDebtMinimumsSheet = false
+    @State private var showEmergencyFundSheet = false
+    @State private var showDebtSheet = false
+    @State private var showInvestmentsSheet = false
+
     var body: some View {
         ZStack {
             NavigationStack {
                 ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: DesignTokens.Spacing.lg) {
                     // Show different content based on user journey state
                     switch viewModel.userJourneyState {
                     case .noAccountsConnected:
@@ -30,9 +38,10 @@ struct DashboardView: View {
                         planActiveView
                     }
                 }
-                .padding()
+                .padding(DesignTokens.Spacing.md)
             }
             .id(viewModel.userJourneyState) // Reset scroll position when state changes
+            .primaryBackgroundGradient()
             .navigationTitle(navigationTitle)
             .toolbar {
                 // Health Report Button (only in planCreated state)
@@ -46,11 +55,12 @@ struct DashboardView: View {
                             ZStack(alignment: .topTrailing) {
                                 Image(systemName: "chart.line.uptrend.xyaxis")
                                     .imageScale(.large)
+                                    .foregroundColor(DesignTokens.Colors.accentSecondary)
 
                                 // "New" badge (red dot)
                                 if !UserDefaults.standard.bool(forKey: "has_viewed_health_report") {
                                     Circle()
-                                        .fill(Color.red)
+                                        .fill(DesignTokens.Colors.opportunityOrange)
                                         .frame(width: 8, height: 8)
                                         .offset(x: 6, y: -6)
                                 }
@@ -69,6 +79,7 @@ struct DashboardView: View {
                             }
                         } label: {
                             Image(systemName: "plus.circle.fill")
+                                .foregroundColor(DesignTokens.Colors.accentPrimary)
                         }
                     }
                 }
@@ -122,6 +133,59 @@ struct DashboardView: View {
                         }
                     }
             }
+            // Drill-down sheets for AnalysisCompleteView
+            .sheet(isPresented: $showIncomeSheet) {
+                if let snapshot = viewModel.analysisSnapshot {
+                    IncomeDetailSheet(
+                        transactions: viewModel.transactions,
+                        monthlyAverage: snapshot.monthlyFlow.income
+                    )
+                }
+            }
+            .sheet(isPresented: $showExpensesSheet) {
+                if let snapshot = viewModel.analysisSnapshot {
+                    ExpenseDetailSheet(
+                        transactions: viewModel.transactions,
+                        monthlyAverage: snapshot.monthlyFlow.essentialExpenses,
+                        expenseBreakdown: snapshot.monthlyFlow.expenseBreakdown,
+                        onValidateTransaction: { _ in }
+                    )
+                }
+            }
+            .sheet(isPresented: $showDebtMinimumsSheet) {
+                if let snapshot = viewModel.analysisSnapshot {
+                    DebtMinimumsDetailSheet(
+                        accounts: viewModel.accounts,
+                        monthlyMinimums: snapshot.monthlyFlow.debtMinimums
+                    )
+                }
+            }
+            .sheet(isPresented: $showEmergencyFundSheet) {
+                if let snapshot = viewModel.analysisSnapshot {
+                    EmergencyFundDetailSheet(
+                        accounts: viewModel.accounts,
+                        totalCash: snapshot.position.emergencyCash,
+                        monthsCovered: snapshot.position.emergencyCash / max(snapshot.monthlyFlow.essentialExpenses, 1)
+                    )
+                }
+            }
+            .sheet(isPresented: $showDebtSheet) {
+                if let snapshot = viewModel.analysisSnapshot {
+                    DebtMinimumsDetailSheet(
+                        accounts: viewModel.accounts,
+                        monthlyMinimums: snapshot.monthlyFlow.debtMinimums
+                    )
+                }
+            }
+            .sheet(isPresented: $showInvestmentsSheet) {
+                if let snapshot = viewModel.analysisSnapshot {
+                    InvestmentDetailSheet(
+                        accounts: viewModel.accounts,
+                        totalInvested: snapshot.position.investmentBalances,
+                        monthlyContributions: snapshot.position.monthlyInvestmentContributions
+                    )
+                }
+            }
             }
 
             // Loading overlay
@@ -147,7 +211,7 @@ struct DashboardView: View {
         case .accountsConnected:
             return "Accounts Connected"
         case .analysisComplete:
-            return "Analysis Complete"
+            return "" // AnalysisCompleteView has its own header
         case .allocationPlanning:
             return "Plan Your Budget"
         case .planCreated:
@@ -159,40 +223,30 @@ struct DashboardView: View {
 
     /// Empty state when no accounts are connected
     private var emptyStateView: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: DesignTokens.Spacing.xl) {
             Spacer()
 
             Image(systemName: "chart.pie.fill")
                 .font(.system(size: 80))
-                .foregroundColor(.blue)
+                .foregroundColor(DesignTokens.Colors.stableBlue)
 
-            VStack(spacing: 12) {
+            VStack(spacing: DesignTokens.Spacing.sm) {
                 Text(viewModel.userJourneyState.title)
-                    .font(.title)
-                    .fontWeight(.bold)
+                    .displayStyle()
 
                 Text(viewModel.userJourneyState.description)
-                    .font(.body)
-                    .foregroundColor(.secondary)
+                    .bodyStyle()
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
+                    .padding(.horizontal, DesignTokens.Spacing.xxl)
             }
 
-            Button {
+            PrimaryButton(title: viewModel.userJourneyState.nextActionTitle) {
                 Task {
                     await viewModel.connectBankAccount(from: nil)
                 }
-            } label: {
-                Label(viewModel.userJourneyState.nextActionTitle, systemImage: "building.columns.fill")
-                    .font(.headline)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
             }
-            .padding(.horizontal, 32)
-            .padding(.top, 24)
+            .padding(.horizontal, DesignTokens.Spacing.xxl)
+            .padding(.top, DesignTokens.Spacing.xl)
 
             Spacer()
         }
@@ -200,91 +254,61 @@ struct DashboardView: View {
 
     /// View shown after accounts are connected but before analysis
     private var accountsConnectedView: some View {
-        VStack(spacing: 32) {
+        VStack(spacing: DesignTokens.Spacing.xxl) {
             Spacer()
 
             // Success message
-            VStack(spacing: 16) {
+            VStack(spacing: DesignTokens.Spacing.md) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 80))
-                    .foregroundColor(.green)
+                    .foregroundColor(DesignTokens.Colors.progressGreen)
 
                 Text("Accounts Connected!")
-                    .font(.title)
-                    .fontWeight(.bold)
+                    .displayStyle()
 
                 Text("You've connected \(viewModel.accounts.count) account\(viewModel.accounts.count == 1 ? "" : "s")")
-                    .font(.body)
-                    .foregroundColor(.secondary)
+                    .bodyStyle()
 
                 // View Connected Accounts button
-                Button {
+                TextButton(title: "View Connected Accounts", color: DesignTokens.Colors.accentSecondary) {
                     showConnectedAccountsSheet = true
-                } label: {
-                    HStack {
-                        Image(systemName: "list.bullet")
-                        Text("View Connected Accounts")
-                    }
-                    .font(.subheadline)
-                    .foregroundColor(.blue)
                 }
-                .padding(.top, 8)
+                .padding(.top, DesignTokens.Spacing.xs)
             }
 
             Spacer()
 
             // Next step section
-            VStack(spacing: 20) {
-                VStack(spacing: 12) {
+            VStack(spacing: DesignTokens.Spacing.lg) {
+                VStack(spacing: DesignTokens.Spacing.sm) {
                     Text("Ready for the next step?")
-                        .font(.headline)
+                        .headlineStyle()
 
                     Text("We'll analyze your transactions and identify spending patterns")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .subheadlineStyle()
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
+                        .padding(.horizontal, DesignTokens.Spacing.xxl)
                 }
 
                 // Action buttons
-                VStack(spacing: 12) {
+                VStack(spacing: DesignTokens.Spacing.sm) {
                     // Primary CTA - Analyze Transactions
-                    Button {
+                    PrimaryButton(title: "Analyze My Transactions") {
                         Task {
                             await viewModel.analyzeMyFinances()
                         }
-                    } label: {
-                        Label("Analyze My Transactions", systemImage: "chart.bar.doc.horizontal.fill")
-                            .font(.headline)
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(12)
                     }
 
                     // Secondary CTA - Connect Another Account
-                    Button {
+                    SecondaryButton(title: "Connect Another Account") {
                         Task {
                             await viewModel.connectBankAccount(from: nil)
                         }
-                    } label: {
-                        Label("Connect Another Account", systemImage: "plus.circle")
-                            .font(.headline)
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(Color.clear)
-                            .foregroundColor(.blue)
-                            .cornerRadius(12)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.blue, lineWidth: 2)
-                            )
                     }
                 }
-                .padding(.horizontal, 32)
+                .padding(.horizontal, DesignTokens.Spacing.xxl)
             }
-            .padding(.bottom, 32)
+            .padding(.bottom, DesignTokens.Spacing.xxl)
         }
         .sheet(isPresented: $showConnectedAccountsSheet) {
             ConnectedAccountsSheet(viewModel: viewModel)
@@ -292,95 +316,53 @@ struct DashboardView: View {
     }
 
     /// View shown after analysis is complete but before plan is created
+    @ViewBuilder
     private var analysisCompleteView: some View {
-        VStack(spacing: 24) {
-            // Analysis summary header
-            VStack(spacing: 12) {
-                Image(systemName: "chart.line.uptrend.xyaxis")
-                    .font(.system(size: 60))
-                    .foregroundColor(.blue)
-
-                Text("Analysis Complete!")
-                    .font(.title2)
-                    .fontWeight(.bold)
-
-                if let summary = viewModel.summary {
-                    Text("Analyzed \(summary.totalTransactions) transactions over \(summary.monthsAnalyzed) months")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-            }
-            .padding(.top, 40)
-
-            // Show financial buckets if summary exists
-            if let summary = viewModel.summary {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Your Spending Breakdown")
-                        .font(.headline)
-                        .padding(.horizontal)
-
-                    LazyVGrid(columns: [
-                        GridItem(.flexible()),
-                        GridItem(.flexible())
-                    ], spacing: 16) {
-                        ForEach(BucketCategory.allCases, id: \.self) { bucket in
-                            NavigationLink {
-                                CategoryDetailView(
-                                    category: bucket,
-                                    amount: summary.bucketValue(for: bucket),
-                                    summary: summary,
-                                    accounts: viewModel.accounts,
-                                    viewModel: viewModel
-                                )
-                            } label: {
-                                BucketCard(
-                                    category: bucket,
-                                    amount: summary.bucketValue(for: bucket),
-                                    isSelected: false
-                                )
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-                }
-            }
-
-            Spacer()
-
-            // Next step CTA
-            VStack(spacing: 12) {
-                Text("Ready to create your plan?")
-                    .font(.headline)
-
-                Text("We'll generate personalized budgets based on your spending patterns")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-
-                Button {
+        if let snapshot = viewModel.analysisSnapshot {
+            AnalysisCompleteView(
+                snapshot: snapshot,
+                onSeePlan: {
                     Task {
                         await viewModel.createMyPlan()
                     }
-                } label: {
-                    Label("Create My Financial Plan", systemImage: "sparkles")
-                        .font(.headline)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
+                },
+                onDrillDown: { drillDownType in
+                    // Handle drill-down navigation
+                    handleDrillDown(drillDownType)
                 }
-                .padding(.horizontal, 32)
+            )
+        } else {
+            // Fallback if snapshot not available
+            VStack(spacing: DesignTokens.Spacing.xl) {
+                ProgressView()
+                    .tint(DesignTokens.Colors.accentPrimary)
+                Text("Loading analysis...")
+                    .subheadlineStyle()
             }
-            .padding(.bottom, 24)
+        }
+    }
+
+    /// Handles drill-down navigation from AnalysisCompleteView
+    private func handleDrillDown(_ type: AnalysisCompleteView.DrillDownType) {
+        switch type {
+        case .income:
+            showIncomeSheet = true
+        case .expenses:
+            showExpensesSheet = true
+        case .debtMinimums:
+            showDebtMinimumsSheet = true
+        case .emergencyFund:
+            showEmergencyFundSheet = true
+        case .debt:
+            showDebtSheet = true
+        case .investments:
+            showInvestmentsSheet = true
         }
     }
 
     /// Full dashboard view shown when plan is created (existing functionality)
     private var planActiveView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: DesignTokens.Spacing.lg) {
             // Financial Health Section (if available)
             if let healthMetrics = viewModel.healthMetrics {
                 FinancialHealthDashboardSection(
@@ -418,13 +400,12 @@ struct DashboardView: View {
 
     /// Displays allocation buckets as horizontal scrolling cards
     private var allocationBucketsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
             Text("Your Financial Plan")
-                .font(.title2)
-                .fontWeight(.bold)
+                .headlineStyle(color: .white)
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
+                HStack(spacing: DesignTokens.Spacing.md) {
                     ForEach(viewModel.budgetManager.allocationBuckets) { bucket in
                         AllocationBucketSummaryCard(
                             bucket: bucket,
@@ -433,7 +414,7 @@ struct DashboardView: View {
                         .frame(width: 160)
                     }
                 }
-                .padding(.horizontal, 4)
+                .padding(.horizontal, DesignTokens.Spacing.xxs)
             }
         }
     }
@@ -441,19 +422,16 @@ struct DashboardView: View {
     // MARK: - Subviews
 
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
             Text("Your Financial Summary")
-                .font(.title2)
-                .fontWeight(.bold)
+                .headlineStyle(color: .white)
 
             if let summary = viewModel.summary {
                 Text("Analysis of \(summary.totalTransactions) transactions over \(summary.monthsAnalyzed) months")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .captionStyle()
 
                 Text("Last updated: \(summary.lastUpdated, style: .relative) ago")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .captionStyle()
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -463,7 +441,7 @@ struct DashboardView: View {
         LazyVGrid(columns: [
             GridItem(.flexible()),
             GridItem(.flexible())
-        ], spacing: 16) {
+        ], spacing: DesignTokens.Spacing.md) {
             ForEach(BucketCategory.allCases, id: \.self) { bucket in
                 NavigationLink {
                     CategoryDetailView(
@@ -488,26 +466,24 @@ struct DashboardView: View {
     private var budgetStatusSection: some View {
         Group {
             if !viewModel.budgetManager.budgets.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
                     HStack {
                         Text("Budget Status")
-                            .font(.headline)
+                            .headlineStyle(color: .white)
 
                         Spacer()
 
                         Text("\(viewModel.budgetManager.budgets.count) budgets")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .captionStyle()
 
                         Button {
                             showAddBudgetSheet = true
                         } label: {
                             Image(systemName: "plus.circle.fill")
                                 .font(.title3)
-                                .foregroundColor(.blue)
+                                .foregroundColor(DesignTokens.Colors.accentPrimary)
                         }
                     }
-                    .padding(.horizontal)
                     .onAppear {
                         print("🎨 [DashboardView] Rendering budget section with \(viewModel.budgetManager.budgets.count) budgets")
                         for (index, budget) in viewModel.budgetManager.budgets.enumerated() {
@@ -517,7 +493,7 @@ struct DashboardView: View {
 
                     // Budget cards
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
+                        HStack(spacing: DesignTokens.Spacing.sm) {
                             ForEach(viewModel.budgetManager.budgets.prefix(6)) { budget in
                                 BudgetStatusCard(budget: budget)
                                     .onAppear {
@@ -525,7 +501,6 @@ struct DashboardView: View {
                                     }
                             }
                         }
-                        .padding(.horizontal)
                     }
 
                     // Warning if approaching limits
@@ -533,51 +508,36 @@ struct DashboardView: View {
                         $0.status == .warning || $0.status == .exceeded
                     }
                     if !warningBudgets.isEmpty {
-                        HStack(spacing: 8) {
+                        HStack(spacing: DesignTokens.Spacing.xs) {
                             Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(.orange)
+                                .foregroundColor(DesignTokens.Colors.opportunityOrange)
                                 .font(.caption)
                             Text("\(warningBudgets.count) budget\(warningBudgets.count == 1 ? "" : "s") need attention")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                                .captionStyle()
                         }
-                        .padding(.horizontal)
                     }
                 }
             } else if !viewModel.transactions.isEmpty {
                 // Show generate budgets button if we have transactions but no budgets
-                VStack(spacing: 12) {
+                VStack(spacing: DesignTokens.Spacing.sm) {
                     HStack {
                         Text("Budget Status")
-                            .font(.headline)
+                            .headlineStyle(color: .white)
                         Spacer()
                     }
 
-                    Button {
+                    SecondaryButton(title: "Generate Budgets from Transactions") {
                         viewModel.budgetManager.generateBudgets(from: viewModel.transactions)
-                    } label: {
-                        HStack {
-                            Image(systemName: "chart.bar.fill")
-                            Text("Generate Budgets from Transactions")
-                                .font(.subheadline)
-                        }
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.blue.opacity(0.1))
-                        .foregroundColor(.blue)
-                        .cornerRadius(10)
                     }
                 }
-                .padding(.horizontal)
             }
         }
     }
 
     private var recentTransactionsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
             Text("Recent Transactions")
-                .font(.headline)
-                .padding(.horizontal)
+                .headlineStyle(color: .white)
 
             ForEach(viewModel.recentTransactions(limit: 5), id: \.id) { transaction in
                 TransactionRow(transaction: transaction)
@@ -588,28 +548,18 @@ struct DashboardView: View {
                     TransactionsListView(transactions: viewModel.transactions)
                 } label: {
                     Text("View All Transactions")
-                        .font(.subheadline)
-                        .foregroundColor(.blue)
+                        .subheadlineStyle(color: DesignTokens.Colors.accentPrimary)
                 }
-                .padding(.horizontal)
             }
         }
     }
 
     private var refreshButton: some View {
-        Button {
+        SecondaryButton(title: viewModel.isLoading ? "Refreshing..." : "Refresh Data", isDisabled: viewModel.isLoading) {
             Task {
                 await viewModel.refreshAllData()
             }
-        } label: {
-            if viewModel.isLoading {
-                ProgressView()
-            } else {
-                Label("Refresh Data", systemImage: "arrow.clockwise")
-            }
         }
-        .buttonStyle(.bordered)
-        .disabled(viewModel.isLoading)
     }
 
     // MARK: - Helper Functions
@@ -631,11 +581,11 @@ struct BucketCard: View {
     var needsValidationCount: Int = 0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
             HStack {
                 Image(systemName: category.iconName)
                     .font(.title2)
-                    .foregroundColor(color)
+                    .foregroundColor(category.designColor)
 
                 Spacer()
 
@@ -643,7 +593,7 @@ struct BucketCard: View {
                 if needsValidationCount > 0 {
                     ZStack {
                         Circle()
-                            .fill(Color.orange)
+                            .fill(DesignTokens.Colors.opportunityOrange)
                             .frame(width: 24, height: 24)
 
                         Text("\(needsValidationCount)")
@@ -655,39 +605,22 @@ struct BucketCard: View {
             }
 
             Text(category.rawValue)
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .captionStyle()
                 .lineLimit(2)
                 .minimumScaleFactor(0.8)
 
             Text(formattedAmount)
-                .font(.title3)
-                .fontWeight(.bold)
+                .titleValueStyle()
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
-        .padding()
+        .padding(DesignTokens.Spacing.md)
         .frame(maxWidth: .infinity, minHeight: 120)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(color.opacity(0.1))
-        )
+        .primaryCardStyle()
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(isSelected ? color : Color.clear, lineWidth: 2)
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.lg)
+                .stroke(isSelected ? category.designColor : Color.clear, lineWidth: 2)
         )
-    }
-
-    private var color: Color {
-        switch category.color {
-        case "green": return .green
-        case "red": return .red
-        case "orange": return .orange
-        case "blue": return .blue
-        case "mint": return .mint
-        case "purple": return .purple
-        default: return .gray
-        }
     }
 
     private var formattedAmount: String {
@@ -705,32 +638,26 @@ struct TransactionRow: View {
 
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                 Text(transaction.name)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                    .subheadlineStyle(color: DesignTokens.Colors.textPrimary)
 
                 if let merchantName = transaction.merchantName {
                     Text(merchantName)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .captionStyle()
                 }
 
                 Text(transaction.date, style: .date)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .captionStyle()
             }
 
             Spacer()
 
             Text(formattedAmount)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(transaction.amount < 0 ? .green : .primary)
+                .subheadlineStyle(color: transaction.amount < 0 ? DesignTokens.Colors.progressGreen : DesignTokens.Colors.textPrimary)
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(8)
+        .padding(DesignTokens.Spacing.md)
+        .primaryCardStyle()
     }
 
     private var formattedAmount: String {
@@ -749,12 +676,11 @@ struct BudgetStatusCard: View {
     let budget: Budget
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
             // Category name and badges
             HStack {
                 Text(budget.categoryName)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
+                    .subheadlineStyle(color: DesignTokens.Colors.textPrimary)
                     .lineLimit(1)
 
                 Spacer()
@@ -766,8 +692,8 @@ struct BudgetStatusCard: View {
                         .fontWeight(.bold)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 3)
-                        .background(Color.blue.opacity(0.2))
-                        .foregroundColor(.blue)
+                        .background(DesignTokens.Colors.stableBlue.opacity(0.2))
+                        .foregroundColor(DesignTokens.Colors.stableBlue)
                         .cornerRadius(4)
                 }
 
@@ -783,15 +709,13 @@ struct BudgetStatusCard: View {
             }
 
             // Spending progress
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                 HStack {
                     Text(formatCurrency(budget.currentSpent))
-                        .font(.title3)
-                        .fontWeight(.bold)
+                        .titleValueStyle()
 
                     Text("of \(formatCurrency(budget.monthlyLimit))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .captionStyle()
                 }
 
                 // Progress bar
@@ -799,7 +723,7 @@ struct BudgetStatusCard: View {
                     ZStack(alignment: .leading) {
                         // Background
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.gray.opacity(0.2))
+                            .fill(DesignTokens.Colors.borderMedium)
 
                         // Progress
                         RoundedRectangle(cornerRadius: 4)
@@ -811,20 +735,12 @@ struct BudgetStatusCard: View {
 
                 // Remaining amount
                 Text("\(formatCurrency(budget.remaining)) remaining")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .captionStyle()
             }
         }
-        .padding()
+        .padding(DesignTokens.Spacing.md)
         .frame(width: 200)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.secondarySystemBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(statusColor.opacity(0.3), lineWidth: 1)
-        )
+        .primaryCardStyle()
     }
 
     private var percentUsed: Double {
@@ -834,10 +750,10 @@ struct BudgetStatusCard: View {
 
     private var statusColor: Color {
         switch budget.status {
-        case .onTrack: return .green
-        case .caution: return .yellow
-        case .warning: return .orange
-        case .exceeded: return .red
+        case .onTrack: return DesignTokens.Colors.progressGreen
+        case .caution: return DesignTokens.Colors.accentPrimary
+        case .warning: return DesignTokens.Colors.opportunityOrange
+        case .exceeded: return Color(red: 255/255, green: 59/255, blue: 48/255)  // System red
         }
     }
 
@@ -861,7 +777,7 @@ struct AllocationBucketSummaryCard: View {
             bucket: bucket,
             budgetManager: budgetManager
         )) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
                 // Icon
                 HStack {
                     Image(systemName: bucket.icon)
@@ -872,27 +788,21 @@ struct AllocationBucketSummaryCard: View {
 
                 // Name
                 Text(bucket.displayName)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .captionStyle()
                     .lineLimit(2)
                     .minimumScaleFactor(0.8)
 
                 // Amount
                 Text(formatCurrency(bucket.allocatedAmount))
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
+                    .titleValueStyle()
                     .lineLimit(1)
 
                 // Percentage
                 Text("\(Int(bucket.percentageOfIncome))% of income")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .captionStyle()
             }
-            .padding()
-            .background(Color(.systemBackground))
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+            .padding(DesignTokens.Spacing.md)
+            .primaryCardStyle()
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(bucket.displayName), \(formatCurrency(bucket.allocatedAmount)), \(Int(bucket.percentageOfIncome))% of income")
         }
