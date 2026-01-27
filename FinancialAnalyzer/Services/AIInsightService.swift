@@ -6,7 +6,7 @@ class AIInsightService {
 
     private let baseURL: String
 
-    init(baseURL: String = "http://localhost:3000") {
+    init(baseURL: String = AppConfig.baseURL) {
         self.baseURL = baseURL
     }
 

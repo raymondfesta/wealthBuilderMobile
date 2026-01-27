@@ -284,6 +284,7 @@ Cmd+R to build and run
 ## Current Focus
 
 **Recent work (from git):**
+- Dark mode enforced app-wide (FinancialAnalyzerApp.swift:86)
 - My Plan view COMPLETE
   - Replaced Dashboard tab with 4 allocation bucket cards
   - Essential/Discretionary spending from transactions (not Budget.currentSpent)

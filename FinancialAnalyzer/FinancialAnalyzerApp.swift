@@ -83,7 +83,7 @@ struct ContentView: View {
                 OnboardingFlowView(viewModel: viewModel)
             }
         }
-        .preferredColorScheme(.light)
+        .preferredColorScheme(.dark)
         .tint(.blue)
         .sheet(isPresented: $viewModel.isShowingGuidance) {
             if let alert = viewModel.currentAlert {

@@ -210,7 +210,7 @@ struct DebugView: View {
 
     private func checkBackendStatus() async {
         do {
-            let baseURL = "http://localhost:3000"
+            let baseURL = AppConfig.baseURL
             guard let url = URL(string: "\(baseURL)/health") else {
                 backendStatus = .disconnected
                 return
@@ -332,7 +332,7 @@ struct DebugView: View {
 
     private func clearBackendTokens() async {
         do {
-            let baseURL = "http://localhost:3000"
+            let baseURL = AppConfig.baseURL
             guard let url = URL(string: "\(baseURL)/api/dev/reset-all") else {
                 debugInfo += "❌ Invalid backend URL\n"
                 return

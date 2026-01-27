@@ -118,6 +118,7 @@
 		OB001003 /* AccountsConnectedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = OB002003 /* AccountsConnectedView.swift */; };
 		MP001001 /* MyPlanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = MP002001 /* MyPlanView.swift */; };
 		MP001002 /* PlanAdherenceCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = MP002002 /* PlanAdherenceCard.swift */; };
+		AC001001 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC002001 /* AppConfig.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -233,6 +234,7 @@
 		OB002003 /* AccountsConnectedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsConnectedView.swift; sourceTree = "<group>"; };
 		MP002001 /* MyPlanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyPlanView.swift; sourceTree = "<group>"; };
 		MP002002 /* PlanAdherenceCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanAdherenceCard.swift; sourceTree = "<group>"; };
+		AC002001 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -439,6 +441,7 @@
 		FA006001 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				AC002001 /* AppConfig.swift */,
 				991CAD7C2EAD535300000EDB /* ColorPalette.swift */,
 				991CAD7D2EAD535300000EDB /* DataResetManager.swift */,
 				991CAD7E2EAD535300000EDB /* UserDefaultsExtension.swift */,
@@ -539,6 +542,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AC001001 /* AppConfig.swift in Sources */,
 				AU001001 /* AuthState.swift in Sources */,
 				AU001002 /* AuthUser.swift in Sources */,
 				AU001003 /* SecureTokenStorage.swift in Sources */,

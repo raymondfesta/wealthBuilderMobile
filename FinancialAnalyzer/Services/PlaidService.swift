@@ -15,7 +15,7 @@ class PlaidService: ObservableObject {
     private var linkTokenExpiration: Date?
     private let linkTokenValidityDuration: TimeInterval = 20 * 60 // 20 minutes (tokens expire at 30, we refresh at 20)
 
-    init(baseURL: String = "http://192.168.1.8:3000") {
+    init(baseURL: String = AppConfig.baseURL) {
         self.baseURL = baseURL
     }
 

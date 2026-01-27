@@ -39,12 +39,7 @@ final class AuthService: ObservableObject {
     private let baseURL: String
 
     private init() {
-        #if DEBUG
-        // Use your Mac's local IP for simulator
-        self.baseURL = "http://192.168.1.8:3000"
-        #else
-        self.baseURL = "https://api.yourapp.com"
-        #endif
+        self.baseURL = AppConfig.baseURL
 
         Task {
             await checkExistingAuth()

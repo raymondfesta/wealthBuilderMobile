@@ -1,6 +1,6 @@
 # Project Progress Tracker
 
-Last Updated: 2026-01-27 (My Plan feature - 4 allocation bucket cards)
+Last Updated: 2026-01-27 (Dark mode enforcement)
 
 ## Current State
 
@@ -67,6 +67,11 @@ Last Updated: 2026-01-27 (My Plan feature - 4 allocation bucket cards)
 ## Completed This Session
 
 ### 2026-01-27
+
+- ✓ **Fix: Enforce dark mode app-wide**
+  - Changed `.preferredColorScheme(.light)` → `.preferredColorScheme(.dark)` in FinancialAnalyzerApp.swift:86
+  - DesignTokens built for dark theme (#0B0D10 base) now display correctly
+  - **File:** [FinancialAnalyzerApp.swift](FinancialAnalyzer/FinancialAnalyzerApp.swift)
 
 - ✓ **Feat: My Plan View - Real-time allocation plan adherence**
   - **Goal:** Replace Dashboard with 4 vertical cards showing plan adherence for Essential, Discretionary, Emergency Fund, Investments

@@ -11,16 +11,11 @@ final class TransactionFetchService {
 
     private init() {
         self.plaidService = PlaidService()
-
-        #if DEBUG
-        self.baseURL = "http://localhost:3000"
-        #else
-        self.baseURL = "https://api.yourproductionserver.com"
-        #endif
+        self.baseURL = AppConfig.baseURL
     }
 
     // For dependency injection in tests
-    init(plaidService: PlaidService, baseURL: String = "http://localhost:3000") {
+    init(plaidService: PlaidService, baseURL: String = AppConfig.baseURL) {
         self.plaidService = plaidService
         self.baseURL = baseURL
     }

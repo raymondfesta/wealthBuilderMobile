@@ -12,7 +12,7 @@ class BudgetManager: ObservableObject {
     private let baseURL: String
     private var userId: String?
 
-    init(baseURL: String = "http://localhost:3000", userId: String? = nil) {
+    init(baseURL: String = AppConfig.baseURL, userId: String? = nil) {
         self.baseURL = baseURL
         self.userId = userId
         if let userId = userId {
