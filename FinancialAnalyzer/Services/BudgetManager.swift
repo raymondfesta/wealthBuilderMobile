@@ -37,6 +37,26 @@ class BudgetManager: ObservableObject {
         loadFromCache()
     }
 
+    // MARK: - Cache Migration
+
+    /// Migrates old global cache key to user-scoped key (one-time migration)
+    private func migrateOldCacheKey(_ oldKey: String, to newKey: String) {
+        guard UserDefaults.standard.data(forKey: newKey) == nil,
+              let oldData = UserDefaults.standard.data(forKey: oldKey) else { return }
+        print("💾 [BudgetManager Migration] Migrating \(oldKey) → \(newKey)")
+        UserDefaults.standard.set(oldData, forKey: newKey)
+        UserDefaults.standard.removeObject(forKey: oldKey)
+    }
+
+    /// Migrates all old cache keys to user-scoped keys
+    private func migrateOldCacheKeys() {
+        guard userId != nil else { return }
+        print("💾 [BudgetManager Migration] Checking for old cache keys...")
+        migrateOldCacheKey("cached_budgets", to: cacheKey("budgets"))
+        migrateOldCacheKey("cached_goals", to: cacheKey("goals"))
+        migrateOldCacheKey("cached_allocation_buckets", to: cacheKey("allocation_buckets"))
+    }
+
     // MARK: - Budget Operations
 
     /// Creates or updates budgets based on transaction history
@@ -515,6 +535,9 @@ class BudgetManager: ObservableObject {
     }
 
     private func loadFromCache() {
+        // Migrate old global cache keys to user-scoped keys (one-time)
+        migrateOldCacheKeys()
+
         let decoder = JSONDecoder()
         if let budgetsData = UserDefaults.standard.data(forKey: cacheKey("budgets")),
            let budgets = try? decoder.decode([Budget].self, from: budgetsData) {

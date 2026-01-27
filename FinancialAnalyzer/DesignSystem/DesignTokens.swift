@@ -157,18 +157,11 @@ extension View {
             )
     }
 
-    /// Apply dark gradient background
+    /// Apply primary background color
     func primaryBackgroundGradient() -> some View {
         self.background(
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    DesignTokens.Colors.backgroundSecondary,
-                    DesignTokens.Colors.backgroundPrimary
-                ]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            DesignTokens.Colors.backgroundPrimary
+                .ignoresSafeArea()
         )
     }
 }

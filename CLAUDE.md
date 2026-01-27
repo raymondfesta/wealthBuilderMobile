@@ -122,7 +122,7 @@ backend/
 
 **ItemId-Based API:** iOS stores only itemIds in Keychain (not access tokens). Backend manages encrypted tokens in SQLite. All Plaid endpoints require auth and accept `item_id` instead of `access_token`.
 
-**Cache-First Loading:** Load cached accounts/transactions from encrypted cache on launch (<1s). First sync takes 10-20s, subsequent loads instant within 24h.
+**Cache-First Loading:** For logged-in users, `setCurrentUser()` syncs itemIds from backend first, then loads from encrypted cache (<1s). If cache empty but backend has items, auto-fetches from Plaid. First sync takes 10-20s, subsequent loads instant within 24h.
 
 **AI Data Minimization:** Only send aggregated summaries to OpenAI (totals, averages, patterns). Never raw transaction data.
 
@@ -280,6 +280,10 @@ Cmd+R to build and run
 ## Current Focus
 
 **Recent work (from git):**
+- Login persistence fix COMPLETE
+  - Accounts now load correctly after logout/login
+  - Fixed init order: cache deferred to `setCurrentUser()` when user logged in
+  - Added recovery: fetch from Plaid if cache empty but backend has items
 - User authentication system COMPLETE
   - Sign in with Apple + email/password
   - SQLite database (users, plaid_items, sessions tables)
@@ -328,6 +332,12 @@ curl http://localhost:3000/api/debug/items
 
 ### Build fails after adding files
 Ensure new .swift files registered in project.pbxproj. See [ADD_NEW_FILES_TO_XCODE.md](ADD_NEW_FILES_TO_XCODE.md).
+
+### Onboarding shown after logout/login (accounts not loading)
+Fixed in 2026-01-27. If this recurs, check:
+1. `setCurrentUser()` is called in `ContentView.task`
+2. `syncPlaidItemsFromBackend()` runs before `loadFromCache()`
+3. Recovery fetch triggers when cache empty but backend has items
 
 ## External Dependencies
 

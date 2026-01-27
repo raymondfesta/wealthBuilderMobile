@@ -25,6 +25,9 @@ class PlaidService: ObservableObject {
     private func addAuthHeader(to request: inout URLRequest) {
         if let accessToken = tokenStorage.accessToken {
             request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+            print("🔐 [PlaidService] Auth header added (token: \(accessToken.prefix(20))...)")
+        } else {
+            print("⚠️ [PlaidService] No access token available - request will be unauthenticated")
         }
     }
 

@@ -97,11 +97,9 @@ struct ContentView: View {
                 navigationCoordinator.setViewModel(viewModel)
             }
 
-            // Set current user to load user-scoped cache data
+            // Set current user to sync Plaid items and load cache
             if let userId = AuthService.shared.userId {
-                await MainActor.run {
-                    viewModel.setCurrentUser(userId)
-                }
+                await viewModel.setCurrentUser(userId)
             }
 
             // Check for launch argument to auto-reset data

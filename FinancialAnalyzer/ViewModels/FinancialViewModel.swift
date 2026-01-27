@@ -54,19 +54,21 @@ class FinancialViewModel: ObservableObject {
         // Set userId BEFORE creating BudgetManager so cache keys are scoped correctly
         if let userId = AuthService.shared.userId {
             self.currentUserId = userId
-            print("👤 [ViewModel] Init with user: \(userId.prefix(8))...")
+            print("👤 [ViewModel] Init with user: \(userId.prefix(8))... (cache deferred to setCurrentUser)")
         }
 
         self.budgetManager = BudgetManager(userId: currentUserId)
 
         // Skip cache loading if auto-reset is enabled
-        // This ensures we start with truly fresh data
         if ProcessInfo.processInfo.arguments.contains("-ResetDataOnLaunch") {
-            print("🔄 [ViewModel] Auto-reset detected - skipping cache load for fresh start")
-            // State will remain at default: .noAccountsConnected
-        } else {
+            print("🔄 [ViewModel] Auto-reset detected - skipping cache load")
+        } else if currentUserId == nil {
+            // Only load cache here if no user logged in (guest mode)
+            // When user IS logged in, setCurrentUser() will sync itemIds from backend first
             loadFromCache()
         }
+        // Note: Logged-in users have cache loading deferred to setCurrentUser()
+        // This ensures syncPlaidItemsFromBackend() runs BEFORE loadFromCache()
 
         setupNotificationObservers()
         startLinkTokenPreloading()
@@ -105,13 +107,85 @@ class FinancialViewModel: ObservableObject {
         migrateOldCacheKey("cached_summary", to: cacheKey("summary"))
     }
 
-    /// Sets current user and reloads cache with user-scoped keys
-    func setCurrentUser(_ userId: String) {
-        guard currentUserId != userId else { return }
-        print("👤 [ViewModel] Setting current user: \(userId.prefix(8))...")
-        currentUserId = userId
-        budgetManager.setUserId(userId)
+    /// Sets current user, syncs Plaid items from backend, and reloads cache
+    func setCurrentUser(_ userId: String) async {
+        let isNewUser = currentUserId != userId
+
+        if isNewUser {
+            print("👤 [ViewModel] Setting current user: \(userId.prefix(8))...")
+            currentUserId = userId
+            budgetManager.setUserId(userId)
+        } else {
+            print("👤 [ViewModel] Restoring session for user: \(userId.prefix(8))...")
+        }
+
+        // ALWAYS sync itemIds from backend before loading cache
+        // This ensures Keychain has correct itemIds for this user
+        await syncPlaidItemsFromBackend()
+
         loadFromCache()
+
+        // Recovery: If we have backend itemIds but no cached accounts, fetch from Plaid
+        if accounts.isEmpty {
+            let itemIds = (try? KeychainService.shared.allKeys()) ?? []
+            // Filter out encryption key identifier
+            let plaidItemIds = itemIds.filter { !$0.contains("com.financial") }
+            if !plaidItemIds.isEmpty {
+                print("🔄 [Recovery] Have \(plaidItemIds.count) itemId(s) but no cached accounts, fetching...")
+                await fetchAccountsOnly()
+            }
+        }
+    }
+
+    /// Syncs Plaid itemIds from backend to local Keychain
+    /// Ensures cache uses correct itemIds for authenticated user
+    private func syncPlaidItemsFromBackend() async {
+        print("🔄 [Sync] Syncing Plaid items from backend...")
+
+        do {
+            // Fetch user's actual Plaid items from backend
+            let backendItems = try await plaidService.getPlaidItems()
+            let backendItemIds = Set(backendItems.map { $0.itemId })
+            print("🔄 [Sync] Backend has \(backendItemIds.count) item(s)")
+
+            // Get current Keychain itemIds
+            let keychainItemIds = Set((try? KeychainService.shared.allKeys()) ?? [])
+            print("🔄 [Sync] Keychain has \(keychainItemIds.count) item(s)")
+
+            // Remove stale itemIds from Keychain (not in backend)
+            let staleIds = keychainItemIds.subtracting(backendItemIds)
+            for staleId in staleIds {
+                try? KeychainService.shared.delete(for: staleId)
+                SecureTransactionCache.shared.invalidateCache(for: staleId)
+                print("🗑️ [Sync] Removed stale itemId: \(staleId.prefix(8))...")
+            }
+
+            // Add missing itemIds to Keychain (placeholder value, backend manages actual tokens)
+            let missingIds = backendItemIds.subtracting(keychainItemIds)
+            for missingId in missingIds {
+                try? KeychainService.shared.save("backend-managed", for: missingId)
+                print("➕ [Sync] Added itemId: \(missingId.prefix(8))...")
+            }
+
+            // If backend has no items, clear all local cache
+            if backendItems.isEmpty && !keychainItemIds.isEmpty {
+                print("🗑️ [Sync] Backend has no items, clearing local cache")
+                for itemId in keychainItemIds {
+                    try? KeychainService.shared.delete(for: itemId)
+                    SecureTransactionCache.shared.invalidateCache(for: itemId)
+                }
+                // Also clear UserDefaults cache and account cache
+                UserDefaults.standard.removeObject(forKey: cacheKey("summary"))
+                if let userId = currentUserId {
+                    SecureTransactionCache.shared.invalidateAccountCache(for: userId)
+                }
+            }
+
+            print("✅ [Sync] Sync complete - \(backendItemIds.count) item(s) synced")
+        } catch {
+            // Fallback to existing Keychain itemIds if network fails
+            print("⚠️ [Sync] Backend sync failed, using existing Keychain: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - Link Token Preloading
@@ -1267,6 +1341,10 @@ class FinancialViewModel: ObservableObject {
 
     private func loadFromCache() {
         print("💾 [Cache Load] Starting cache load...")
+
+        // Migrate old global cache keys to user-scoped keys (one-time)
+        migrateOldCacheKeys()
+
         let decoder = JSONDecoder()
 
         // Try to load from encrypted cache first, falling back to UserDefaults migration
@@ -1364,15 +1442,9 @@ class FinancialViewModel: ObservableObject {
             print("💾 [Cache Load] No transactions available for budget generation")
         }
 
-        // Load user journey state (user-scoped)
-        if let stateData = UserDefaults.standard.data(forKey: cacheKey("journey_state")),
-           let state = try? decoder.decode(UserJourneyState.self, from: stateData) {
-            self.userJourneyState = state
-            print("📂 [Cache] Loaded journey state: \(state.rawValue)")
-        } else {
-            // Infer state from cached data for existing users
-            inferStateFromCache()
-        }
+        // Always infer journey state from actual cached data to ensure consistency
+        // This prevents stale journey state from being restored without matching data
+        inferStateFromCache()
 
         // Load allocation schedule
         allocationScheduleConfig = AllocationScheduleConfig.load()

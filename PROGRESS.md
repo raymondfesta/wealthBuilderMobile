@@ -1,6 +1,6 @@
 # Project Progress Tracker
 
-Last Updated: 2026-01-26 (User-scoped cache fix)
+Last Updated: 2026-01-27 (Fixed login persistence - accounts now load after logout/login)
 
 ## Current State
 
@@ -22,6 +22,7 @@ Last Updated: 2026-01-26 (User-scoped cache fix)
 - Cache-first loading (<1s repeat analysis)
 - Automated data reset via launch arguments
 - Keychain token storage (auth + Plaid)
+- Plaid items synced from backend on login (data persists across logout/login)
 
 ### In Progress 🔨
 - Sign in with Apple capability setup (requires Apple Developer portal)
@@ -60,18 +61,73 @@ Last Updated: 2026-01-26 (User-scoped cache fix)
 
 ## Completed This Session
 
+### 2026-01-27
+- ✓ **Fix: Login persistence - accounts not loading after logout/login**
+  - **Issue:** After logout/login, users shown onboarding instead of their connected accounts
+  - **Root cause:** Two issues:
+    1. `init()` called `loadFromCache()` before `syncPlaidItemsFromBackend()` could sync itemIds
+    2. `setCurrentUser()` had early return when userId matched, skipping sync entirely
+    3. No recovery when cache files empty but backend has items
+  - **Fix:**
+    1. Defer `loadFromCache()` in `init()` when user is logged in (let `setCurrentUser()` handle it)
+    2. Remove early return in `setCurrentUser()` - always sync from backend
+    3. Add recovery: if accounts empty after cache load but itemIds exist, fetch from Plaid
+  - **Files:** `FinancialViewModel.swift:51-73, 111-135`
+  - **Build verified:** ✓
+
+- ✓ **Fix: Journey state cache causing wrong view after login**
+  - **Issue:** After logout/login, users shown AllocationPlannerView instead of correct onboarding step
+  - **Root cause:** Cached journey state restored without validating actual data exists
+  - **Fix:** Changed `loadFromCache()` to always call `inferStateFromCache()` instead of blindly trusting cached state
+  - **File:** `FinancialViewModel.swift:1371-1379`
+
+- ✓ **Fix: PlaidService auth header debug logging**
+  - Added logging to show whether auth token is present when making API calls
+  - **File:** `PlaidService.swift:25-29`
+
+- ✓ **Identified: `-ResetDataOnLaunch` race condition**
+  - **Bug:** Reset runs in ContentView.task AFTER user logs in, clearing fresh auth tokens
+  - **Workaround:** Disable `-ResetDataOnLaunch` after initial reset
+  - **Root cause:** ContentView.task checks flag and runs reset, but user already authenticated
+
+- 🔍 **Investigated: Legacy Plaid token not migrated**
+  - Old tokens in `plaid_tokens.json` not in SQLite `plaid_items` table
+  - User `68191d9b-9387-41a7-952c-d652ee824347` had 0 plaid_items until fresh connect
+  - **Resolution:** Fresh bank connection creates proper SQLite entry
+
+- ✓ **Fix: Data not persisting after logout/login (empty state)**
+  - **Issue:** After logout/login, users see onboarding instead of their connected bank data
+  - **Root cause:** `loadFromCache()` used itemIds from local Keychain only; never fetched user's actual Plaid items from backend. Keychain itemIds could be empty/stale.
+  - **Fix:** Added `syncPlaidItemsFromBackend()` method that:
+    1. Calls `getPlaidItems()` to fetch user's items from backend
+    2. Removes stale itemIds from Keychain (not in backend)
+    3. Adds missing itemIds to Keychain
+    4. Clears local cache if backend has no items
+    5. Falls back to existing Keychain on network failure
+  - Made `setCurrentUser()` async to call sync before loading cache
+  - **Files:** `FinancialViewModel.swift`, `FinancialAnalyzerApp.swift`
+  - **Build verified:** ✓
+
 ### 2026-01-26
 - ✓ **Fix: Returning users see onboarding instead of dashboard**
   - **Issue:** After logout/login, users shown onboarding flow instead of their existing data (accounts, allocation plan, transactions)
   - **Root cause:** Cache data in UserDefaults not scoped by userId. With multi-user auth, cache could be corrupted/overwritten. When FinancialViewModel created, cache loading failed or loaded wrong user's data.
-  - **Fix:** Scope all UserDefaults cache keys by userId prefix
+  - **Fix #1:** Scope all UserDefaults cache keys by userId prefix
+  - **Fix #2:** Get userId from AuthService.shared in init() to ensure cache loads with correct user before .task runs
+  - **Fix #3:** Add migration logic to copy existing data from old global keys to new user-scoped keys (one-time migration)
   - **Files modified:**
-    - `FinancialViewModel.swift` - added `currentUserId`, `cacheKey()` helper, `setCurrentUser()` method; updated `saveToCache()`/`loadFromCache()` to use user-scoped keys
-    - `BudgetManager.swift` - added `userId`, `cacheKey()` helper, `setUserId()` method; updated cache methods to use user-scoped keys
+    - `FinancialViewModel.swift` - added `currentUserId`, `cacheKey()` helper, `setCurrentUser()` method, `migrateOldCacheKey()`, `migrateOldCacheKeys()`; updated `saveToCache()`/`loadFromCache()` to use user-scoped keys with migration
+    - `BudgetManager.swift` - added `userId`, `cacheKey()` helper, `setUserId()` method, `migrateOldCacheKey()`, `migrateOldCacheKeys()`; updated cache methods to use user-scoped keys with migration
     - `FinancialAnalyzerApp.swift` - added call to `viewModel.setCurrentUser(userId)` after auth
     - `ProfileView.swift` - updated footer text to match actual behavior (data preserved on logout)
   - **Cache keys now user-scoped:**
     - `user_{userId}_summary`, `user_{userId}_journey_state`, `user_{userId}_budgets`, `user_{userId}_goals`, `user_{userId}_allocation_buckets`
+  - **Migration handles:**
+    - `cached_journey_state` → `user_{userId}_journey_state`
+    - `cached_summary` → `user_{userId}_summary`
+    - `cached_budgets` → `user_{userId}_budgets`
+    - `cached_goals` → `user_{userId}_goals`
+    - `cached_allocation_buckets` → `user_{userId}_allocation_buckets`
   - **Build verified:** ✓ Compiled successfully
 
 - ✓ **Removed Financial Health Feature (iOS + Backend)**
@@ -374,6 +430,11 @@ Last Updated: 2026-01-26 (User-scoped cache fix)
   - Capability not yet configured
   - Email/password auth works as fallback
   - Impact: Apple Sign In button will fail until configured
+
+- **JWT access token can expire during Plaid Link flow**
+  - 15min token lifetime; Plaid Link can take longer
+  - PlaidService doesn't retry on 401
+  - Impact: "Failed to exchange token" error if idle >15min
 
 ### Minor 🟢
 - Plaid sandbox limited to 10 accounts per custom user
