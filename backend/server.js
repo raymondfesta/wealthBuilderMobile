@@ -11,6 +11,13 @@ import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import * as jose from 'jose';
+import { v4 as uuidv4 } from 'uuid';
+
+// Auth imports
+import { getDb, createUser, createPlaidItem, findPlaidItemsByUserId, findPlaidItemByItemId, findPlaidItemByItemIdOnly, deletePlaidItem, deletePlaidItemByItemId, updatePlaidItemToken } from './db/database.js';
+import { encrypt, decrypt } from './services/encryption.js';
+import { requireAuth, optionalAuth } from './middleware/auth.js';
+import authRoutes from './routes/auth.js';
 
 // Load environment variables
 dotenv.config();
@@ -113,9 +120,17 @@ function saveTokens(tokens) {
   }
 }
 
-// Initialize token storage
+// Initialize token storage (legacy - will be migrated to SQLite)
 const accessTokens = loadTokens();
 console.log(`💾 Loaded ${accessTokens.size} stored access token(s)`);
+
+// Initialize SQLite database
+try {
+  const db = getDb();
+  console.log('✅ SQLite database initialized');
+} catch (error) {
+  console.error('❌ Database initialization failed:', error);
+}
 
 // MARK: - Routes
 
@@ -123,6 +138,9 @@ console.log(`💾 Loaded ${accessTokens.size} stored access token(s)`);
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Mount auth routes
+app.use('/auth', authRoutes);
 
 // Debug endpoint to list all stored items
 app.get('/api/debug/items', (req, res) => {
@@ -234,6 +252,9 @@ app.post('/api/plaid/create_link_token', async (req, res) => {
       },
       client_name: 'Financial Analyzer',
       products: ['transactions'],
+      transactions: {
+        days_requested: 90, // 3 months for faster sync
+      },
       country_codes: ['US'],
       language: 'en',
     };
@@ -406,6 +427,38 @@ app.post('/api/plaid/transactions/refresh', async (req, res) => {
   } catch (error) {
     console.error('[Plaid] Transactions refresh error:', error.message, error.response?.data || '');
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Check Sync Status - used by iOS cache to determine if data is ready
+app.post('/api/plaid/sync-status', async (req, res) => {
+  const { access_token } = req.body;
+
+  if (!access_token) {
+    return res.status(400).json({ error: 'Missing access_token' });
+  }
+
+  try {
+    // Try transactionsSync with count:1 to check if transactions are available
+    const response = await plaidClient.transactionsSync({
+      access_token,
+      count: 1,
+    });
+
+    const hasTransactions = response.data.added.length > 0 || response.data.modified.length > 0;
+
+    res.json({
+      status: hasTransactions ? 'ready' : 'syncing',
+      transactions_available: response.data.added.length + response.data.modified.length,
+      has_more: response.data.has_more,
+    });
+  } catch (error) {
+    // PRODUCT_NOT_READY means Plaid is still syncing
+    if (error.response?.data?.error_code === 'PRODUCT_NOT_READY') {
+      return res.json({ status: 'syncing', transactions_available: 0 });
+    }
+    console.error('[Plaid] Sync status error:', error.message);
+    res.status(500).json({ error: error.message });
   }
 });
 

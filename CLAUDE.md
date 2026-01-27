@@ -22,7 +22,7 @@ Native iOS financial app (SwiftUI) with Node.js backend. Connects bank accounts 
 - Plaid Link SDK 5.0+ (via SPM)
 - iOS 16.0+ target
 - Keychain for secure token storage
-- UserDefaults for caching
+- Encrypted transaction cache (AES-256-GCM)
 
 ### Backend (Node.js)
 - Express 4.18.2
@@ -58,8 +58,10 @@ FinancialAnalyzer/
 │   ├── AllocationBucket.swift # 4-5 allocation buckets
 │   ├── PaycheckSchedule.swift
 │   └── UserJourneyState.swift # Onboarding state machine
-├── Services/                  # 14 service files
+├── Services/                  # 16 service files
 │   ├── PlaidService.swift     # Plaid API + link token caching
+│   ├── SecureTransactionCache.swift # AES-256-GCM encrypted cache
+│   ├── TransactionFetchService.swift # Cache-first fetching
 │   ├── TransactionAnalyzer.swift # Category mapping
 │   ├── FinancialHealthCalculator.swift
 │   ├── BudgetManager.swift
@@ -92,7 +94,7 @@ backend/
 
 **ItemId → AccessToken Mapping:** Keychain stores access_token keyed by item_id. Critical: Set `account.itemId` after fetching accounts (Plaid API doesn't return it).
 
-**Cache-First Loading:** Load cached accounts/transactions from UserDefaults on launch, refresh from Plaid in background.
+**Cache-First Loading:** Load cached accounts/transactions from encrypted cache on launch (<1s). First sync takes 10-20s, subsequent loads instant within 24h.
 
 **AI Data Minimization:** Only send aggregated summaries to OpenAI (totals, averages, patterns). Never raw transaction data.
 
@@ -250,21 +252,15 @@ Cmd+R to build and run
 ## Current Focus
 
 **Recent work (from git):**
+- Session cache implementation (encrypted local caching)
+  - `SecureTransactionCache.swift` - AES-256-GCM encrypted file cache
+  - `TransactionFetchService.swift` - Cache-first fetching with retry
+  - Backend: `/api/plaid/sync-status` endpoint, `days_requested: 90`
+  - 3-month history (reduced from 6 for faster sync)
+  - 24h cache expiration with background refresh
 - TASK 1-6: TransactionAnalyzer implementation plan COMPLETE
-  - **TASK 1:** Model files refactor (BankAccount, ExpenseBreakdown, FinancialPosition, etc.)
-  - **TASK 2:** Rewrote TransactionAnalyzer.swift with correct classification:
-    - `isActualIncome()` - negative amounts, excludes transfers/refunds
-    - `isInvestmentContribution()` - 401k/IRA/investment transfers
-    - `isInternalTransfer()` - filters internal transfers
-    - `shouldExcludeFromBudget()` - unified exclusion check
-    - `generateSnapshot()` - correct disposable income calculation
-  - **TASK 3:** Updated SpendingPatternAnalyzer to use `shouldExcludeFromBudget()`
-  - **TASK 4:** Updated BudgetManager to use `shouldExcludeFromBudget()`
-  - **TASK 5:** Updated AlertRulesEngine (`availableToSpend` → `disposableIncome`)
-  - **TASK 6:** Migrated all consumers to AnalysisSnapshot, deleted FinancialSummary.swift
 - Design system (glassmorphic components)
 - Expense breakdown feature
-- Dashboard refactor
 - Swift 6 concurrency fixes
 
 **Next priorities:**

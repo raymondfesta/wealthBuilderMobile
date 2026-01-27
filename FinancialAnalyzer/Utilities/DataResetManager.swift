@@ -25,13 +25,16 @@ class DataResetManager {
         // 2. Clear Keychain (all access tokens)
         clearKeychain()
 
-        // 3. Clear UserDefaults (all cached data)
+        // 3. Clear Secure Cache (encrypted transactions/accounts)
+        clearSecureCache()
+
+        // 4. Clear UserDefaults (all cached data)
         clearUserDefaults()
 
-        // 4. Reset ViewModel state
+        // 5. Reset ViewModel state
         await resetViewModelState(viewModel)
 
-        // 5. Cancel any pending notifications
+        // 6. Cancel any pending notifications
         await cancelNotifications()
 
         // Final log
@@ -62,10 +65,13 @@ class DataResetManager {
         // 2. Clear Keychain (all access tokens)
         clearKeychain()
 
-        // 3. Reset ViewModel state
+        // 3. Clear Secure Cache (encrypted transactions/accounts)
+        clearSecureCache()
+
+        // 4. Reset ViewModel state
         await resetViewModelState(viewModel)
 
-        // 4. Cancel any pending notifications
+        // 5. Cancel any pending notifications
         await cancelNotifications()
 
         print("✅ [Reset] ===== REMAINING DATA CLEARED =====")
@@ -121,6 +127,14 @@ class DataResetManager {
         } catch {
             print("🗑️ [Reset] ⚠️ Error listing Keychain keys: \(error)")
         }
+    }
+
+    /// Clear encrypted transaction and account caches
+    private static func clearSecureCache() {
+        print("🗑️ [Reset] Clearing secure transaction/account cache...")
+        SecureTransactionCache.shared.clearAllCaches()
+        SecureTransactionCache.shared.deleteEncryptionKey()
+        print("🗑️ [Reset] Secure cache cleared")
     }
 
     /// Clear all cached data from UserDefaults

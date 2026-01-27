@@ -47,6 +47,7 @@ class FinancialViewModel: ObservableObject {
     }
 
     private let plaidService: PlaidService
+    private let transactionFetchService = TransactionFetchService.shared
     private var linkTokenRefreshTask: Task<Void, Never>?
 
     init(plaidService: PlaidService = PlaidService()) {
@@ -317,9 +318,9 @@ class FinancialViewModel: ObservableObject {
 
             var allTransactions: [Transaction] = []
 
-            // Fetch 6 months of transactions for each account
+            // Fetch 3 months of transactions (reduced from 6 for faster sync)
             let endDate = Date()
-            let startDate = Calendar.current.date(byAdding: .month, value: -6, to: endDate) ?? endDate
+            let startDate = Calendar.current.date(byAdding: .month, value: -3, to: endDate) ?? endDate
 
             // Allow Plaid time to sync transactions after initial connection
             print("⏳ [Analyze Finances] Waiting 3s for Plaid to sync transactions...")
@@ -331,12 +332,14 @@ class FinancialViewModel: ObservableObject {
                 do {
                     let accessToken = try KeychainService.shared.load(for: itemId)
 
-                    let transactions = try await plaidService.fetchTransactions(
+                    let (transactions, fromCache) = try await transactionFetchService.fetchTransactions(
                         accessToken: accessToken,
+                        itemId: itemId,
                         startDate: startDate,
                         endDate: endDate
                     )
-                    print("📊 [Analyze Finances] Fetched \(transactions.count) transaction(s) for itemId: \(itemId)")
+                    let source = fromCache ? "cache" : "Plaid"
+                    print("📊 [Analyze Finances] Got \(transactions.count) transaction(s) from \(source) for itemId: \(itemId)")
                     allTransactions.append(contentsOf: transactions)
 
                     // Update loading step with current count
@@ -814,6 +817,10 @@ class FinancialViewModel: ObservableObject {
             print("🗑️ [Account Removal] Deleting access token from Keychain...")
             try KeychainService.shared.delete(for: removedItemId)
             print("🗑️ [Account Removal] Access token deleted from Keychain")
+
+            // Invalidate encrypted transaction cache for this item
+            transactionFetchService.invalidateCache(for: removedItemId)
+            print("🗑️ [Account Removal] Invalidated transaction cache")
 
             // Filter out accounts belonging to removed itemId
             let accountsToRemove = accounts.filter { $0.itemId == removedItemId }
@@ -1397,30 +1404,22 @@ class FinancialViewModel: ObservableObject {
 
         let encoder = JSONEncoder()
 
-        // Save accounts
-        if let accountsData = try? encoder.encode(accounts) {
-            UserDefaults.standard.set(accountsData, forKey: "cached_accounts")
-            print("💾 [Cache Save] ✅ Saved \(accounts.count) accounts")
+        // Save accounts to encrypted cache (grouped by itemId)
+        let accountsByItem = Dictionary(grouping: accounts) { $0.itemId }
+        for (itemId, itemAccounts) in accountsByItem where !itemId.isEmpty {
+            SecureTransactionCache.shared.cacheAccounts(itemAccounts, for: itemId)
+        }
+        print("💾 [Cache Save] ✅ Saved \(accounts.count) accounts to encrypted cache")
 
-            // Log itemId status for each account being saved
-            for account in accounts {
-                if account.itemId.isEmpty {
-                    print("💾 [Cache Save] ⚠️ Saving account '\(account.name)' with EMPTY itemId!")
-                } else {
-                    print("💾 [Cache Save] ✅ Saving account '\(account.name)' with itemId: \(account.itemId)")
-                }
+        // Save transactions to encrypted cache (grouped by itemId via accounts)
+        for (itemId, itemAccounts) in accountsByItem where !itemId.isEmpty {
+            let accountIds = Set(itemAccounts.map { $0.id })
+            let itemTransactions = transactions.filter { accountIds.contains($0.accountId) }
+            if !itemTransactions.isEmpty {
+                SecureTransactionCache.shared.cacheTransactions(itemTransactions, for: itemId)
             }
-        } else {
-            print("💾 [Cache Save] ❌ Failed to encode accounts")
         }
-
-        // Save transactions
-        if let transactionsData = try? encoder.encode(transactions) {
-            UserDefaults.standard.set(transactionsData, forKey: "cached_transactions")
-            print("💾 [Cache Save] ✅ Saved \(transactions.count) transactions")
-        } else {
-            print("💾 [Cache Save] ❌ Failed to encode transactions")
-        }
+        print("💾 [Cache Save] ✅ Saved \(transactions.count) transactions to encrypted cache")
 
         // Save summary
         if let summaryData = try? encoder.encode(summary) {
@@ -1448,33 +1447,78 @@ class FinancialViewModel: ObservableObject {
         print("💾 [Cache Load] Starting cache load...")
         let decoder = JSONDecoder()
 
-        // Load accounts
-        if let accountsData = UserDefaults.standard.data(forKey: "cached_accounts") {
-            print("💾 [Cache Load] Found cached accounts data (\(accountsData.count) bytes)")
-            if let accounts = try? decoder.decode([BankAccount].self, from: accountsData) {
-                self.accounts = accounts
-                print("💾 [Cache Load] ✅ Decoded \(accounts.count) account(s) from cache")
+        // Try to load from encrypted cache first, falling back to UserDefaults migration
+        var loadedAccounts: [BankAccount] = []
+        var loadedTransactions: [Transaction] = []
+        var needsMigration = false
 
-                // Validate that cached accounts have proper itemIds
-                validateAndFixAccountItemIds()
-            } else {
-                print("💾 [Cache Load] ❌ Failed to decode accounts from cache")
-            }
-        } else {
-            print("💾 [Cache Load] No cached accounts data found")
+        // Check for legacy UserDefaults cache (for migration)
+        if let accountsData = UserDefaults.standard.data(forKey: "cached_accounts"),
+           let legacyAccounts = try? decoder.decode([BankAccount].self, from: accountsData) {
+            print("💾 [Cache Load] Found legacy UserDefaults accounts, will migrate to encrypted cache")
+            loadedAccounts = legacyAccounts
+            needsMigration = true
         }
 
-        // Load transactions
-        if let transactionsData = UserDefaults.standard.data(forKey: "cached_transactions") {
-            print("💾 [Cache Load] Found cached transactions data (\(transactionsData.count) bytes)")
-            if let transactions = try? decoder.decode([Transaction].self, from: transactionsData) {
-                self.transactions = transactions
-                print("💾 [Cache Load] ✅ Decoded \(transactions.count) transaction(s) from cache")
-            } else {
-                print("💾 [Cache Load] ❌ Failed to decode transactions from cache")
+        if let transactionsData = UserDefaults.standard.data(forKey: "cached_transactions"),
+           let legacyTransactions = try? decoder.decode([Transaction].self, from: transactionsData) {
+            print("💾 [Cache Load] Found legacy UserDefaults transactions, will migrate to encrypted cache")
+            loadedTransactions = legacyTransactions
+            needsMigration = true
+        }
+
+        // If no legacy data, try loading from encrypted cache
+        if loadedAccounts.isEmpty {
+            // Load accounts from encrypted cache using known itemIds from Keychain
+            if let itemIds = try? KeychainService.shared.allKeys() {
+                for itemId in itemIds {
+                    if let cached = SecureTransactionCache.shared.loadAccounts(for: itemId) {
+                        loadedAccounts.append(contentsOf: cached.accounts)
+                    }
+                }
             }
-        } else {
-            print("💾 [Cache Load] No cached transactions data found")
+            print("💾 [Cache Load] Loaded \(loadedAccounts.count) account(s) from encrypted cache")
+        }
+
+        if loadedTransactions.isEmpty {
+            // Load transactions from encrypted cache using known itemIds from Keychain
+            if let itemIds = try? KeychainService.shared.allKeys() {
+                for itemId in itemIds {
+                    if let cached = SecureTransactionCache.shared.loadTransactions(for: itemId) {
+                        loadedTransactions.append(contentsOf: cached.transactions)
+                    }
+                }
+            }
+            print("💾 [Cache Load] Loaded \(loadedTransactions.count) transaction(s) from encrypted cache")
+        }
+
+        // Apply loaded data
+        self.accounts = loadedAccounts
+        self.transactions = loadedTransactions
+
+        // Validate that cached accounts have proper itemIds
+        if !loadedAccounts.isEmpty {
+            validateAndFixAccountItemIds()
+        }
+
+        // Migrate legacy data to encrypted cache and clear old UserDefaults
+        if needsMigration && !loadedAccounts.isEmpty {
+            print("💾 [Cache Load] Migrating to encrypted cache...")
+            let accountsByItem = Dictionary(grouping: loadedAccounts) { $0.itemId }
+            for (itemId, itemAccounts) in accountsByItem where !itemId.isEmpty {
+                SecureTransactionCache.shared.cacheAccounts(itemAccounts, for: itemId)
+
+                let accountIds = Set(itemAccounts.map { $0.id })
+                let itemTransactions = loadedTransactions.filter { accountIds.contains($0.accountId) }
+                if !itemTransactions.isEmpty {
+                    SecureTransactionCache.shared.cacheTransactions(itemTransactions, for: itemId)
+                }
+            }
+
+            // Clear legacy UserDefaults cache
+            UserDefaults.standard.removeObject(forKey: "cached_accounts")
+            UserDefaults.standard.removeObject(forKey: "cached_transactions")
+            print("💾 [Cache Load] ✅ Migration complete, legacy cache cleared")
         }
 
         // Load summary
