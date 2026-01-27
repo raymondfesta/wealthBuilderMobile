@@ -85,6 +85,26 @@ class FinancialViewModel: ObservableObject {
         return "user_\(userId)_\(base)"
     }
 
+    /// Migrates old global cache key to user-scoped key (one-time migration)
+    private func migrateOldCacheKey(_ oldKey: String, to newKey: String) {
+        // Only migrate if new key doesn't exist and old key does
+        guard UserDefaults.standard.data(forKey: newKey) == nil,
+              let oldData = UserDefaults.standard.data(forKey: oldKey) else { return }
+
+        print("💾 [Migration] Migrating \(oldKey) → \(newKey)")
+        UserDefaults.standard.set(oldData, forKey: newKey)
+        UserDefaults.standard.removeObject(forKey: oldKey)
+    }
+
+    /// Migrates all old cache keys to user-scoped keys
+    private func migrateOldCacheKeys() {
+        guard currentUserId != nil else { return }
+        print("💾 [Migration] Checking for old cache keys to migrate...")
+
+        migrateOldCacheKey("cached_journey_state", to: cacheKey("journey_state"))
+        migrateOldCacheKey("cached_summary", to: cacheKey("summary"))
+    }
+
     /// Sets current user and reloads cache with user-scoped keys
     func setCurrentUser(_ userId: String) {
         guard currentUserId != userId else { return }
