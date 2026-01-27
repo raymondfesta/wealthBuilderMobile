@@ -9,6 +9,7 @@ Native iOS financial app (SwiftUI) with Node.js backend. Connects bank accounts 
 **Key Value Proposition:** Analyzes transactions and helps users allocate income across smart buckets (Essential, Emergency Fund, Discretionary, Investments, Debt Paydown) with AI-generated recommendations.
 
 **Core Features:**
+- My Plan view (4 bucket cards: Essential, Discretionary, Emergency Fund, Investments)
 - Interactive Allocation Planner (Low/Rec/High presets, account linking)
 - Allocation Schedule & Execution (paycheck detection, notifications, history)
 - Proactive Guidance via GPT-4o-mini
@@ -67,7 +68,7 @@ FinancialAnalyzer/
 │   ├── PlaidService.swift     # Plaid API + link token caching
 │   ├── SecureTransactionCache.swift # AES-256-GCM encrypted cache
 │   ├── TransactionFetchService.swift # Cache-first fetching
-│   ├── TransactionAnalyzer.swift # Category mapping
+│   ├── TransactionAnalyzer.swift # Category mapping + essential/discretionary classification
 │   ├── BudgetManager.swift
 │   ├── AllocationScheduler.swift
 │   ├── NotificationService.swift
@@ -79,8 +80,11 @@ FinancialAnalyzer/
 │   ├── AuthRootView.swift     # Root auth router
 │   ├── LoginView.swift        # Sign in with Apple + email/password
 │   ├── ProfileView.swift      # User profile + logout
-│   ├── DashboardView.swift    # Allocation plan + buckets grid (simplified)
+│   ├── DashboardView.swift    # Legacy (replaced by MyPlanView)
 │   ├── ScheduleTabView.swift
+│   ├── MyPlan/                # Main post-onboarding view
+│   │   ├── MyPlanView.swift          # 4 bucket cards, cycle header
+│   │   └── PlanAdherenceCard.swift   # Spending/savings card components
 │   ├── Onboarding/            # Onboarding flow (separated from Dashboard)
 │   │   ├── OnboardingFlowView.swift    # Journey state router
 │   │   ├── WelcomeConnectView.swift    # Connect bank CTA
@@ -280,6 +284,12 @@ Cmd+R to build and run
 ## Current Focus
 
 **Recent work (from git):**
+- My Plan view COMPLETE
+  - Replaced Dashboard tab with 4 allocation bucket cards
+  - Essential/Discretionary spending from transactions (not Budget.currentSpent)
+  - Emergency Fund/Investments from linked account balances
+  - TransactionAnalyzer: `isEssentialSpending()`, `spentThisCycle()`, `projectedCycleSpend()`
+  - Auto-link accounts on view load via AccountLinkingService suggestions
 - Silent background recovery COMPLETE
   - Returning users see instant dashboard (no loading spinners)
   - `performBackgroundRefresh()` updates data without UI indicators
@@ -383,6 +393,11 @@ APPLE_BUNDLE_ID=com.yourcompany.FinancialAnalyzer
 - [Data Reset Feature](CLEAR_DATA_FEATURE.md)
 
 ## Architecture Decisions
+
+### 2026-01: My Plan View
+**Decision:** Calculate spending from transactions, use linked account balances for savings
+**Rationale:** Budget.currentSpent was stale; transactions are source of truth; Plaid balances reflect actual savings
+**Trade-offs:** More computation per render; mitigated by cycle-based filtering
 
 ### 2025-01: State Management
 **Decision:** MVVM with centralized FinancialViewModel

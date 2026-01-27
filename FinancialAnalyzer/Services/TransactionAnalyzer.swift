@@ -404,6 +404,195 @@ struct TransactionAnalyzer {
         isInvestmentContribution(transaction) || isInternalTransfer(transaction)
     }
 
+    // MARK: - Essential vs Discretionary Classification
+
+    /// Determines if a transaction is essential spending (housing, utilities, groceries, healthcare, transportation basics)
+    /// Used by My Plan to calculate Essential Spending bucket
+    static func isEssentialSpending(_ transaction: Transaction) -> Bool {
+        // Must be an outflow that qualifies as an expense
+        guard isEssentialExpense(transaction) else { return false }
+
+        if let pfc = transaction.personalFinanceCategory {
+            let primary = pfc.primary.uppercased()
+            let detailed = pfc.detailed.uppercased()
+
+            // Always essential primaries
+            if ["RENT_AND_UTILITIES", "LOAN_PAYMENTS", "BANK_FEES",
+                "GOVERNMENT_AND_NON_PROFIT", "MEDICAL"].contains(primary) {
+                return true
+            }
+
+            // Food: Groceries = essential, Restaurants = discretionary
+            if primary == "FOOD_AND_DRINK" {
+                return ["GROCERIES", "SUPERMARKET", "WAREHOUSE_CLUB"]
+                    .contains(where: { detailed.contains($0) })
+            }
+
+            // Transportation: Daily transit = essential, Travel = discretionary
+            if primary == "TRANSPORTATION" {
+                return !["AIRLINE", "HOTEL", "VACATION", "CRUISE", "RESORT"]
+                    .contains(where: { detailed.contains($0) })
+            }
+
+            // Travel is discretionary
+            if primary == "TRAVEL" { return false }
+
+            // Entertainment is discretionary
+            if primary == "ENTERTAINMENT" { return false }
+
+            // General merchandise: Check for essentials vs discretionary
+            if primary == "GENERAL_MERCHANDISE" {
+                return ["PHARMACY", "HEALTHCARE", "PET_FOOD"]
+                    .contains(where: { detailed.contains($0) })
+            }
+
+            // General services: Childcare, education = essential; others = discretionary
+            if primary == "GENERAL_SERVICES" {
+                return ["CHILDCARE", "EDUCATION", "VETERINARY", "AUTOMOTIVE"]
+                    .contains(where: { detailed.contains($0) })
+            }
+
+            // Home improvement - consider essential (maintenance)
+            if primary == "HOME_IMPROVEMENT" { return true }
+
+            // Insurance anywhere in detailed = essential
+            if detailed.contains("INSURANCE") { return true }
+
+            // Default to discretionary for uncategorized
+            return false
+        }
+
+        // Fallback: keyword matching for essential merchants
+        let nameLower = transaction.name.lowercased()
+        let essentialKeywords = [
+            "rent", "mortgage", "hoa", "property management",
+            "electric", "water", "gas bill", "pge", "con edison",
+            "internet", "comcast", "verizon", "at&t", "spectrum",
+            "grocery", "safeway", "kroger", "publix", "whole foods", "trader joe",
+            "walmart", "target", "costco", "aldi",
+            "pharmacy", "cvs", "walgreens", "medical", "doctor", "hospital",
+            "dental", "vision", "healthcare", "clinic",
+            "insurance", "geico", "progressive", "state farm",
+            "gas station", "shell", "chevron", "exxon",
+            "parking", "transit", "metro", "toll"
+        ]
+
+        return essentialKeywords.contains(where: { nameLower.contains($0) })
+    }
+
+    /// Determines if a transaction is discretionary spending (dining, entertainment, shopping, subscriptions)
+    static func isDiscretionarySpending(_ transaction: Transaction) -> Bool {
+        // Must be an outflow that qualifies as an expense
+        guard isEssentialExpense(transaction) else { return false }
+
+        // If it's not essential, it's discretionary
+        return !isEssentialSpending(transaction)
+    }
+
+    // MARK: - Cycle Spending Calculations
+
+    /// Calculates total spending for a specific allocation bucket within a billing cycle
+    static func spentThisCycle(
+        for bucketType: AllocationBucketType,
+        transactions: [Transaction],
+        cycleStart: Date,
+        cycleEnd: Date = Date()
+    ) -> Double {
+        let cycleTransactions = transactions.filter {
+            $0.date >= cycleStart && $0.date <= cycleEnd && !$0.pending
+        }
+
+        switch bucketType {
+        case .essentialSpending:
+            return cycleTransactions
+                .filter { isEssentialSpending($0) }
+                .reduce(0) { $0 + abs($1.amount) }
+
+        case .discretionarySpending:
+            return cycleTransactions
+                .filter { isDiscretionarySpending($0) }
+                .reduce(0) { $0 + abs($1.amount) }
+
+        case .emergencyFund, .investments, .debtPaydown:
+            // These buckets use account balances, not transaction sums
+            return 0
+        }
+    }
+
+    /// Calculates daily burn rate for a spending bucket
+    static func dailyBurnRate(
+        for bucketType: AllocationBucketType,
+        transactions: [Transaction],
+        cycleStart: Date
+    ) -> Double {
+        let spent = spentThisCycle(
+            for: bucketType,
+            transactions: transactions,
+            cycleStart: cycleStart
+        )
+
+        let daysElapsed = Calendar.current.dateComponents([.day], from: cycleStart, to: Date()).day ?? 1
+        return spent / Double(max(1, daysElapsed))
+    }
+
+    /// Projects end-of-cycle spending based on current burn rate
+    static func projectedCycleSpend(
+        for bucketType: AllocationBucketType,
+        transactions: [Transaction],
+        cycleStart: Date,
+        cycleEnd: Date
+    ) -> Double {
+        let burnRate = dailyBurnRate(
+            for: bucketType,
+            transactions: transactions,
+            cycleStart: cycleStart
+        )
+
+        let totalDays = Calendar.current.dateComponents([.day], from: cycleStart, to: cycleEnd).day ?? 30
+        return burnRate * Double(totalDays)
+    }
+
+    /// Gets detailed category breakdown for a bucket (used for off-track diagnosis)
+    static func categoryBreakdown(
+        for bucketType: AllocationBucketType,
+        transactions: [Transaction],
+        cycleStart: Date,
+        cycleEnd: Date = Date()
+    ) -> [(category: String, amount: Double)] {
+        let cycleTransactions = transactions.filter {
+            $0.date >= cycleStart && $0.date <= cycleEnd && !$0.pending
+        }
+
+        let relevantTransactions: [Transaction]
+        switch bucketType {
+        case .essentialSpending:
+            relevantTransactions = cycleTransactions.filter { isEssentialSpending($0) }
+        case .discretionarySpending:
+            relevantTransactions = cycleTransactions.filter { isDiscretionarySpending($0) }
+        default:
+            return []
+        }
+
+        var breakdown: [String: Double] = [:]
+
+        for transaction in relevantTransactions {
+            let category: String
+            if let pfc = transaction.personalFinanceCategory {
+                category = pfc.detailed
+                    .replacingOccurrences(of: "_", with: " ")
+                    .capitalized
+            } else {
+                category = transaction.category.first ?? "Other"
+            }
+
+            breakdown[category, default: 0] += abs(transaction.amount)
+        }
+
+        return breakdown
+            .map { (category: $0.key, amount: $0.value) }
+            .sorted { $0.amount > $1.amount }
+    }
+
     // MARK: - Expense Categorization
 
     /// Categorizes essential expenses with confidence scoring

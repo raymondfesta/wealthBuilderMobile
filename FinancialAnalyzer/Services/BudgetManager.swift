@@ -98,6 +98,46 @@ class BudgetManager: ObservableObject {
         saveContext()
     }
 
+    /// Updates spending progress from transactions without regenerating budgets
+    /// Used during background refresh to update progress bars without changing budget amounts
+    func updateSpendingProgress(from transactions: [Transaction]) {
+        print("💰 [BudgetManager] Updating spending progress from \(transactions.count) transactions")
+
+        // Filter to current month's transactions
+        let calendar = Calendar.current
+        let now = Date()
+        guard let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: now)) else { return }
+
+        let currentMonthTransactions = transactions.filter { txn in
+            txn.date >= startOfMonth && txn.amount > 0 && !TransactionAnalyzer.shouldExcludeFromBudget(txn)
+        }
+
+        // Update each budget's current spending
+        for i in budgets.indices {
+            let budgetCategory = budgets[i].categoryName.lowercased()
+            let categoryTransactions = currentMonthTransactions.filter { txn in
+                let txnCategory = txn.category.first?.lowercased() ?? "uncategorized"
+                return txnCategory == budgetCategory
+            }
+
+            let totalSpent = categoryTransactions.reduce(0) { $0 + $1.amount }
+            budgets[i].currentSpent = totalSpent
+        }
+
+        // Save updated budgets
+        saveBudgetsToCache()
+
+        print("💰 [BudgetManager] Spending progress updated for \(budgets.count) budget(s)")
+    }
+
+    /// Public method to save budgets to cache
+    func saveBudgetsToCache() {
+        let encoder = JSONEncoder()
+        if let budgetsData = try? encoder.encode(budgets) {
+            UserDefaults.standard.set(budgetsData, forKey: cacheKey("budgets"))
+        }
+    }
+
     /// Updates spent amount for a budget when a transaction occurs
     func recordTransaction(_ transaction: Transaction) {
         // Only record actual expenses, not investments or transfers
@@ -552,7 +592,7 @@ class BudgetManager: ObservableObject {
         loadAllocationBucketsFromCache()
     }
 
-    private func saveAllocationBucketsToCache() {
+    func saveAllocationBucketsToCache() {
         let encoder = JSONEncoder()
         if let data = try? encoder.encode(allocationBuckets) {
             UserDefaults.standard.set(data, forKey: cacheKey("allocation_buckets"))

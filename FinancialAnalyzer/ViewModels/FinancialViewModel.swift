@@ -326,28 +326,24 @@ class FinancialViewModel: ObservableObject {
             }
 
         case .planCreated:
-            // Completed onboarding - restore or refresh data, preserve state
-            if accounts.isEmpty && !itemIds.isEmpty {
-                print("🔄 [Recovery] Completed user, fetching fresh data...")
-                await fetchAccountsOnly(preserveState: true)
-            }
+            // Completed user returning - prioritize instant dashboard display
+            print("🔄 [Recovery] Completed user - showing dashboard immediately")
 
-            // Restore allocation plan if missing
+            // Restore allocation plan from backend if missing locally
             if budgetManager.allocationBuckets.isEmpty {
+                print("🔄 [Recovery] Restoring allocation plan from backend...")
                 await restoreAllocationPlanFromBackend()
             }
 
-            // Regenerate analysis if we have transactions but no summary
-            if summary == nil && !transactions.isEmpty {
-                print("🔄 [Recovery] Regenerating analysis from cached transactions...")
-                summary = TransactionAnalyzer.generateSnapshot(
-                    transactions: transactions,
-                    accounts: accounts
-                )
+            // We have cached summary - no need to regenerate
+            if summary != nil {
+                print("✅ [Recovery] Using cached summary - skipping re-analysis")
             }
 
-            // Trigger smart refresh for fresh data
-            await performSmartRefresh(isAppLaunch: true)
+            // Background refresh - NO visible loading UI
+            // This will silently update balances and transactions
+            print("🔄 [Recovery] Starting silent background refresh...")
+            await performBackgroundRefresh(itemIds: itemIds)
         }
     }
 
@@ -1098,6 +1094,79 @@ class FinancialViewModel: ObservableObject {
     }
 
     // MARK: - Smart Refresh
+
+    /// Performs a silent background refresh for returning users
+    /// No loading indicators shown - data updates seamlessly
+    /// - Parameter itemIds: The Plaid item IDs to refresh
+    private func performBackgroundRefresh(itemIds: [String]) async {
+        print("🔄 [Background Refresh] Starting silent refresh for \(itemIds.count) item(s)...")
+
+        guard !itemIds.isEmpty else {
+            print("⚠️ [Background Refresh] No itemIds to refresh")
+            return
+        }
+
+        // DO NOT set isLoading = true (no visible loading indicator)
+        // DO NOT set showLoadingOverlay = true
+
+        do {
+            var allAccounts: [BankAccount] = []
+            var allTransactions: [Transaction] = []
+
+            let endDate = Date()
+            let startDate = Calendar.current.date(byAdding: .month, value: -6, to: endDate) ?? endDate
+
+            for itemId in itemIds {
+                // Fetch accounts (for balances)
+                let accounts = try await plaidService.fetchAccounts(itemId: itemId)
+                for account in accounts {
+                    if account.itemId.isEmpty {
+                        account.itemId = itemId
+                    }
+                }
+                allAccounts.append(contentsOf: accounts)
+
+                // Fetch transactions (for budget tracking)
+                let transactions = try await plaidService.fetchTransactions(
+                    itemId: itemId,
+                    startDate: startDate,
+                    endDate: endDate
+                )
+                allTransactions.append(contentsOf: transactions)
+            }
+
+            // Update state on main actor WITHOUT triggering loading UI
+            await MainActor.run {
+                // Update accounts (for balance display)
+                self.accounts = allAccounts
+                print("✅ [Background Refresh] Updated \(allAccounts.count) account(s)")
+
+                // Update transactions (for budget tracking)
+                self.transactions = allTransactions
+                print("✅ [Background Refresh] Updated \(allTransactions.count) transaction(s)")
+
+                // DO NOT regenerate analysis - use cached summary
+                // The summary from cache is still valid for the dashboard
+                if self.summary != nil {
+                    print("✅ [Background Refresh] Keeping cached summary (no re-analysis)")
+                }
+
+                // Regenerate budget PROGRESS only (not the budgets themselves)
+                // This updates spending tracking without changing budget amounts
+                self.budgetManager.updateSpendingProgress(from: allTransactions)
+
+                // Save updated data to cache
+                self.saveToCache()
+
+                print("✅ [Background Refresh] Complete - dashboard data updated silently")
+            }
+
+        } catch {
+            // Silent failure - don't show error to user for background refresh
+            print("⚠️ [Background Refresh] Failed (silent): \(error.localizedDescription)")
+            // User still sees cached data, which is fine
+        }
+    }
 
     /// Performs smart refresh based on cache age
     /// - Parameters:
@@ -1970,5 +2039,54 @@ class FinancialViewModel: ObservableObject {
         saveToCache()
 
         print("✅ [AllocationSchedule] Skipped allocations for \(paycheckDate)")
+    }
+
+    // MARK: - My Plan Account Linking
+
+    /// Updates bucket balances from linked accounts using AccountLinkingService
+    func updateBucketBalances() {
+        let service = AccountLinkingService()
+        for bucket in budgetManager.allocationBuckets {
+            bucket.currentBalanceFromAccounts = service.calculateBucketBalance(
+                for: bucket.type,
+                linkedAccountIds: bucket.linkedAccountIds,
+                accounts: accounts
+            )
+        }
+        print("💰 [MyPlan] Updated bucket balances from \(accounts.count) accounts")
+    }
+
+    /// Auto-links accounts to buckets using AccountLinkingService suggestions
+    func autoLinkAccountsToBuckets() {
+        let service = AccountLinkingService()
+        let suggestions = service.suggestBucketLinks(for: accounts)
+
+        print("🔗 [MyPlan] Auto-linking accounts to buckets...")
+        print("🔗 [MyPlan] Found \(suggestions.count) link suggestions")
+
+        for suggestion in suggestions {
+            // Find the bucket for this suggestion
+            guard let bucket = budgetManager.allocationBuckets.first(where: { $0.type == suggestion.bucketType }) else {
+                continue
+            }
+
+            // Skip if already linked
+            if bucket.linkedAccountIds.contains(suggestion.accountId) {
+                continue
+            }
+
+            // Only auto-link high confidence suggestions
+            if suggestion.confidence == .high || suggestion.confidence == .medium {
+                bucket.linkedAccountIds.append(suggestion.accountId)
+                bucket.accountLinkageMethod[suggestion.accountId] = .auto
+                print("🔗 [MyPlan] Linked account \(suggestion.accountId.prefix(8))... to \(bucket.displayName) (\(suggestion.confidence))")
+            }
+        }
+
+        // Update balances after linking
+        updateBucketBalances()
+
+        // Save bucket state
+        budgetManager.saveAllocationBucketsToCache()
     }
 }

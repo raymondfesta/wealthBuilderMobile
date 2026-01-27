@@ -116,6 +116,8 @@
 		OB001001 /* OnboardingFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = OB002001 /* OnboardingFlowView.swift */; };
 		OB001002 /* WelcomeConnectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = OB002002 /* WelcomeConnectView.swift */; };
 		OB001003 /* AccountsConnectedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = OB002003 /* AccountsConnectedView.swift */; };
+		MP001001 /* MyPlanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = MP002001 /* MyPlanView.swift */; };
+		MP001002 /* PlanAdherenceCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = MP002002 /* PlanAdherenceCard.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -229,6 +231,8 @@
 		OB002001 /* OnboardingFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlowView.swift; sourceTree = "<group>"; };
 		OB002002 /* WelcomeConnectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeConnectView.swift; sourceTree = "<group>"; };
 		OB002003 /* AccountsConnectedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsConnectedView.swift; sourceTree = "<group>"; };
+		MP002001 /* MyPlanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyPlanView.swift; sourceTree = "<group>"; };
+		MP002002 /* PlanAdherenceCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanAdherenceCard.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -394,6 +398,7 @@
 			children = (
 				991CAD7A2EAD533300000EDB /* Components */,
 				OB003000 /* Onboarding */,
+				MP003000 /* MyPlan */,
 				AU002005 /* LoginView.swift */,
 				AU002006 /* AuthRootView.swift */,
 				AU002008 /* ProfileView.swift */,
@@ -453,6 +458,15 @@
 				9978B8FA2EA839BB0065A5FE /* AllocationPlannerView.swift */,
 			);
 			path = Onboarding;
+			sourceTree = "<group>";
+		};
+		MP003000 /* MyPlan */ = {
+			isa = PBXGroup;
+			children = (
+				MP002001 /* MyPlanView.swift */,
+				MP002002 /* PlanAdherenceCard.swift */,
+			);
+			path = MyPlan;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -632,6 +646,8 @@
 				CP001002 /* TransactionRow.swift in Sources */,
 				CP001003 /* BudgetStatusCard.swift in Sources */,
 				CP001004 /* AllocationBucketSummaryCard.swift in Sources */,
+				MP001001 /* MyPlanView.swift in Sources */,
+				MP001002 /* PlanAdherenceCard.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

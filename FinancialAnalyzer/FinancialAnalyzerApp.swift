@@ -38,9 +38,9 @@ struct ContentView: View {
             if isOnboardingComplete {
                 // Show full app with bottom navigation after onboarding
                 TabView {
-                    DashboardView(viewModel: viewModel)
+                    MyPlanView(viewModel: viewModel)
                         .tabItem {
-                            Label("Dashboard", systemImage: "chart.pie.fill")
+                            Label("My Plan", systemImage: "chart.pie.fill")
                         }
 
                     // Schedule tab - allocation schedule and history

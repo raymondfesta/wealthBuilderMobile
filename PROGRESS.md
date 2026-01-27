@@ -1,6 +1,6 @@
 # Project Progress Tracker
 
-Last Updated: 2026-01-27 (Silent background recovery for returning users)
+Last Updated: 2026-01-27 (My Plan feature - 4 allocation bucket cards)
 
 ## Current State
 
@@ -27,6 +27,7 @@ Last Updated: 2026-01-27 (Silent background recovery for returning users)
 - Offline mode detection with graceful degradation
 - Backend allocation plan storage (survives reinstall)
 - **Silent background recovery** (returning users see instant dashboard, no loading UI)
+- **My Plan view** (4 allocation bucket cards replacing Dashboard, real-time plan adherence)
 
 ### In Progress 🔨
 - Sign in with Apple capability setup (requires Apple Developer portal)
@@ -66,6 +67,42 @@ Last Updated: 2026-01-27 (Silent background recovery for returning users)
 ## Completed This Session
 
 ### 2026-01-27
+
+- ✓ **Feat: My Plan View - Real-time allocation plan adherence**
+  - **Goal:** Replace Dashboard with 4 vertical cards showing plan adherence for Essential, Discretionary, Emergency Fund, Investments
+  - **Architecture:**
+    - Calculate spending from transactions (not Budget.currentSpent)
+    - Use linked account balances for savings buckets
+    - Calendar month cycle (1st to end of month)
+    - Auto-link accounts on view load
+  - **Files created:**
+    - `Views/MyPlan/MyPlanView.swift` - Main view with cycle header, status badge, 4 bucket cards
+    - `Views/MyPlan/PlanAdherenceCard.swift` - Card component with SpendingCardContent, EmergencyFundCardContent, InvestmentsCardContent inline
+  - **TransactionAnalyzer.swift additions:**
+    - `isEssentialSpending()` - PFC-based classification (rent, utilities, groceries vs restaurants, entertainment)
+    - `isDiscretionarySpending()` - Essential expense that's not essential spending
+    - `spentThisCycle()` - Sum transactions for bucket type within cycle dates
+    - `dailyBurnRate()` - Average daily spend for projection
+    - `projectedCycleSpend()` - Extrapolated end-of-cycle spend
+    - `categoryBreakdown()` - Top spending categories for detail view
+  - **AllocationBucket.swift additions:**
+    - `PlanAdherenceStatus` enum (onTrack, warning, overBudget, ahead, behind, noData)
+    - Cycle computed properties (cycleStartDate, cycleEndDate, daysRemainingInCycle, totalDaysInCycle)
+    - `monthsOfCoverage(essentialMonthlySpend:)` for emergency fund tracking
+  - **FinancialViewModel.swift additions:**
+    - `updateBucketBalances()` - Populate currentBalanceFromAccounts via AccountLinkingService
+    - `autoLinkAccountsToBuckets()` - Auto-link high/medium confidence account suggestions
+  - **BudgetManager.swift change:**
+    - `saveAllocationBucketsToCache()` changed from private to internal (needed for auto-link save)
+  - **Navigation changes:**
+    - `FinancialAnalyzerApp.swift` - TabView uses MyPlanView instead of DashboardView
+    - Label changed from "Dashboard" to "My Plan"
+  - **Card content by bucket type:**
+    - **Essential/Discretionary:** Remaining balance, daily burn rate, days remaining at current pace, progress bar, status badge
+    - **Emergency Fund:** Account balance, months of coverage (vs essential expenses), target progress, status badge
+    - **Investments:** Account balance, contribution goal tracking
+  - **Debt Paydown:** Always hidden (only 4 cards displayed)
+  - **Build verified:** ✓
 
 - ✓ **Refactor: Simplified Dashboard UI**
   - Removed "Your Financial Summary" header section
@@ -730,6 +767,17 @@ Enable `-ResetDataOnLaunch` in Xcode scheme for clean state on each run.
 ---
 
 ## Architecture Decisions Log
+
+### 2026-01-27: My Plan View Architecture
+**Decision:** Calculate spending from transactions directly, not Budget.currentSpent; use linked account balances for savings buckets
+**Rationale:** Budget.currentSpent was stale/unreliable; transactions are source of truth; account balances from Plaid reflect actual savings
+**Implementation:**
+- TransactionAnalyzer classifies essential vs discretionary via Plaid Personal Finance Category
+- spentThisCycle/projectedCycleSpend calculate from filtered transactions
+- AccountLinkingService.calculateBucketBalance() aggregates linked account balances
+- Auto-link accounts on view load using suggestion confidence
+**Files:** `TransactionAnalyzer.swift`, `AllocationBucket.swift`, `MyPlanView.swift`, `PlanAdherenceCard.swift`, `FinancialViewModel.swift`
+**Trade-off:** More computation on each render; mitigated by cycle-based filtering
 
 ### 2026-01-27: Backend Allocation Plan Storage
 **Decision:** Store allocation plan in backend SQLite, restore on login

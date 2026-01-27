@@ -199,6 +199,83 @@ final class AllocationBucket: Identifiable, ObservableObject, @unchecked Sendabl
     func acknowledgeChange() {
         self.hasUnacknowledgedChange = false
     }
+
+    // MARK: - My Plan Cycle Properties
+
+    /// Start date of current billing cycle (1st of current month)
+    var cycleStartDate: Date {
+        Calendar.current.date(from: Calendar.current.dateComponents(
+            [.year, .month], from: Date()
+        )) ?? Date()
+    }
+
+    /// End date of current billing cycle (last day of current month)
+    var cycleEndDate: Date {
+        guard let nextMonth = Calendar.current.date(byAdding: .month, value: 1, to: cycleStartDate),
+              let lastDay = Calendar.current.date(byAdding: .day, value: -1, to: nextMonth) else {
+            return Date()
+        }
+        return lastDay
+    }
+
+    /// Days remaining in current billing cycle
+    var daysRemainingInCycle: Int {
+        Calendar.current.dateComponents([.day], from: Date(), to: cycleEndDate).day ?? 0
+    }
+
+    /// Total days in current billing cycle
+    var totalDaysInCycle: Int {
+        Calendar.current.dateComponents([.day], from: cycleStartDate, to: cycleEndDate).day ?? 30
+    }
+
+    /// Days elapsed in current billing cycle
+    var daysElapsedInCycle: Int {
+        Calendar.current.dateComponents([.day], from: cycleStartDate, to: Date()).day ?? 0
+    }
+
+    /// For Emergency Fund: Calculate months of coverage at current essential spending rate
+    func monthsOfCoverage(essentialMonthlySpend: Double) -> Int {
+        guard type == .emergencyFund, essentialMonthlySpend > 0 else { return 0 }
+        return Int(currentBalanceFromAccounts / essentialMonthlySpend)
+    }
+}
+
+// MARK: - Plan Adherence Status
+
+/// Represents the user's adherence status to their allocation plan
+enum PlanAdherenceStatus: String {
+    case onTrack = "On Track"
+    case warning = "Warning"
+    case overBudget = "Over Budget"
+    case ahead = "Ahead"
+    case behind = "Behind"
+    case noData = "No Data"
+
+    var color: String {
+        switch self {
+        case .onTrack, .ahead:
+            return "#34C759" // Green
+        case .warning:
+            return "#FF9500" // Orange
+        case .overBudget, .behind:
+            return "#FF3B30" // Red
+        case .noData:
+            return "#8E8E93" // Gray
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .onTrack, .ahead:
+            return "checkmark.circle.fill"
+        case .warning:
+            return "exclamationmark.triangle.fill"
+        case .overBudget, .behind:
+            return "xmark.circle.fill"
+        case .noData:
+            return "questionmark.circle.fill"
+        }
+    }
 }
 
 // MARK: - Discretionary Spending Validation
