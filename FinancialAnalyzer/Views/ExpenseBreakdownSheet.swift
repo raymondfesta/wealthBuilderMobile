@@ -225,7 +225,8 @@ struct ExpenseBreakdownSheet_Previews: PreviewProvider {
                 utilities: 200,
                 insurance: 150,
                 subscriptions: 80,
-                other: 270,
+                healthcare: 120,
+                other: 150,
                 confidence: 0.78
             ),
             monthlyAverage: 3500

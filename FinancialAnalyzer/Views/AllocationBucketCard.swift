@@ -47,16 +47,16 @@ struct AllocationBucketCard: View {
         VStack(alignment: .leading, spacing: 0) {
             // Compressed header
             compressedHeader
-                .padding(.bottom, 20)
+                .padding(.bottom, DesignTokens.Spacing.lg)
 
             // Allocation amount section (varies by bucket type)
             allocationSection
-                .padding(.bottom, 16)
+                .padding(.bottom, DesignTokens.Spacing.md)
 
             // Account linking section
             if !allAccounts.isEmpty {
                 accountLinkingSection
-                    .padding(.bottom, 16)
+                    .padding(.bottom, DesignTokens.Spacing.md)
             }
 
             // Investment projections
@@ -66,27 +66,25 @@ struct AllocationBucketCard: View {
                     projection: projection,
                     selectedTier: selectedPresetTier
                 )
-                .padding(.bottom, 16)
+                .padding(.bottom, DesignTokens.Spacing.md)
             }
 
             // Contextual warnings
             if bucket.type == .discretionarySpending {
                 discretionarySpendingWarning
-                    .padding(.bottom, 12)
+                    .padding(.bottom, DesignTokens.Spacing.sm)
             }
 
             if bucket.type == .investments {
                 investmentsWarning
-                    .padding(.bottom, 12)
+                    .padding(.bottom, DesignTokens.Spacing.sm)
             }
 
             // "Why This Amount?" button
             whyThisAmountButton
         }
-        .padding(20)
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
+        .padding(DesignTokens.Spacing.lg)
+        .primaryCardStyle()
         .sheet(isPresented: $showingDetailsSheet) {
             AllocationDetailsSheet(
                 bucket: bucket,
@@ -120,7 +118,7 @@ struct AllocationBucketCard: View {
 
     /// Compressed header with icon, name, and action buttons
     private var compressedHeader: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DesignTokens.Spacing.sm) {
             // Icon (smaller, 32px)
             ZStack {
                 Circle()
@@ -134,7 +132,7 @@ struct AllocationBucketCard: View {
 
             // Bucket name
             Text(bucket.displayName)
-                .font(.subheadline)
+                .subheadlineStyle(color: DesignTokens.Colors.textPrimary)
                 .fontWeight(.semibold)
 
             // Non-modifiable badge
@@ -142,16 +140,16 @@ struct AllocationBucketCard: View {
                 Text("LOCKED")
                     .font(.caption2)
                     .fontWeight(.bold)
-                    .padding(.horizontal, 6)
+                    .padding(.horizontal, DesignTokens.Spacing.xs)
                     .padding(.vertical, 2)
-                    .background(Color.blue.opacity(0.2))
-                    .foregroundColor(.blue)
-                    .cornerRadius(4)
+                    .background(DesignTokens.Colors.stableBlue.opacity(0.2))
+                    .foregroundColor(DesignTokens.Colors.stableBlue)
+                    .cornerRadius(DesignTokens.CornerRadius.sm / 2)
             }
 
             // Auto-adjusted badge (with dismiss button)
             if bucket.hasUnacknowledgedChange {
-                HStack(spacing: 4) {
+                HStack(spacing: DesignTokens.Spacing.xxs) {
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.caption2)
                     Text("AUTO-ADJUSTED")
@@ -165,11 +163,11 @@ struct AllocationBucketCard: View {
                             .font(.caption2)
                     }
                 }
-                .padding(.horizontal, 6)
+                .padding(.horizontal, DesignTokens.Spacing.xs)
                 .padding(.vertical, 2)
-                .background(Color.opportunityOrange.opacity(0.2))
-                .foregroundColor(Color.opportunityOrange)
-                .cornerRadius(4)
+                .background(DesignTokens.Colors.opportunityOrange.opacity(0.2))
+                .foregroundColor(DesignTokens.Colors.opportunityOrange)
+                .cornerRadius(DesignTokens.CornerRadius.sm / 2)
             }
 
             Spacer()
@@ -182,7 +180,7 @@ struct AllocationBucketCard: View {
             } label: {
                 Image(systemName: "info.circle")
                     .font(.subheadline)
-                    .foregroundColor(.blue)
+                    .foregroundColor(DesignTokens.Colors.accentSecondary)
             }
             .accessibilityLabel("Show allocation details")
         }
@@ -253,8 +251,8 @@ struct AllocationBucketCard: View {
 
     /// Simple amount display for non-modifiable or fallback cases
     private var simpleAmountDisplay: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
+            HStack(alignment: .firstTextBaseline, spacing: DesignTokens.Spacing.xs) {
                 Text(formatCurrency(editedAmount))
                     .font(.system(size: 48, weight: .bold, design: .rounded))
                     .foregroundColor(Color(hex: bucket.color))
@@ -267,18 +265,15 @@ struct AllocationBucketCard: View {
             }
 
             // Percentage and description
-            HStack(spacing: 8) {
+            HStack(spacing: DesignTokens.Spacing.xs) {
                 Text("\(Int(percentageOfIncome))%")
-                    .font(.title3)
-                    .foregroundColor(.secondary)
+                    .title3Style(color: DesignTokens.Colors.textSecondary)
 
                 Text("•")
-                    .font(.title3)
-                    .foregroundColor(.secondary)
+                    .title3Style(color: DesignTokens.Colors.textSecondary)
 
                 Text(bucket.description)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .captionStyle()
                     .lineLimit(1)
             }
         }
@@ -286,25 +281,22 @@ struct AllocationBucketCard: View {
 
     /// Locked amount display for essential spending
     private var lockedAmountDisplay: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+            HStack(spacing: DesignTokens.Spacing.sm) {
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                     Text(formatCurrency(editedAmount))
                         .font(.system(size: 48, weight: .bold, design: .rounded))
                         .foregroundColor(Color(hex: bucket.color))
 
-                    HStack(spacing: 8) {
+                    HStack(spacing: DesignTokens.Spacing.xs) {
                         Text("\(Int(percentageOfIncome))%")
-                            .font(.title3)
-                            .foregroundColor(.secondary)
+                            .title3Style(color: DesignTokens.Colors.textSecondary)
 
                         Text("•")
-                            .font(.title3)
-                            .foregroundColor(.secondary)
+                            .title3Style(color: DesignTokens.Colors.textSecondary)
 
                         Text(bucket.description)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .captionStyle()
                             .lineLimit(1)
                     }
                 }
@@ -313,19 +305,18 @@ struct AllocationBucketCard: View {
             }
 
             // Locked explanation
-            HStack(spacing: 8) {
+            HStack(spacing: DesignTokens.Spacing.xs) {
                 Image(systemName: "lock.fill")
                     .font(.caption)
-                    .foregroundColor(.blue)
+                    .foregroundColor(DesignTokens.Colors.stableBlue)
                 Text("Based on your actual spending")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .captionStyle()
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, DesignTokens.Spacing.sm)
+            .padding(.vertical, DesignTokens.Spacing.xs)
             .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.blue.opacity(0.1))
+                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
+                    .fill(DesignTokens.Colors.stableBlue.opacity(0.1))
             )
         }
     }
@@ -333,12 +324,12 @@ struct AllocationBucketCard: View {
     /// Account linking section with balance display
     @ViewBuilder
     private var accountLinkingSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
             HStack {
                 Image(systemName: "link.circle.fill")
                     .foregroundColor(Color(hex: bucket.color))
                 Text("Linked Accounts")
-                    .font(.subheadline)
+                    .subheadlineStyle(color: DesignTokens.Colors.textPrimary)
                     .fontWeight(.semibold)
 
                 Spacer()
@@ -346,14 +337,14 @@ struct AllocationBucketCard: View {
                 Button {
                     showingAccountLinkingSheet = true
                 } label: {
-                    HStack(spacing: 4) {
+                    HStack(spacing: DesignTokens.Spacing.xxs) {
                         Text(bucket.linkedAccountIds.isEmpty ? "Link" : "Manage")
                             .font(.caption)
                             .fontWeight(.semibold)
                         Image(systemName: "chevron.right")
                             .font(.caption2)
                     }
-                    .foregroundColor(.blue)
+                    .foregroundColor(DesignTokens.Colors.accentSecondary)
                 }
             }
 
@@ -362,12 +353,10 @@ struct AllocationBucketCard: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Current Balance")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .captionStyle()
                         Text(formatCurrency(bucket.currentBalanceFromAccounts))
-                            .font(.title3)
+                            .title3Style(color: Color(hex: bucket.color))
                             .fontWeight(.bold)
-                            .foregroundColor(Color(hex: bucket.color))
                     }
 
                     Spacer()
@@ -377,41 +366,39 @@ struct AllocationBucketCard: View {
                         Text("AUTO-LINKED")
                             .font(.caption2)
                             .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 6)
+                            .foregroundColor(DesignTokens.Colors.backgroundPrimary)
+                            .padding(.horizontal, DesignTokens.Spacing.xs)
                             .padding(.vertical, 3)
-                            .background(Color.protectionMint)
-                            .cornerRadius(4)
+                            .background(DesignTokens.Colors.protectionMint)
+                            .cornerRadius(DesignTokens.CornerRadius.sm / 2)
                     }
                 }
-                .padding()
+                .padding(DesignTokens.Spacing.md)
                 .background(
-                    RoundedRectangle(cornerRadius: 10)
+                    RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
                         .fill(Color(hex: bucket.color).opacity(0.1))
                 )
             } else if !bucket.linkedAccountIds.isEmpty {
                 // Linked but zero balance
                 Text("\(bucket.linkedAccountIds.count) account\(bucket.linkedAccountIds.count == 1 ? "" : "s") linked")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .captionStyle()
+                    .padding(.horizontal, DesignTokens.Spacing.sm)
+                    .padding(.vertical, DesignTokens.Spacing.xs)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color(.systemGray6))
+                        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
+                            .fill(DesignTokens.Colors.cardOverlay1)
                     )
             } else {
                 // No accounts linked
                 Text("No accounts linked")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .captionStyle()
+                    .padding(.horizontal, DesignTokens.Spacing.sm)
+                    .padding(.vertical, DesignTokens.Spacing.xs)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color(.systemGray6))
+                        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
+                            .fill(DesignTokens.Colors.cardOverlay1)
                     )
             }
         }
@@ -430,20 +417,20 @@ struct AllocationBucketCard: View {
                     .foregroundColor(Color(hex: bucket.color))
 
                 Text("Why This Amount?")
-                    .font(.subheadline)
+                    .subheadlineStyle(color: DesignTokens.Colors.textPrimary)
                     .fontWeight(.semibold)
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(DesignTokens.Colors.textSecondary)
             }
-            .padding(12)
+            .padding(DesignTokens.Spacing.sm)
             .background(Color(hex: bucket.color).opacity(0.05))
-            .cornerRadius(12)
+            .cornerRadius(DesignTokens.CornerRadius.md)
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
                     .stroke(Color(hex: bucket.color).opacity(0.2), lineWidth: 1)
             )
         }
@@ -494,27 +481,25 @@ struct AllocationBucketCard: View {
     }
 
     private func warningBox(icon: String, color: Color, title: String, message: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+            HStack(spacing: DesignTokens.Spacing.xs) {
                 Image(systemName: icon)
                     .foregroundColor(color)
                     .font(.subheadline)
                 Text(title)
-                    .font(.subheadline)
+                    .subheadlineStyle(color: color)
                     .fontWeight(.semibold)
-                    .foregroundColor(color)
             }
 
             Text(message)
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .captionStyle()
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding()
+        .padding(DesignTokens.Spacing.md)
         .background(color.opacity(0.1))
-        .cornerRadius(12)
+        .cornerRadius(DesignTokens.CornerRadius.md)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
                 .stroke(color.opacity(0.3), lineWidth: 1.5)
         )
     }
@@ -523,7 +508,7 @@ struct AllocationBucketCard: View {
         let change = bucket.changeFromOriginal
         let isIncrease = change > 0
         let arrow = isIncrease ? "↑" : "↓"
-        let color: Color = isIncrease ? .green : .orange
+        let color: Color = isIncrease ? DesignTokens.Colors.progressGreen : DesignTokens.Colors.opportunityOrange
 
         return HStack(spacing: 2) {
             Text(arrow)
@@ -533,11 +518,11 @@ struct AllocationBucketCard: View {
                 .font(.caption)
                 .fontWeight(.semibold)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.horizontal, DesignTokens.Spacing.xs)
+        .padding(.vertical, DesignTokens.Spacing.xxs)
         .background(color.opacity(0.15))
         .foregroundColor(color)
-        .cornerRadius(8)
+        .cornerRadius(DesignTokens.CornerRadius.sm)
         .accessibilityLabel("\(isIncrease ? "Increased" : "Decreased") by \(formatCurrency(abs(change)))")
     }
 
@@ -655,7 +640,7 @@ struct FlowLayout: Layout {
     )
 
     ScrollView {
-        VStack(spacing: 20) {
+        VStack(spacing: DesignTokens.Spacing.lg) {
             AllocationBucketCard(
                 bucket: emergencyBucket,
                 monthlyIncome: 5000,
@@ -674,6 +659,8 @@ struct FlowLayout: Layout {
                 editedAmount: .constant(3200)
             )
         }
-        .padding()
+        .padding(DesignTokens.Spacing.md)
     }
+    .primaryBackgroundGradient()
+    .preferredColorScheme(.dark)
 }

@@ -337,6 +337,8 @@ app.post('/api/plaid/transactions', async (req, res) => {
   try {
     const { access_token, start_date, end_date } = req.body;
 
+    console.log(`[Transactions] Request: ${start_date} to ${end_date}`);
+
     if (!access_token || !start_date || !end_date) {
       return res.status(400).json({
         error: 'access_token, start_date, and end_date are required',
@@ -347,9 +349,13 @@ app.post('/api/plaid/transactions', async (req, res) => {
     let hasMore = true;
     let offset = 0;
     const count = 500; // Max transactions per request
+    let pageNum = 0;
 
     // Plaid returns transactions in pages, so we need to fetch all pages
     while (hasMore) {
+      pageNum++;
+      console.log(`[Transactions] Fetching page ${pageNum}, offset=${offset}`);
+
       const response = await plaidClient.transactionsGet({
         access_token,
         start_date,
@@ -360,10 +366,19 @@ app.post('/api/plaid/transactions', async (req, res) => {
         },
       });
 
-      allTransactions = allTransactions.concat(response.data.transactions);
-      hasMore = allTransactions.length < response.data.total_transactions;
+      const pageTxs = response.data.transactions;
+      const totalReported = response.data.total_transactions;
+
+      console.log(`[Transactions] Page ${pageNum}: got ${pageTxs.length} txs, total_transactions=${totalReported}`);
+
+      allTransactions = allTransactions.concat(pageTxs);
+      hasMore = allTransactions.length < totalReported;
       offset += count;
+
+      console.log(`[Transactions] Cumulative: ${allTransactions.length}/${totalReported}, hasMore=${hasMore}`);
     }
+
+    console.log(`[Transactions] FINAL: Returning ${allTransactions.length} transactions`);
 
     res.json({
       transactions: allTransactions,
@@ -371,8 +386,26 @@ app.post('/api/plaid/transactions', async (req, res) => {
       accounts: [], // Optionally include accounts
     });
   } catch (error) {
-    console.error('Error fetching transactions:', error);
+    console.error('[Transactions] Error:', error.message, error.response?.data || '');
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Refresh Transactions (triggers Plaid to fetch new transactions)
+app.post('/api/plaid/transactions/refresh', async (req, res) => {
+  const { access_token } = req.body;
+
+  if (!access_token) {
+    return res.status(400).json({ error: 'Missing access_token' });
+  }
+
+  try {
+    const response = await plaidClient.transactionsRefresh({ access_token });
+    console.log('[Plaid] Transactions refresh triggered:', response.data.request_id);
+    res.status(202).json({ success: true, request_id: response.data.request_id });
+  } catch (error) {
+    console.error('[Plaid] Transactions refresh error:', error.message, error.response?.data || '');
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

@@ -437,7 +437,7 @@ struct DashboardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func bucketsGrid(summary: FinancialSummary) -> some View {
+    private func bucketsGrid(summary: AnalysisSnapshot) -> some View {
         LazyVGrid(columns: [
             GridItem(.flexible()),
             GridItem(.flexible())

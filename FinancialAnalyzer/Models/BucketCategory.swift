@@ -7,7 +7,7 @@ enum BucketCategory: String, Codable, CaseIterable {
     case debt = "Total Debt"
     case invested = "Total Invested"
     case cash = "Total Cash Available"
-    case disposable = "To Allocate"
+    case disposable = "Disposable Income"
 
     var description: String {
         switch self {

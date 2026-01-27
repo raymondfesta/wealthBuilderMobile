@@ -17,7 +17,7 @@ struct AllocationPlannerView: View {
         NavigationStack {
             ZStack {
                 ScrollView {
-                    VStack(spacing: 24) {
+                    VStack(spacing: DesignTokens.Spacing.xl) {
                         // Header section
                         headerSection
 
@@ -33,25 +33,27 @@ struct AllocationPlannerView: View {
                         // Spacer for bottom button
                         Spacer().frame(height: 100)
                     }
-                    .padding()
+                    .padding(DesignTokens.Spacing.md)
                 }
 
                 // Sticky bottom button
                 VStack {
                     Spacer()
                     createPlanButton
-                        .padding()
+                        .padding(DesignTokens.Spacing.md)
                         .background(
                             LinearGradient(
-                                colors: [Color(.systemBackground).opacity(0), Color(.systemBackground)],
+                                colors: [DesignTokens.Colors.backgroundPrimary.opacity(0), DesignTokens.Colors.backgroundPrimary],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
                         )
                 }
             }
+            .primaryBackgroundGradient()
             .navigationTitle("Build Your Plan")
             .navigationBarTitleDisplayMode(.large)
+            .preferredColorScheme(.dark)
             .alert("Allocation Error", isPresented: $showingValidationError) {
                 Button("OK", role: .cancel) {
                     showingValidationError = false
@@ -78,27 +80,22 @@ struct AllocationPlannerView: View {
     // MARK: - Subviews
 
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Main instruction
-            Text("Allocate your \(formatCurrency(monthlyIncome)) monthly income")
-                .font(.title3)
-                .fontWeight(.semibold)
-                .foregroundColor(.primary)
+        GlassmorphicCard {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
+                // Main instruction
+                Text("Allocate your \(formatCurrency(monthlyIncome)) monthly income")
+                    .title3Style()
 
-            Text("Adjust each category below to create your personalized financial plan. Your total must equal 100%.")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+                Text("Adjust each category below to create your personalized financial plan. Your total must equal 100%.")
+                    .subheadlineStyle()
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(20)
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(16)
     }
 
     @ViewBuilder
     private var edgeCaseWarnings: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: DesignTokens.Spacing.sm) {
             // High essential spending warning
             if let essentialBucket = viewModel.budgetManager.allocationBuckets.first(where: { $0.type == .essentialSpending }) {
                 let detection = editorViewModel.detectHighEssentialSpending(
@@ -150,36 +147,34 @@ struct AllocationPlannerView: View {
     }
 
     private func warningBanner(icon: String, title: String, message: String, color: Color) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: DesignTokens.Spacing.sm) {
             Image(systemName: icon)
                 .font(.title3)
                 .foregroundColor(color)
                 .frame(width: 24)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                 Text(title)
-                    .font(.subheadline)
+                    .subheadlineStyle(color: DesignTokens.Colors.textPrimary)
                     .fontWeight(.semibold)
-                    .foregroundColor(.primary)
 
                 Text(message)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .captionStyle()
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(16)
+        .padding(DesignTokens.Spacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(color.opacity(0.1))
-        .cornerRadius(12)
+        .cornerRadius(DesignTokens.CornerRadius.md)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
                 .stroke(color.opacity(0.3), lineWidth: 1)
         )
     }
 
     private var bucketsSection: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: DesignTokens.Spacing.lg) {
             ForEach(viewModel.budgetManager.allocationBuckets) { bucket in
                 AllocationBucketCard(
                     bucket: bucket,
@@ -219,9 +214,9 @@ struct AllocationPlannerView: View {
     }
 
     private var validationBar: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DesignTokens.Spacing.sm) {
             // Bucket dots (visual allocation summary)
-            HStack(spacing: 6) {
+            HStack(spacing: DesignTokens.Spacing.xs) {
                 ForEach(viewModel.budgetManager.allocationBuckets) { bucket in
                     let currentAmount = editorViewModel.bucketAmounts[bucket.id] ?? bucket.allocatedAmount
                     Circle()
@@ -235,67 +230,50 @@ struct AllocationPlannerView: View {
                 .frame(height: 20)
 
             // Allocated vs total
-            HStack(spacing: 4) {
+            HStack(spacing: DesignTokens.Spacing.xxs) {
                 Text(formatCurrency(totalAllocated))
-                    .font(.headline)
-                    .foregroundColor(isValid ? .primary : .orange)
+                    .headlineStyle(color: isValid ? DesignTokens.Colors.textPrimary : DesignTokens.Colors.opportunityOrange)
 
                 Text("/ \(formatCurrency(monthlyIncome))")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .subheadlineStyle()
             }
 
             Spacer()
 
             // Percentage with icon
-            HStack(spacing: 4) {
+            HStack(spacing: DesignTokens.Spacing.xxs) {
                 Text("\(Int(allocationPercentage))%")
-                    .font(.headline)
-                    .foregroundColor(isValid ? .green : .orange)
+                    .headlineStyle(color: isValid ? DesignTokens.Colors.progressGreen : DesignTokens.Colors.opportunityOrange)
 
                 Image(systemName: isValid ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                     .font(.subheadline)
-                    .foregroundColor(isValid ? .green : .orange)
+                    .foregroundColor(isValid ? DesignTokens.Colors.progressGreen : DesignTokens.Colors.opportunityOrange)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(.ultraThinMaterial)
-        .cornerRadius(16)
+        .padding(.horizontal, DesignTokens.Spacing.md)
+        .padding(.vertical, DesignTokens.Spacing.sm)
+        .primaryCardStyle()
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(isValid ? Color.green.opacity(0.3) : Color.orange.opacity(0.5), lineWidth: 2)
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.lg)
+                .stroke(isValid ? DesignTokens.Colors.progressGreen.opacity(0.3) : DesignTokens.Colors.opportunityOrange.opacity(0.5), lineWidth: 2)
         )
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isValid)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: totalAllocated)
     }
 
     private var createPlanButton: some View {
-        Button {
-            if isValid {
-                createPlan()
-            } else {
-                showValidationError()
-            }
-        } label: {
-            HStack {
-                if viewModel.isLoading {
-                    ProgressView()
-                        .tint(.white)
+        PrimaryButton(
+            title: "Create My Financial Plan",
+            action: {
+                if isValid {
+                    createPlan()
                 } else {
-                    Image(systemName: "checkmark.circle.fill")
-                    Text("Create My Financial Plan")
+                    showValidationError()
                 }
-            }
-            .font(.headline)
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(isValid ? Color.blue : Color.gray)
-            .cornerRadius(16)
-            .shadow(color: isValid ? Color.blue.opacity(0.3) : Color.clear, radius: 8, x: 0, y: 4)
-        }
-        .disabled(!isValid || viewModel.isLoading)
+            },
+            isDisabled: !isValid,
+            isLoading: viewModel.isLoading
+        )
         .accessibilityLabel("Create financial plan")
         .accessibilityHint(isValid ? "Creates your personalized financial plan" : "Total allocation must equal 100% of income")
     }
@@ -352,116 +330,106 @@ struct AllocationPlannerView: View {
     private var incomeExplanationSheet: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.lg) {
                     // Header
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
                         Text("How We Calculate Your Monthly Income")
-                            .font(.title2)
-                            .fontWeight(.bold)
+                            .title3Style()
 
                         Text("Understanding where this number comes from")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .subheadlineStyle()
                     }
 
-                    Divider()
+                    Rectangle()
+                        .fill(DesignTokens.Colors.divider)
+                        .frame(height: 1)
 
                     // Main explanation
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
+                        HStack(alignment: .top, spacing: DesignTokens.Spacing.sm) {
                             Image(systemName: "chart.bar.fill")
                                 .font(.title2)
-                                .foregroundColor(.green)
+                                .foregroundColor(DesignTokens.Colors.progressGreen)
                                 .frame(width: 32)
 
-                            VStack(alignment: .leading, spacing: 4) {
+                            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                                 Text("Monthly Income")
-                                    .font(.headline)
+                                    .headlineStyle()
 
                                 Text(formatCurrency(monthlyIncome))
                                     .font(.system(size: 28, weight: .bold))
-                                    .foregroundColor(.green)
+                                    .foregroundColor(DesignTokens.Colors.progressGreen)
                             }
                         }
-                        .padding()
-                        .background(Color.green.opacity(0.1))
-                        .cornerRadius(12)
+                        .padding(DesignTokens.Spacing.md)
+                        .background(DesignTokens.Colors.progressGreen.opacity(0.1))
+                        .cornerRadius(DesignTokens.CornerRadius.md)
 
                         // Calculation explanation
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
                             Text("Calculation Method")
-                                .font(.headline)
+                                .headlineStyle()
 
                             if let summary = viewModel.summary {
                                 Text("Your monthly income of \(formatCurrency(monthlyIncome)) is calculated as the average of positive transactions (deposits, paychecks, transfers in) over the past \(summary.monthsAnalyzed) months based on \(summary.totalTransactions) transactions analyzed.")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
+                                    .subheadlineStyle()
                                     .fixedSize(horizontal: false, vertical: true)
                             }
 
                             // Breakdown box
-                            VStack(alignment: .leading, spacing: 8) {
+                            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
                                 Text("What's Included:")
-                                    .font(.subheadline)
+                                    .subheadlineStyle(color: DesignTokens.Colors.textPrimary)
                                     .fontWeight(.semibold)
 
                                 Label("Paycheck deposits", systemImage: "checkmark.circle.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .captionStyle()
 
                                 Label("Direct deposits", systemImage: "checkmark.circle.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .captionStyle()
 
                                 Label("Bank transfers (incoming)", systemImage: "checkmark.circle.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .captionStyle()
 
                                 Label("Other positive transactions", systemImage: "checkmark.circle.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .captionStyle()
                             }
-                            .padding()
-                            .background(Color(.secondarySystemBackground))
-                            .cornerRadius(8)
+                            .padding(DesignTokens.Spacing.md)
+                            .primaryCardStyle()
                         }
 
                         // Analysis period
                         if let summary = viewModel.summary {
-                            VStack(alignment: .leading, spacing: 8) {
+                            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
                                 Text("Analysis Period")
-                                    .font(.headline)
+                                    .headlineStyle()
 
                                 HStack {
-                                    VStack(alignment: .leading, spacing: 4) {
+                                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                                         Text("Months Analyzed")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
+                                            .captionStyle()
                                         Text("\(summary.monthsAnalyzed)")
-                                            .font(.title3)
-                                            .fontWeight(.semibold)
+                                            .title3Style()
                                     }
 
                                     Spacer()
 
-                                    VStack(alignment: .trailing, spacing: 4) {
+                                    VStack(alignment: .trailing, spacing: DesignTokens.Spacing.xxs) {
                                         Text("Total Transactions")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
+                                            .captionStyle()
                                         Text("\(summary.totalTransactions)")
-                                            .font(.title3)
-                                            .fontWeight(.semibold)
+                                            .title3Style()
                                     }
                                 }
-                                .padding()
-                                .background(Color(.secondarySystemBackground))
-                                .cornerRadius(8)
+                                .padding(DesignTokens.Spacing.md)
+                                .primaryCardStyle()
                             }
                         }
                     }
                 }
-                .padding()
+                .padding(DesignTokens.Spacing.md)
             }
+            .primaryBackgroundGradient()
             .navigationTitle("Monthly Income")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -469,10 +437,12 @@ struct AllocationPlannerView: View {
                     Button("Done") {
                         showingIncomeExplanation = false
                     }
+                    .foregroundColor(DesignTokens.Colors.accentPrimary)
                 }
             }
         }
         .presentationDetents([.medium, .large])
+        .preferredColorScheme(.dark)
     }
 
     // MARK: - Helper Methods
@@ -619,16 +589,26 @@ struct AllocationPlannerView: View {
         ]
 
         vm.budgetManager.allocationBuckets = mockBuckets
-        vm.summary = FinancialSummary(
-            avgMonthlyIncome: 5000,
-            avgMonthlyExpenses: 4200,
-            totalDebt: 0,
-            totalInvested: 0,
-            totalCashAvailable: 0,
-            availableToSpend: 800,
-            monthsAnalyzed: 6,
-            totalTransactions: 150,
-            lastUpdated: Date()
+        vm.summary = AnalysisSnapshot(
+            monthlyFlow: MonthlyFlow(
+                income: 5000,
+                essentialExpenses: 4200,
+                debtMinimums: 0
+            ),
+            position: FinancialPosition(
+                emergencyCash: 0,
+                totalDebt: 0,
+                investmentBalances: 0,
+                monthlyInvestmentContributions: 0
+            ),
+            metadata: AnalysisMetadata(
+                monthsAnalyzed: 6,
+                accountsConnected: 3,
+                transactionsAnalyzed: 150,
+                transactionsNeedingValidation: 0,
+                overallConfidence: 0.9,
+                lastUpdated: Date()
+            )
         )
 
         return vm

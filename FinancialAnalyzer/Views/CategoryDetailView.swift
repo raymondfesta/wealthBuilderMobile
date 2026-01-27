@@ -4,7 +4,7 @@ import Charts
 struct CategoryDetailView: View {
     let category: BucketCategory
     let amount: Double
-    let summary: FinancialSummary
+    let summary: AnalysisSnapshot
     let accounts: [BankAccount]
     @ObservedObject var viewModel: FinancialViewModel
 

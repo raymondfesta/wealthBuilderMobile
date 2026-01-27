@@ -1,38 +1,599 @@
+// FinancialAnalyzer/Services/TransactionAnalyzer.swift
+
 import Foundation
 
+/// Analyzes transactions to calculate monthly flow and financial position
+/// CRITICAL: This is the core calculation engine - accuracy is paramount
 struct TransactionAnalyzer {
+
+    // MARK: - Main Analysis Function (Plan Compatibility)
+
+    /// Generates a complete financial snapshot from transactions and accounts
+    /// - Parameters:
+    ///   - transactions: All transactions from connected accounts
+    ///   - accounts: All connected bank accounts
+    /// - Returns: Complete FinancialSnapshot for display and algorithm
+    static func generateSnapshot(
+        transactions: [Transaction],
+        accounts: [BankAccount]
+    ) -> AnalysisSnapshot {
+        generateAnalysisSnapshot(transactions: transactions, accounts: accounts)
+    }
+
+    // MARK: - Analysis Snapshot Generation
+
+    /// Generates a complete analysis snapshot with MonthlyFlow and FinancialPosition
+    /// This is the primary output for the Analysis Complete screen
+    static func generateAnalysisSnapshot(
+        transactions: [Transaction],
+        accounts: [BankAccount]
+    ) -> AnalysisSnapshot {
+        // Filter last 6 months of transactions
+        let sixMonthsAgo = Calendar.current.date(byAdding: .month, value: -6, to: Date()) ?? Date()
+        let filteredTransactions = transactions.filter {
+            $0.date >= sixMonthsAgo && !$0.pending
+        }
+
+        // Calculate date range
+        let analysisStartDate = filteredTransactions.map { $0.date }.min() ?? Date()
+        let analysisEndDate = filteredTransactions.map { $0.date }.max() ?? Date()
+        let monthsAnalyzed = max(
+            Calendar.current.dateComponents([.month], from: analysisStartDate, to: analysisEndDate).month ?? 1,
+            1
+        )
+
+        // Calculate monthly flow using new classification logic
+        let monthlyFlow = calculateMonthlyFlow(
+            transactions: filteredTransactions,
+            accounts: accounts,
+            months: monthsAnalyzed
+        )
+
+        // Calculate financial position
+        let position = calculateFinancialPosition(
+            transactions: filteredTransactions,
+            accounts: accounts,
+            months: monthsAnalyzed
+        )
+
+        // Count transactions needing validation
+        let transactionsNeedingValidation = filteredTransactions.filter { $0.needsValidation }.count
+
+        // Compute overall confidence
+        let validationRatio = filteredTransactions.isEmpty ? 0.0 :
+            Double(filteredTransactions.count - transactionsNeedingValidation) / Double(filteredTransactions.count)
+        let expenseConfidence = monthlyFlow.expenseBreakdown?.confidence ?? 0.5
+        let overallConfidence = (expenseConfidence + validationRatio) / 2.0
+
+        let metadata = AnalysisMetadata(
+            monthsAnalyzed: monthsAnalyzed,
+            accountsConnected: Set(accounts.map { $0.itemId }).count,
+            transactionsAnalyzed: filteredTransactions.count,
+            transactionsNeedingValidation: transactionsNeedingValidation,
+            overallConfidence: overallConfidence,
+            lastUpdated: Date()
+        )
+
+        print("📊 [AnalysisSnapshot] Generated:")
+        print("   Income: $\(Int(monthlyFlow.income))/mo")
+        print("   Expenses: $\(Int(monthlyFlow.essentialExpenses))/mo")
+        print("   Debt Minimums: $\(Int(monthlyFlow.debtMinimums))/mo")
+        print("   Disposable Income: $\(Int(monthlyFlow.disposableIncome))/mo")
+        print("   Emergency Cash: $\(Int(position.emergencyCash))")
+        print("   Monthly Investment Contributions: $\(Int(position.monthlyInvestmentContributions))/mo")
+
+        return AnalysisSnapshot(
+            monthlyFlow: monthlyFlow,
+            position: position,
+            metadata: metadata
+        )
+    }
+
+    // MARK: - Monthly Flow Calculation
+
+    /// Calculate monthly cash flow from transactions
+    static func calculateMonthlyFlow(
+        transactions: [Transaction],
+        accounts: [BankAccount],
+        months: Int
+    ) -> MonthlyFlow {
+        guard months > 0 else {
+            print("⚠️ [MonthlyFlow] months=0, returning empty")
+            return .empty
+        }
+
+        // DIAGNOSTIC: Log all negative-amount transactions (potential income)
+        let negativeAmounts = transactions.filter { $0.amount < 0 }
+        print("📊 [MonthlyFlow] === DIAGNOSTIC START ===")
+        print("📊 [MonthlyFlow] Total transactions: \(transactions.count)")
+        print("📊 [MonthlyFlow] Negative amount (potential income): \(negativeAmounts.count)")
+        print("📊 [MonthlyFlow] Months analyzed: \(months)")
+
+        // Calculate monthly income (ONLY actual income, not transfers)
+        let incomeTransactions = transactions.filter { transaction in
+            isActualIncome(transaction) && !isInvestmentContribution(transaction)
+        }
+        let totalIncome = incomeTransactions.reduce(0) { $0 + abs($1.amount) }
+        let monthlyIncome = totalIncome / Double(months)
+
+        print("📊 [MonthlyFlow] Income transactions found: \(incomeTransactions.count)")
+        print("📊 [MonthlyFlow] Total income over period: $\(Int(totalIncome))")
+        print("📊 [MonthlyFlow] Monthly income: $\(Int(monthlyIncome))")
+
+        // Log sample income transactions
+        for txn in incomeTransactions.prefix(5) {
+            print("   💰 Income: '\(txn.name)' $\(Int(abs(txn.amount))) (PFC: \(txn.personalFinanceCategory?.primary ?? "none"))")
+        }
+
+        // Log missed income candidates (negative amounts not classified as income)
+        let missedIncome = negativeAmounts.filter { txn in
+            !incomeTransactions.contains { $0.id == txn.id }
+        }
+        if !missedIncome.isEmpty {
+            print("📊 [MonthlyFlow] ⚠️ Missed income candidates: \(missedIncome.count)")
+            for txn in missedIncome.prefix(5) {
+                let pfc = txn.personalFinanceCategory
+                print("   ❌ Missed: '\(txn.name)' $\(Int(abs(txn.amount))) cat:\(txn.category.first ?? "none") PFC:\(pfc?.primary ?? "none")/\(pfc?.detailed ?? "none")")
+            }
+        }
+
+        // Calculate essential expenses (EXCLUDE investment contributions and transfers)
+        let essentialTransactions = transactions.filter { transaction in
+            isEssentialExpense(transaction) && !isInvestmentContribution(transaction)
+        }
+        let expenseBreakdown = categorizeEssentialExpenses(essentialTransactions, months: months)
+
+        print("📊 [MonthlyFlow] Expense transactions: \(essentialTransactions.count)")
+        print("📊 [MonthlyFlow] Monthly expenses: $\(Int(expenseBreakdown.total))")
+
+        // Calculate minimum debt payments from accounts
+        let debtMinimums = calculateDebtMinimums(accounts: accounts)
+
+        print("📊 [MonthlyFlow] Debt minimums: $\(Int(debtMinimums))")
+        print("📊 [MonthlyFlow] Disposable: $\(Int(monthlyIncome - expenseBreakdown.total - debtMinimums))")
+        print("📊 [MonthlyFlow] === DIAGNOSTIC END ===")
+
+        return MonthlyFlow(
+            income: monthlyIncome,
+            expenseBreakdown: expenseBreakdown,
+            debtMinimums: debtMinimums
+        )
+    }
+
+    // MARK: - Financial Position Calculation
+
+    /// Calculate current financial position from account balances
+    static func calculateFinancialPosition(
+        transactions: [Transaction],
+        accounts: [BankAccount],
+        months: Int
+    ) -> FinancialPosition {
+        // Emergency cash (liquid depository accounts only)
+        let liquidAccounts = accounts.filter { account in
+            account.isDepository && account.subtype != "cd"
+        }
+        let emergencyCash = liquidAccounts.reduce(0) {
+            $0 + ($1.availableBalance ?? $1.currentBalance ?? 0)
+        }
+
+        // Debt accounts
+        let debtAccounts = accounts.filter {
+            $0.isCredit || $0.isLoan
+        }.map { DebtAccount(from: $0) }
+
+        // Investment balances
+        let investmentAccounts = accounts.filter { $0.isInvestment }
+        let investmentBalances = investmentAccounts.reduce(0) {
+            $0 + ($1.currentBalance ?? 0)
+        }
+
+        // Track investment contributions separately (NOT as expense)
+        let investmentContributions = transactions.filter { isInvestmentContribution($0) }
+        let totalContributions = investmentContributions.reduce(0) { $0 + abs($1.amount) }
+        let monthlyContributions = months > 0 ? totalContributions / Double(months) : 0
+
+        return FinancialPosition(
+            emergencyCash: emergencyCash,
+            debtBalances: debtAccounts,
+            investmentBalances: investmentBalances,
+            monthlyInvestmentContributions: monthlyContributions
+        )
+    }
+
+    // MARK: - Transaction Classification Helpers
+
+    /// Determines if a transaction is actual income (not a transfer or contribution)
+    /// CRITICAL: This prevents investment contributions from being counted as income
+    static func isActualIncome(_ transaction: Transaction) -> Bool {
+        // In Plaid, negative amounts = money flowing INTO the account
+        guard transaction.amount < 0 else { return false }
+
+        // Check PFC first (most reliable)
+        if let pfc = transaction.personalFinanceCategory {
+            let primary = pfc.primary.uppercased()
+            if primary == "INCOME" {
+                return true
+            }
+            // TRANSFER_IN that's not internal
+            if primary == "TRANSFER_IN" && !pfc.detailed.uppercased().contains("ACCOUNT") {
+                // Check if it's investment-related
+                if pfc.detailed.uppercased().contains("INVESTMENT") ||
+                   pfc.detailed.uppercased().contains("RETIREMENT") {
+                    return false
+                }
+                return true
+            }
+        }
+
+        // Check for income-related legacy categories
+        let incomeCategories = [
+            "INCOME", "PAYROLL", "DIRECT_DEPOSIT", "INTEREST",
+            "DIVIDEND", "TAX_REFUND", "UNEMPLOYMENT", "SOCIAL_SECURITY"
+        ]
+
+        if let category = transaction.category.first?.uppercased() {
+            if incomeCategories.contains(where: { category.contains($0) }) {
+                return true
+            }
+            // Exclude transfers - these are NOT income
+            if category.contains("TRANSFER") {
+                return false
+            }
+        }
+
+        // Check transaction name for payroll patterns (expanded for sandbox)
+        let incomeMerchants = [
+            "payroll", "direct dep", "direct deposit", "salary", "wages",
+            "ach deposit", "employer", "dd ", "paycheck", "payment received",
+            "credit", "deposit"
+        ]
+        let nameLower = transaction.name.lowercased()
+
+        // Exclude refunds and returns from being counted as income
+        let refundTerms = ["refund", "return", "reversal", "adjustment", "cashback"]
+        if refundTerms.contains(where: { nameLower.contains($0) }) {
+            return false
+        }
+
+        if incomeMerchants.contains(where: { nameLower.contains($0) }) {
+            // Additional validation: "credit" and "deposit" are generic, need context
+            if nameLower.contains("credit") || nameLower.contains("deposit") {
+                // Must NOT be a transfer or payment
+                if nameLower.contains("transfer") || nameLower.contains("payment to") {
+                    return false
+                }
+            }
+            return true
+        }
+
+        // Interest and dividend payments
+        if nameLower.contains("interest") || nameLower.contains("dividend") {
+            return true
+        }
+
+        // Plaid sandbox often uses "United Airlines" for payroll - detect regular large negative deposits
+        // This is a fallback for sandbox data that may not have proper categories
+        if transaction.personalFinanceCategory == nil && transaction.category.isEmpty {
+            // FIRST: Reject transfer/funding keywords that indicate internal moves, not income
+            let transferKeywords = [
+                "transfer", "funding", "buffer", "emergency fund", "savings",
+                "contribution", "investment", "401k", "ira", "brokerage"
+            ]
+            if transferKeywords.contains(where: { nameLower.contains($0) }) {
+                return false
+            }
+
+            // Large negative amount with no category = likely income in sandbox
+            if abs(transaction.amount) > 500 {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    /// Determines if a transaction is an investment contribution
+    /// CRITICAL: These should NOT be counted as expenses
+    static func isInvestmentContribution(_ transaction: Transaction) -> Bool {
+        // Check PFC first
+        if let pfc = transaction.personalFinanceCategory {
+            let primary = pfc.primary.uppercased()
+            let detailed = pfc.detailed.uppercased()
+
+            if primary == "TRANSFER_OUT" {
+                if detailed.contains("INVESTMENT") ||
+                   detailed.contains("RETIREMENT") ||
+                   detailed.contains("SAVINGS") {
+                    return true
+                }
+            }
+        }
+
+        // Check Plaid category codes for investment transfers
+        let investmentCategories = [
+            "TRANSFER_OUT_INVESTMENT", "TRANSFER_OUT_RETIREMENT",
+            "TRANSFER_IN_INVESTMENT", "TRANSFER_IN_RETIREMENT",
+            "401K", "IRA", "CONTRIBUTION", "INVESTMENT"
+        ]
+
+        if let category = transaction.category.first?.uppercased() {
+            if investmentCategories.contains(where: { category.contains($0) }) {
+                return true
+            }
+        }
+
+        // Check merchant name patterns
+        let investmentMerchants = [
+            "vanguard", "fidelity", "schwab", "betterment", "wealthfront",
+            "robinhood", "etrade", "td ameritrade", "merrill", "401k",
+            "retirement", "roth", "ira"
+        ]
+        let nameLower = transaction.name.lowercased()
+        if investmentMerchants.contains(where: { nameLower.contains($0) }) {
+            // Additional check: make sure it's a contribution
+            let contributionTerms = ["contribution", "transfer", "deposit", "buy", "purchase"]
+            if contributionTerms.contains(where: { nameLower.contains($0) }) {
+                return true
+            }
+            // If it's FROM checking/savings TO investment (positive amount = outflow)
+            if transaction.amount > 0 {
+                return true
+            }
+        }
+
+        // Check for employee contribution patterns
+        if nameLower.contains("employee contribution") ||
+           nameLower.contains("employer match") ||
+           nameLower.contains("monthly contribution") {
+            return true
+        }
+
+        return false
+    }
+
+    /// Determines if a transaction is an internal transfer (between user's own accounts)
+    static func isInternalTransfer(_ transaction: Transaction) -> Bool {
+        // Check PFC
+        if let pfc = transaction.personalFinanceCategory {
+            let detailed = pfc.detailed.uppercased()
+            if detailed.contains("ACCOUNT_TRANSFER") ||
+               detailed.contains("SAME_INSTITUTION") {
+                return true
+            }
+        }
+
+        let transferCategories = [
+            "TRANSFER_INTERNAL", "TRANSFER_SAME_INSTITUTION"
+        ]
+
+        if let category = transaction.category.first?.uppercased() {
+            if transferCategories.contains(where: { category.contains($0) }) {
+                return true
+            }
+        }
+
+        let nameLower = transaction.name.lowercased()
+        let transferTerms = [
+            "transfer to", "transfer from", "internal transfer",
+            "online transfer", "funds transfer",
+            // Debt payment patterns (should not count as expenses)
+            "credit card payment", "card payment", "loan payment",
+            "autopay", "auto pay", "payment - chase", "payment - citi",
+            "payment - amex", "payment - discover", "payment - capital one"
+        ]
+
+        return transferTerms.contains(where: { nameLower.contains($0) })
+    }
+
+    /// Determines if a transaction is an essential expense
+    private static func isEssentialExpense(_ transaction: Transaction) -> Bool {
+        // Must be an outflow (positive amount in Plaid = money OUT)
+        guard transaction.amount > 0 else { return false }
+
+        // Must NOT be an investment contribution
+        guard !isInvestmentContribution(transaction) else { return false }
+
+        // Must NOT be an internal transfer
+        guard !isInternalTransfer(transaction) else { return false }
+
+        return true
+    }
+
+    /// Convenience method for other services to check if transaction should be excluded
+    static func shouldExcludeFromBudget(_ transaction: Transaction) -> Bool {
+        isInvestmentContribution(transaction) || isInternalTransfer(transaction)
+    }
+
+    // MARK: - Expense Categorization
+
+    /// Categorizes essential expenses with confidence scoring
+    static func categorizeEssentialExpenses(
+        _ transactions: [Transaction],
+        months: Int
+    ) -> ExpenseBreakdown {
+        guard months > 0 else { return .empty }
+
+        var housing = 0.0
+        var food = 0.0
+        var transportation = 0.0
+        var utilities = 0.0
+        var insurance = 0.0
+        var subscriptions = 0.0
+        var healthcare = 0.0
+        var other = 0.0
+        var highConfidenceCount = 0
+        var totalCount = 0
+
+        for transaction in transactions {
+            let amount = abs(transaction.amount)
+            totalCount += 1
+
+            // Use PFC if available
+            if let pfc = transaction.personalFinanceCategory {
+                if pfc.confidenceLevel == .high || pfc.confidenceLevel == .veryHigh {
+                    highConfidenceCount += 1
+                }
+
+                let primary = pfc.primary.uppercased()
+                let detailed = pfc.detailed.uppercased()
+
+                switch primary {
+                case "RENT_AND_UTILITIES":
+                    if detailed.contains("RENT") || detailed.contains("MORTGAGE") {
+                        housing += amount
+                    } else {
+                        utilities += amount
+                    }
+
+                case "FOOD_AND_DRINK":
+                    food += amount
+
+                case "TRANSPORTATION", "TRAVEL":
+                    transportation += amount
+
+                case "HOME_IMPROVEMENT":
+                    housing += amount
+
+                case "MEDICAL":
+                    if detailed.contains("INSURANCE") {
+                        insurance += amount
+                    } else {
+                        healthcare += amount
+                    }
+
+                case "ENTERTAINMENT", "GENERAL_SERVICES":
+                    if detailed.contains("SUBSCRIPTION") || detailed.contains("STREAMING") ||
+                       detailed.contains("MUSIC") || detailed.contains("VIDEO") ||
+                       detailed.contains("MEMBERSHIP") || detailed.contains("GYM") {
+                        subscriptions += amount
+                    } else {
+                        other += amount
+                    }
+
+                case "LOAN_PAYMENTS", "BANK_FEES", "GOVERNMENT_AND_NON_PROFIT", "GENERAL_MERCHANDISE":
+                    other += amount
+
+                default:
+                    other += amount
+                }
+            } else {
+                // Fallback to legacy keyword matching
+                let categoryString = transaction.category.joined(separator: " ").lowercased()
+                let nameLower = transaction.name.lowercased()
+
+                if categoryString.contains("rent") || categoryString.contains("mortgage") ||
+                   categoryString.contains("housing") {
+                    housing += amount
+                } else if categoryString.contains("groceries") || categoryString.contains("food") ||
+                          categoryString.contains("restaurant") || categoryString.contains("dining") {
+                    food += amount
+                } else if categoryString.contains("gas") || categoryString.contains("uber") ||
+                          categoryString.contains("lyft") || categoryString.contains("transit") ||
+                          categoryString.contains("parking") || categoryString.contains("auto") {
+                    transportation += amount
+                } else if categoryString.contains("electric") || categoryString.contains("utility") ||
+                          categoryString.contains("water") || categoryString.contains("internet") ||
+                          categoryString.contains("phone") {
+                    utilities += amount
+                } else if categoryString.contains("insurance") {
+                    insurance += amount
+                } else if categoryString.contains("subscription") || nameLower.contains("netflix") ||
+                          nameLower.contains("spotify") || nameLower.contains("gym") {
+                    subscriptions += amount
+                } else if categoryString.contains("medical") || categoryString.contains("pharmacy") ||
+                          categoryString.contains("healthcare") {
+                    healthcare += amount
+                } else {
+                    other += amount
+                }
+            }
+        }
+
+        let confidence = totalCount > 0 ? Double(highConfidenceCount) / Double(totalCount) : 0.5
+        let divisor = Double(months)
+
+        return ExpenseBreakdown(
+            housing: housing / divisor,
+            food: food / divisor,
+            transportation: transportation / divisor,
+            utilities: utilities / divisor,
+            insurance: insurance / divisor,
+            subscriptions: subscriptions / divisor,
+            healthcare: healthcare / divisor,
+            other: other / divisor,
+            confidence: confidence
+        )
+    }
+
+    // MARK: - Debt Calculation Helpers
+
+    /// Calculates total minimum debt payments from accounts
+    static func calculateDebtMinimums(accounts: [BankAccount]) -> Double {
+        let debtAccounts = accounts.filter { $0.isCredit || $0.isLoan }
+        return debtAccounts.reduce(0) { sum, account in
+            sum + (account.minimumPayment ?? estimateMinimumPayment(for: account))
+        }
+    }
+
+    /// Estimates minimum payment if not provided by Plaid
+    private static func estimateMinimumPayment(for account: BankAccount) -> Double {
+        guard let balance = account.currentBalance, balance > 0 else { return 0 }
+
+        if account.isCredit {
+            return max(balance * 0.025, 25)
+        } else if account.isLoan {
+            let subtype = account.subtype?.lowercased() ?? ""
+            switch subtype {
+            case _ where subtype.contains("student"):
+                return balance / 120
+            case _ where subtype.contains("auto"):
+                return balance / 60
+            case _ where subtype.contains("mortgage"):
+                return (balance / 360) * 1.5
+            case _ where subtype.contains("personal"):
+                return balance / 36
+            default:
+                return balance * 0.015
+            }
+        }
+
+        return 0
+    }
+
     // MARK: - Category to Bucket Mapping
 
     /// Categorizes a transaction into a high-level bucket using Plaid's Personal Finance Category
-    /// Leverages 90%+ accuracy from Plaid's PFC taxonomy with confidence scoring
     static func categorizeToBucket(
         amount: Double,
         category: [String],
         categoryId: String?,
-        personalFinanceCategory: PersonalFinanceCategory? = nil
+        personalFinanceCategory: PersonalFinanceCategory? = nil,
+        transaction: Transaction? = nil
     ) -> BucketCategory {
-        // PRIORITY 1: Use Plaid Personal Finance Category if available with HIGH confidence
-        if let pfc = personalFinanceCategory,
-           pfc.confidenceLevel == .veryHigh || pfc.confidenceLevel == .high {
-            let bucket = mapPFCToBucket(pfc.primary, detailed: pfc.detailed, amount: amount)
-            print("📊 [PFC] Using Plaid category '\(pfc.primary)' (\(pfc.confidenceLevel.rawValue)) → \(bucket.rawValue)")
-            return bucket
+        // If we have the full transaction, use the new classification
+        if let txn = transaction {
+            if isActualIncome(txn) && !isInvestmentContribution(txn) {
+                return .income
+            }
+            if isInvestmentContribution(txn) {
+                return .invested
+            }
+            if isInternalTransfer(txn) {
+                return .cash
+            }
         }
 
-        // PRIORITY 2: Use Plaid PFC even with lower confidence (better than keyword matching)
+        // Use PFC if available
         if let pfc = personalFinanceCategory {
             let bucket = mapPFCToBucket(pfc.primary, detailed: pfc.detailed, amount: amount)
-            print("⚠️ [PFC] Using Plaid category '\(pfc.primary)' (\(pfc.confidenceLevel.rawValue) confidence) → \(bucket.rawValue)")
             return bucket
         }
 
-        // FALLBACK: Use legacy keyword matching (less accurate, should trigger validation)
-        print("⚠️ [Legacy] No PFC data, using keyword matching (needs validation)")
+        // Fallback to category-based classification
         return legacyCategorizeToBucket(amount: amount, category: category, categoryId: categoryId)
     }
 
     /// Maps Plaid's Personal Finance Category to our 6 high-level buckets
-    /// Based on Plaid's 16 primary categories
     private static func mapPFCToBucket(_ primary: String, detailed: String, amount: Double) -> BucketCategory {
         let primaryUpper = primary.uppercased()
 
@@ -41,19 +602,19 @@ struct TransactionAnalyzer {
             return .income
 
         case "TRANSFER_IN":
-            // Money coming in - treat as income unless it's between own accounts
-            if detailed.contains("ACCOUNT") {
-                return .cash // Internal transfer
+            if detailed.uppercased().contains("ACCOUNT") {
+                return .cash
             }
             return .income
 
         case "TRANSFER_OUT":
-            // Check if it's going to investment/savings
-            if detailed.contains("INVESTMENT") || detailed.contains("RETIREMENT") || detailed.contains("SAVINGS") {
+            if detailed.uppercased().contains("INVESTMENT") ||
+               detailed.uppercased().contains("RETIREMENT") ||
+               detailed.uppercased().contains("SAVINGS") {
                 return .invested
             }
-            // Check if it's a loan/debt payment
-            if detailed.contains("LOAN") || detailed.contains("CREDIT") {
+            if detailed.uppercased().contains("LOAN") ||
+               detailed.uppercased().contains("CREDIT") {
                 return .debt
             }
             return .expenses
@@ -68,23 +629,40 @@ struct TransactionAnalyzer {
             return .expenses
 
         default:
-            // Unknown PFC category - use amount to guess
             return amount < 0 ? .income : .expenses
         }
     }
 
-    /// Legacy categorization using keyword matching (less accurate, kept as fallback)
+    /// Legacy categorization using keyword matching (fallback)
     private static func legacyCategorizeToBucket(
         amount: Double,
         category: [String],
         categoryId: String?
     ) -> BucketCategory {
+        // Check category for investment/transfer patterns FIRST
+        if let primaryCategory = category.first?.uppercased() {
+            if primaryCategory.contains("TRANSFER") {
+                if primaryCategory.contains("INVESTMENT") ||
+                   primaryCategory.contains("401K") ||
+                   primaryCategory.contains("IRA") ||
+                   primaryCategory.contains("RETIREMENT") {
+                    return .invested
+                }
+            }
+        }
+
         // Income transactions (negative amounts in Plaid = money in)
+        // But NOT if it's a transfer
         if amount < 0 {
+            if let primaryCategory = category.first?.uppercased() {
+                if primaryCategory.contains("TRANSFER") {
+                    return .invested
+                }
+            }
             return .income
         }
 
-        // Debt payments - credit cards, loans
+        // Debt payments
         if let primaryCategory = category.first?.lowercased() {
             if primaryCategory.contains("credit card") ||
                primaryCategory.contains("loan payments") ||
@@ -103,422 +681,23 @@ struct TransactionAnalyzer {
             }
         }
 
-        // Default to expenses for positive amounts
         return .expenses
     }
 
-    // MARK: - Financial Summary Calculation
+    // MARK: - Legacy Support (for backward compatibility)
+    // MARK: - Category Detail Helpers
 
-    static func calculateSummary(
-        transactions: [Transaction],
-        accounts: [BankAccount]
-    ) -> FinancialSummary {
-        // Filter last 6 months of transactions
-        let sixMonthsAgo = Calendar.current.date(byAdding: .month, value: -6, to: Date()) ?? Date()
-        let filteredTransactions = transactions.filter { $0.date >= sixMonthsAgo }
-
-        // Calculate date range
-        let analysisStartDate = filteredTransactions.map { $0.date }.min() ?? Date()
-        let analysisEndDate = filteredTransactions.map { $0.date }.max() ?? Date()
-
-        // Calculate months between dates
-        let monthsAnalyzed = max(
-            Calendar.current.dateComponents([.month], from: analysisStartDate, to: analysisEndDate).month ?? 6,
-            1
-        )
-
-        // Group transactions by bucket category
-        var incomeTotal: Double = 0
-        var expensesTotal: Double = 0
-        var investmentContributionsTotal: Double = 0
-        var incomeCount = 0
-        var expenseCount = 0
-        var debtCount = 0
-        var investedCount = 0
-        var otherCount = 0
-
-        for transaction in filteredTransactions where !transaction.pending {
-            let category = transaction.bucketCategory
-
-            switch category {
-            case .income:
-                // Plaid uses negative for income, so negate to get positive
-                incomeTotal += abs(transaction.amount)
-                incomeCount += 1
-            case .expenses:
-                expensesTotal += transaction.amount
-                expenseCount += 1
-            case .debt:
-                expensesTotal += transaction.amount
-                debtCount += 1
-            case .invested:
-                // Track investment contributions separately - NOT as expenses
-                // These are wealth-building transfers, not spending
-                investmentContributionsTotal += transaction.amount
-                investedCount += 1
-            default:
-                otherCount += 1
-            }
-        }
-
-        // Calculate averages
-        let avgMonthlyIncome = incomeTotal / Double(monthsAnalyzed)
-        let avgMonthlyExpenses = expensesTotal / Double(monthsAnalyzed)
-        let monthlyInvestmentContributions = investmentContributionsTotal / Double(monthsAnalyzed)
-
-        // Debug logging
-        print("📊 Transaction Analysis:")
-        print("   Total transactions: \(filteredTransactions.count)")
-        print("   Income txns: \(incomeCount), Expense txns: \(expenseCount)")
-        print("   Debt txns: \(debtCount), Investment txns: \(investedCount), Other: \(otherCount)")
-        print("   Months analyzed: \(monthsAnalyzed)")
-        print("   Income total: $\(incomeTotal)")
-        print("   Expenses total: $\(expensesTotal) (excludes investments)")
-        print("   Investment contributions: $\(investmentContributionsTotal)")
-        print("   Avg Monthly Income: $\(avgMonthlyIncome)")
-        print("   Avg Monthly Expenses: $\(avgMonthlyExpenses)")
-        print("   Monthly Investment Contributions: $\(monthlyInvestmentContributions)")
-        print("   Discretionary Income: $\(avgMonthlyIncome - avgMonthlyExpenses)")
-
-        // Calculate debt from credit/loan accounts
-        let totalDebt = accounts
-            .filter { $0.isCredit || $0.isLoan }
-            .compactMap { $0.currentBalance }
-            .reduce(0, +)
-
-        // Calculate investments
-        let totalInvested = accounts
-            .filter { $0.isInvestment }
-            .compactMap { $0.currentBalance }
-            .reduce(0, +)
-
-        // Calculate cash available
-        let totalCashAvailable = accounts
-            .filter { $0.isDepository }
-            .compactMap { $0.availableBalance ?? $0.currentBalance }
-            .reduce(0, +)
-
-        // Calculate available to spend using a smart approach
-        // Strategy: Use actual cash available and adjust for monthly spending rate
-        // This gives users a realistic view of what they can spend NOW
-        let daysInMonth = 30.0
-        let calendar = Calendar.current
-        let today = Date()
-        let daysRemainingInMonth = Double(calendar.range(of: .day, in: .month, for: today)!.count - calendar.component(.day, from: today))
-
-        // Calculate daily spending rate
-        let dailyExpenseRate = avgMonthlyExpenses / daysInMonth
-
-        // Estimated spending for rest of month
-        let estimatedRemainingExpenses = dailyExpenseRate * daysRemainingInMonth
-
-        // Available to spend = Cash on hand - estimated remaining expenses for this month
-        // This tells the user: "After your usual expenses, you have this much to spend"
-        let availableToSpend = max(totalCashAvailable - estimatedRemainingExpenses, 0)
-
-        print("📊 Available to Spend Calculation:")
-        print("   Total Cash Available: $\(totalCashAvailable)")
-        print("   Avg Monthly Expenses: $\(avgMonthlyExpenses)")
-        print("   Days remaining in month: \(Int(daysRemainingInMonth))")
-        print("   Estimated remaining expenses: $\(estimatedRemainingExpenses)")
-        print("   ✅ Available to Spend: $\(availableToSpend)")
-
-        return FinancialSummary(
-            avgMonthlyIncome: avgMonthlyIncome,
-            avgMonthlyExpenses: avgMonthlyExpenses,
-            totalDebt: totalDebt,
-            totalInvested: totalInvested,
-            totalCashAvailable: totalCashAvailable,
-            availableToSpend: availableToSpend,
-            monthlyInvestmentContributions: monthlyInvestmentContributions,
-            analysisStartDate: analysisStartDate,
-            analysisEndDate: analysisEndDate,
-            monthsAnalyzed: monthsAnalyzed,
-            totalTransactions: filteredTransactions.count,
-            lastUpdated: Date()
-        )
-    }
-
-    // MARK: - Analysis Snapshot Generation
-
-    /// Generates a complete analysis snapshot with MonthlyFlow and FinancialPosition
-    /// This is the primary output for the Analysis Complete screen
-    static func generateAnalysisSnapshot(
-        transactions: [Transaction],
-        accounts: [BankAccount]
-    ) -> AnalysisSnapshot {
-        // Filter last 6 months of transactions
-        let sixMonthsAgo = Calendar.current.date(byAdding: .month, value: -6, to: Date()) ?? Date()
-        let filteredTransactions = transactions.filter { $0.date >= sixMonthsAgo }
-
-        // Calculate date range
-        let analysisStartDate = filteredTransactions.map { $0.date }.min() ?? Date()
-        let analysisEndDate = filteredTransactions.map { $0.date }.max() ?? Date()
-        let monthsAnalyzed = max(
-            Calendar.current.dateComponents([.month], from: analysisStartDate, to: analysisEndDate).month ?? 6,
-            1
-        )
-
-        // Aggregate transaction data
-        var incomeTotal: Double = 0
-        var expensesTotal: Double = 0
-        var investmentContributionsTotal: Double = 0
-
-        for transaction in filteredTransactions where !transaction.pending {
-            switch transaction.bucketCategory {
-            case .income:
-                incomeTotal += abs(transaction.amount)
-            case .expenses:
-                expensesTotal += transaction.amount
-            case .debt:
-                expensesTotal += transaction.amount
-            case .invested:
-                investmentContributionsTotal += transaction.amount
-            default:
-                break
-            }
-        }
-
-        // Calculate monthly averages
-        let monthDivisor = Double(monthsAnalyzed)
-        let avgMonthlyIncome = incomeTotal / monthDivisor
-        let monthlyInvestmentContributions = investmentContributionsTotal / monthDivisor
-
-        // Calculate debt minimums from accounts
-        let debtMinimums = calculateDebtMinimums(accounts: accounts)
-
-        // Generate detailed expense breakdown with confidence scoring
-        let expenseBreakdown = categorizeExpenses(from: filteredTransactions, months: monthsAnalyzed)
-
-        // Calculate position from accounts
-        let totalDebt = accounts
-            .filter { $0.isCredit || $0.isLoan }
-            .compactMap { $0.currentBalance }
-            .reduce(0, +)
-
-        let totalInvested = accounts
-            .filter { $0.isInvestment }
-            .compactMap { $0.currentBalance }
-            .reduce(0, +)
-
-        let emergencyCash = accounts
-            .filter { $0.isDepository }
-            .compactMap { $0.availableBalance ?? $0.currentBalance }
-            .reduce(0, +)
-
-        // Count transactions needing validation
-        let transactionsNeedingValidation = filteredTransactions.filter { $0.needsValidation }.count
-
-        // Build the snapshot with expense breakdown
-        let monthlyFlow = MonthlyFlow(
-            income: avgMonthlyIncome,
-            expenseBreakdown: expenseBreakdown,
-            debtMinimums: debtMinimums
-        )
-
-        let position = FinancialPosition(
-            emergencyCash: emergencyCash,
-            totalDebt: totalDebt,
-            investmentBalances: totalInvested,
-            monthlyInvestmentContributions: monthlyInvestmentContributions
-        )
-
-        let metadata = AnalysisMetadata(
-            monthsAnalyzed: monthsAnalyzed,
-            accountsConnected: Set(accounts.map { $0.itemId }).count,
-            transactionsAnalyzed: filteredTransactions.count,
-            transactionsNeedingValidation: transactionsNeedingValidation,
-            lastUpdated: Date()
-        )
-
-        print("📊 [AnalysisSnapshot] Generated:")
-        print("   Income: $\(Int(avgMonthlyIncome))/mo")
-        print("   Expenses: $\(Int(expenseBreakdown.total))/mo (\(expenseBreakdown.categoryCount) categories)")
-        print("   Expense Confidence: \(Int(expenseBreakdown.confidence * 100))%")
-        print("   Debt Minimums: $\(Int(debtMinimums))/mo")
-        print("   To Allocate: $\(Int(monthlyFlow.discretionaryIncome))/mo")
-        print("   Emergency Fund: $\(Int(emergencyCash))")
-        print("   Investment Contributions: $\(Int(monthlyInvestmentContributions))/mo")
-        print("   Needs Validation: \(transactionsNeedingValidation) txns")
-
-        return AnalysisSnapshot(
-            monthlyFlow: monthlyFlow,
-            position: position,
-            metadata: metadata
-        )
-    }
-
-    // MARK: - Expense Breakdown by Category
-
-    /// Categorizes expense transactions into 7 essential categories with confidence scoring
-    /// Uses Plaid PFC for categorization, falling back to keyword matching
-    /// - Parameters:
-    ///   - transactions: Expense transactions to categorize
-    ///   - months: Number of months for averaging (default 1 for totals)
-    /// - Returns: ExpenseBreakdown with 7 categories and confidence score
-    static func categorizeExpenses(
-        from transactions: [Transaction],
-        months: Int = 1
-    ) -> ExpenseBreakdown {
-        var housing: Double = 0
-        var food: Double = 0
-        var transportation: Double = 0
-        var utilities: Double = 0
-        var insurance: Double = 0
-        var subscriptions: Double = 0
-        var other: Double = 0
-
-        var highConfidenceCount = 0
-        var totalExpenseCount = 0
-
-        // Filter to expense and debt transactions only (debt payments are still expenses)
-        let expenseTransactions = transactions.filter { transaction in
-            let bucket = transaction.bucketCategory
-            return (bucket == .expenses || bucket == .debt) && !transaction.pending
-        }
-
-        for transaction in expenseTransactions {
-            let amount = transaction.amount
-            totalExpenseCount += 1
-
-            if let pfc = transaction.personalFinanceCategory {
-                // Track high confidence for overall score
-                if pfc.confidenceLevel == .high || pfc.confidenceLevel == .veryHigh {
-                    highConfidenceCount += 1
-                }
-
-                // Map PFC primary category to our 7 expense categories
-                let primary = pfc.primary.uppercased()
-                let detailed = pfc.detailed.uppercased()
-
-                switch primary {
-                case "RENT_AND_UTILITIES":
-                    // Split rent vs utilities based on detailed category
-                    if detailed.contains("RENT") || detailed.contains("MORTGAGE") {
-                        housing += amount
-                    } else {
-                        utilities += amount
-                    }
-
-                case "FOOD_AND_DRINK":
-                    food += amount
-
-                case "TRANSPORTATION":
-                    transportation += amount
-
-                case "HOME_IMPROVEMENT":
-                    housing += amount
-
-                case "MEDICAL":
-                    // Check if it's insurance or general medical
-                    if detailed.contains("INSURANCE") {
-                        insurance += amount
-                    } else {
-                        other += amount
-                    }
-
-                case "PERSONAL_CARE":
-                    other += amount
-
-                case "ENTERTAINMENT":
-                    // Check for streaming/subscription services
-                    if detailed.contains("SUBSCRIPTION") || detailed.contains("STREAMING") ||
-                       detailed.contains("MUSIC") || detailed.contains("VIDEO") {
-                        subscriptions += amount
-                    } else {
-                        other += amount
-                    }
-
-                case "GENERAL_SERVICES":
-                    // Check for subscription-type services
-                    if detailed.contains("SUBSCRIPTION") || detailed.contains("MEMBERSHIP") ||
-                       detailed.contains("GYM") || detailed.contains("FITNESS") {
-                        subscriptions += amount
-                    } else {
-                        other += amount
-                    }
-
-                case "LOAN_PAYMENTS":
-                    // Loan payments go to other (debt minimums tracked separately)
-                    other += amount
-
-                case "BANK_FEES", "GOVERNMENT_AND_NON_PROFIT":
-                    other += amount
-
-                case "GENERAL_MERCHANDISE":
-                    other += amount
-
-                case "TRAVEL":
-                    transportation += amount
-
-                default:
-                    other += amount
-                }
-            } else {
-                // Fallback: use legacy category keywords
-                let categoryString = transaction.category.joined(separator: " ").lowercased()
-
-                if categoryString.contains("rent") || categoryString.contains("mortgage") ||
-                   categoryString.contains("housing") {
-                    housing += amount
-                } else if categoryString.contains("groceries") || categoryString.contains("food") ||
-                          categoryString.contains("restaurant") || categoryString.contains("dining") {
-                    food += amount
-                } else if categoryString.contains("gas") || categoryString.contains("uber") ||
-                          categoryString.contains("lyft") || categoryString.contains("transit") ||
-                          categoryString.contains("parking") || categoryString.contains("auto") {
-                    transportation += amount
-                } else if categoryString.contains("electric") || categoryString.contains("utility") ||
-                          categoryString.contains("water") || categoryString.contains("internet") ||
-                          categoryString.contains("phone") {
-                    utilities += amount
-                } else if categoryString.contains("insurance") {
-                    insurance += amount
-                } else if categoryString.contains("subscription") || categoryString.contains("netflix") ||
-                          categoryString.contains("spotify") || categoryString.contains("gym") {
-                    subscriptions += amount
-                } else {
-                    other += amount
-                }
-            }
-        }
-
-        // Calculate confidence score (percentage of high-confidence categorizations)
-        let confidence = totalExpenseCount > 0
-            ? Double(highConfidenceCount) / Double(totalExpenseCount)
-            : 0.0
-
-        // Convert to monthly averages if months > 1
-        let divisor = Double(max(months, 1))
-
-        return ExpenseBreakdown(
-            housing: housing / divisor,
-            food: food / divisor,
-            transportation: transportation / divisor,
-            utilities: utilities / divisor,
-            insurance: insurance / divisor,
-            subscriptions: subscriptions / divisor,
-            other: other / divisor,
-            confidence: confidence
-        )
-    }
-
-    // MARK: - Category Breakdown (Legacy)
-
-    static func expensesByCategory(
-        from transactions: [Transaction]
-    ) -> [String: Double] {
+    static func expensesByCategory(from transactions: [Transaction]) -> [String: Double] {
         var breakdown: [String: Double] = [:]
 
-        for transaction in transactions where transaction.bucketCategory == .expenses {
+        for transaction in transactions {
+            guard isEssentialExpense(transaction) else { continue }
             let categoryName = transaction.category.first ?? "Uncategorized"
             breakdown[categoryName, default: 0] += transaction.amount
         }
 
         return breakdown
     }
-
-    // MARK: - Trend Analysis
 
     static func monthlyTrends(
         from transactions: [Transaction],
@@ -528,7 +707,6 @@ struct TransactionAnalyzer {
         let calendar = Calendar.current
 
         for transaction in transactions where transaction.bucketCategory == bucket {
-            // Get start of month for this transaction
             let components = calendar.dateComponents([.year, .month], from: transaction.date)
             guard let monthStart = calendar.date(from: components) else { continue }
 
@@ -542,7 +720,21 @@ struct TransactionAnalyzer {
         return monthlyData
     }
 
-    // MARK: - Category Detail Helpers
+    static func monthlyTrends(
+        from transactions: [Transaction],
+        filter: (Transaction) -> Bool
+    ) -> [Date: Double] {
+        var monthlyData: [Date: Double] = [:]
+        let calendar = Calendar.current
+
+        for transaction in transactions where filter(transaction) {
+            let components = calendar.dateComponents([.year, .month], from: transaction.date)
+            guard let monthStart = calendar.date(from: components) else { continue }
+            monthlyData[monthStart, default: 0] += abs(transaction.amount)
+        }
+
+        return monthlyData
+    }
 
     static func transactionsForBucket(
         _ bucket: BucketCategory,
@@ -597,52 +789,6 @@ struct TransactionAnalyzer {
             return "Sum of available balances in all checking and savings accounts"
         case .disposable:
             return "Monthly income minus essential expenses and minimum debt payments"
-        }
-    }
-
-    // MARK: - Debt Minimums Calculation
-
-    /// Calculates estimated minimum debt payments from account balances
-    /// Credit cards: ~2.5% of balance (minimum $25)
-    /// Loans: Based on typical payment schedules
-    static func calculateDebtMinimums(accounts: [BankAccount]) -> Double {
-        let debtAccounts = accounts.filter { $0.isCredit || $0.isLoan }
-
-        return debtAccounts.reduce(0) { total, account in
-            let balance = account.currentBalance ?? 0
-            guard balance > 0 else { return total }
-
-            if account.isCredit {
-                // Credit cards: typically 2-3% of balance, minimum $25
-                let minimumPayment = max(25, balance * 0.025)
-                return total + minimumPayment
-            } else if account.isLoan {
-                // Estimate loan minimums based on subtype
-                let subtype = account.subtype?.lowercased() ?? ""
-                let estimatedPayment: Double
-
-                switch subtype {
-                case _ where subtype.contains("student"):
-                    // Student loans: ~1% of balance monthly
-                    estimatedPayment = balance * 0.01
-                case _ where subtype.contains("auto"):
-                    // Auto loans: ~1.5-2% of balance monthly
-                    estimatedPayment = balance * 0.018
-                case _ where subtype.contains("mortgage"):
-                    // Mortgage: ~0.4-0.5% of balance monthly
-                    estimatedPayment = balance * 0.005
-                case _ where subtype.contains("personal"):
-                    // Personal loans: ~2-3% of balance monthly
-                    estimatedPayment = balance * 0.025
-                default:
-                    // Conservative estimate for unknown loan types
-                    estimatedPayment = balance * 0.015
-                }
-
-                return total + estimatedPayment
-            }
-
-            return total
         }
     }
 }

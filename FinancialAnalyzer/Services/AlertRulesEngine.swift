@@ -13,7 +13,7 @@ struct AlertRulesEngine {
         budgets: [Budget],
         goals: [Goal],
         transactions: [Transaction],
-        availableToSpend: Double
+        disposableIncome: Double
     ) -> [ProactiveAlert] {
         var alerts: [ProactiveAlert] = []
 
@@ -41,7 +41,7 @@ struct AlertRulesEngine {
                         actionOptions: generateReallocationOptions(
                             neededAmount: overage,
                             availableBudgets: otherBudgets,
-                            availableToSpend: availableToSpend
+                            disposableIncome: disposableIncome
                         ),
                         relatedBudget: budget,
                         impactSummary: ImpactSummary(
@@ -134,8 +134,8 @@ struct AlertRulesEngine {
                         )
                     ],
                     impactSummary: ImpactSummary(
-                        currentRemaining: availableToSpend,
-                        afterPurchaseRemaining: availableToSpend - amount,
+                        currentRemaining: disposableIncome,
+                        afterPurchaseRemaining: disposableIncome - amount,
                         daysUntilMonthEnd: Date().daysRemainingInMonth,
                         percentOfBudgetUsed: 0
                     )
@@ -300,7 +300,7 @@ struct AlertRulesEngine {
     private static func generateReallocationOptions(
         neededAmount: Double,
         availableBudgets: [Budget],
-        availableToSpend: Double
+        disposableIncome: Double
     ) -> [AlertAction] {
         var options: [AlertAction] = []
 
@@ -319,13 +319,13 @@ struct AlertRulesEngine {
             )
         }
 
-        // Option 2: Use available to spend
-        if availableToSpend > neededAmount {
+        // Option 2: Use disposable income
+        if disposableIncome > neededAmount {
             options.append(
                 AlertAction(
                     title: "Use Disposable Income",
                     actionType: .useDisposableIncome,
-                    description: "$\(Int(availableToSpend)) available"
+                    description: "$\(Int(disposableIncome)) available"
                 )
             )
         }

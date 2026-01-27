@@ -6,9 +6,9 @@ struct FinancialHealthCalculator {
 
     // MARK: - Public Interface
 
-    /// Main entry point: calculates all health metrics from financial summary and transactions
+    /// Main entry point: calculates all health metrics from financial snapshot and transactions
     static func calculateHealthMetrics(
-        summary: FinancialSummary,
+        snapshot: AnalysisSnapshot,
         transactions: [Transaction],
         accounts: [BankAccount]
     ) -> FinancialHealthMetrics {
@@ -16,7 +16,7 @@ struct FinancialHealthCalculator {
         print("📊 [HealthCalculator] Starting health metrics calculation...")
 
         // Calculate savings metrics using actual savings behavior
-        let monthlySavings = calculateMonthlySavings(summary, transactions: transactions, accounts: accounts)
+        let monthlySavings = calculateMonthlySavings(snapshot, transactions: transactions, accounts: accounts)
         let savingsTrend = calculateSavingsTrend(transactions, accounts: accounts)
 
         // Calculate emergency fund metrics using ONLY designated accounts
@@ -32,7 +32,7 @@ struct FinancialHealthCalculator {
         // Calculate debt metrics
         let debtPayments = calculateMonthlyDebtPayments(transactions)
         let monthsToDebtFree = calculateDebtPayoffTimeline(
-            totalDebt: summary.totalDebt,
+            totalDebt: snapshot.totalDebt,
             monthlyPayment: debtPayments
         )
 
@@ -41,8 +41,8 @@ struct FinancialHealthCalculator {
         let spendingTrend = calculateSpendingTrend(transactions)
 
         // Backend-only metrics (for AI decision making)
-        let savingsRate = summary.avgMonthlyIncome > 0 ? monthlySavings / summary.avgMonthlyIncome : 0
-        let debtToIncome = summary.avgMonthlyIncome > 0 ? debtPayments / summary.avgMonthlyIncome : 0
+        let savingsRate = snapshot.monthlyIncome > 0 ? monthlySavings / snapshot.monthlyIncome : 0
+        let debtToIncome = snapshot.monthlyIncome > 0 ? debtPayments / snapshot.monthlyIncome : 0
         let healthScore = calculateHealthScore(
             savingsRate: savingsRate,
             emergencyFundRatio: emergencyMonths / 6.0,
@@ -61,7 +61,7 @@ struct FinancialHealthCalculator {
             monthlySavingsTrend: savingsTrend,
             emergencyFundMonthsCovered: emergencyMonths,
             emergencyFundTarget: emergencyTarget,
-            monthlyIncome: summary.avgMonthlyIncome,
+            monthlyIncome: snapshot.monthlyIncome,
             incomeStability: incomeStability,
             monthlyDebtPayments: debtPayments,
             monthsToDebtFree: monthsToDebtFree,
@@ -72,7 +72,7 @@ struct FinancialHealthCalculator {
             savingsRate: savingsRate,
             debtToIncomeRatio: debtToIncome,
             calculatedAt: Date(),
-            analysisMonths: summary.monthsAnalyzed
+            analysisMonths: snapshot.monthsAnalyzed
         )
     }
 
@@ -81,7 +81,7 @@ struct FinancialHealthCalculator {
     /// Calculates monthly savings using actual savings behavior
     /// Detects transfers to savings/investment accounts, not just income - expenses
     private static func calculateMonthlySavings(
-        _ summary: FinancialSummary,
+        _ snapshot: AnalysisSnapshot,
         transactions: [Transaction],
         accounts: [BankAccount]
     ) -> Double {
@@ -134,7 +134,7 @@ struct FinancialHealthCalculator {
 
         // FALLBACK: If no savings detected, check if there's positive cash flow
         // But be HONEST - if we can't detect savings, show "Insufficient data"
-        let cashFlow = summary.avgMonthlyIncome - summary.avgMonthlyExpenses
+        let cashFlow = snapshot.monthlyIncome - snapshot.avgMonthlyExpenses
         if cashFlow > 0 {
             print("⚠️ [HealthCalculator] No savings detected, using cash flow estimate: $\(String(format: "%.2f", cashFlow))/month")
             return max(cashFlow, 0)

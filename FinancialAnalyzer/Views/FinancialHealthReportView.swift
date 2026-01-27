@@ -27,7 +27,7 @@ struct FinancialHealthReportView: View {
     @ViewBuilder
     private func fullHealthReport(metrics: FinancialHealthMetrics) -> some View {
         ScrollView {
-            VStack(spacing: 32) {
+            VStack(spacing: DesignTokens.Spacing.xxl) {
                 // Header
                 headerSection(metrics: metrics)
 
@@ -38,40 +38,40 @@ struct FinancialHealthReportView: View {
                 spendingBreakdownSection(metrics: metrics)
 
                 // Bottom padding
-                Spacer().frame(height: 24)
+                Spacer().frame(height: DesignTokens.Spacing.xl)
             }
-            .padding()
+            .padding(DesignTokens.Spacing.md)
         }
+        .primaryBackgroundGradient()
         .navigationTitle("Your Financial Health")
         .navigationBarTitleDisplayMode(.large)
+        .preferredColorScheme(.dark)
     }
 
     // MARK: - Subviews
 
     private func headerSection(metrics: FinancialHealthMetrics) -> some View {
-        VStack(spacing: 16) {
+        VStack(spacing: DesignTokens.Spacing.md) {
             Image(systemName: "chart.line.uptrend.xyaxis.circle.fill")
                 .font(.system(size: 60))
-                .foregroundStyle(Color.stableBlue.gradient)
+                .foregroundStyle(DesignTokens.Colors.stableBlue.gradient)
 
             Text("Here's what we learned from your transactions")
-                .font(.title3)
-                .fontWeight(.semibold)
+                .title3Style()
                 .multilineTextAlignment(.center)
 
             Text("Analyzed \(metrics.analysisMonths) months of financial activity")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+                .subheadlineStyle()
         }
-        .padding(.top, 20)
+        .padding(.top, DesignTokens.Spacing.lg)
     }
 
     private func metricsSection(metrics: FinancialHealthMetrics) -> some View {
-        VStack(spacing: 20) {
+        VStack(spacing: DesignTokens.Spacing.lg) {
             // Savings Metric
             MetricCard(
                 icon: "arrow.up.circle.fill",
-                iconColor: .progressGreen,
+                iconColor: DesignTokens.Colors.progressGreen,
                 title: "Monthly Savings",
                 value: metrics.monthlySavings > 0 ? formatCurrency(metrics.monthlySavings) : "Insufficient data",
                 subtitle: metrics.monthlySavings > 0 ? trendText(metrics.monthlySavingsTrend, context: "from last period") : "Tag your savings accounts to improve detection",
@@ -82,7 +82,7 @@ struct FinancialHealthReportView: View {
             // Emergency Fund Metric
             MetricCard(
                 icon: "shield.fill",
-                iconColor: .stableBlue,
+                iconColor: DesignTokens.Colors.stableBlue,
                 title: "Emergency Fund",
                 value: metrics.emergencyFundMonthsCovered > 0 ? "\(String(format: "%.1f", metrics.emergencyFundMonthsCovered)) months" : "Not tagged",
                 subtitle: metrics.emergencyFundMonthsCovered > 0 ? "Covers \(String(format: "%.1f", metrics.emergencyFundMonthsCovered)) months of essential expenses" : "Tag an account as 'Emergency Fund' in Connected Accounts",
@@ -97,7 +97,7 @@ struct FinancialHealthReportView: View {
             // Income Metric
             MetricCard(
                 icon: "dollarsign.circle.fill",
-                iconColor: .protectionMint,
+                iconColor: DesignTokens.Colors.protectionMint,
                 title: "Monthly Income",
                 value: formatCurrency(metrics.monthlyIncome),
                 subtitle: stabilityText(metrics.incomeStability, analysisMonths: metrics.analysisMonths),
@@ -109,7 +109,7 @@ struct FinancialHealthReportView: View {
             if metrics.monthlyDebtPayments > 0 {
                 MetricCard(
                     icon: "creditcard.fill",
-                    iconColor: .opportunityOrange,
+                    iconColor: DesignTokens.Colors.opportunityOrange,
                     title: "Debt Payments",
                     value: formatCurrency(metrics.monthlyDebtPayments),
                     subtitle: debtPayoffText(metrics.monthsToDebtFree),
@@ -128,18 +128,16 @@ struct FinancialHealthReportView: View {
     }
 
     private func spendingBreakdownSection(metrics: FinancialHealthMetrics) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("How You Allocate Your Income")
-                .font(.headline)
-                .padding(.horizontal)
-
-            VStack(spacing: 12) {
+        GlassmorphicCard(
+            title: "How You Allocate Your Income"
+        ) {
+            VStack(spacing: DesignTokens.Spacing.sm) {
                 // Essential Expenses
                 SpendingBreakdownRow(
                     label: "Essential Expenses",
                     amount: metrics.essentialSpending,
                     total: metrics.monthlyIncome,
-                    color: .stableBlue,
+                    color: DesignTokens.Colors.stableBlue,
                     description: "Housing, groceries, utilities, transportation"
                 )
 
@@ -148,7 +146,7 @@ struct FinancialHealthReportView: View {
                     label: "Discretionary Spending",
                     amount: metrics.discretionarySpending,
                     total: metrics.monthlyIncome,
-                    color: .opportunityOrange,
+                    color: DesignTokens.Colors.opportunityOrange,
                     description: "Entertainment, dining, shopping, hobbies"
                 )
 
@@ -158,7 +156,7 @@ struct FinancialHealthReportView: View {
                         label: "Debt Payments",
                         amount: metrics.monthlyDebtPayments,
                         total: metrics.monthlyIncome,
-                        color: .actionOrange,
+                        color: DesignTokens.Colors.opportunityOrange,
                         description: "Credit cards, loans, mortgage"
                     )
                 }
@@ -168,13 +166,10 @@ struct FinancialHealthReportView: View {
                     label: "Savings",
                     amount: metrics.monthlySavings,
                     total: metrics.monthlyIncome,
-                    color: .progressGreen,
+                    color: DesignTokens.Colors.progressGreen,
                     description: "Available for goals and future needs"
                 )
             }
-            .padding()
-            .background(Color(.secondarySystemBackground))
-            .cornerRadius(16)
         }
     }
 

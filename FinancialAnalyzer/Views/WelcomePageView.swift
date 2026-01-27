@@ -5,24 +5,16 @@ struct WelcomePageView: View {
 
     var body: some View {
         ZStack {
-            // Background gradient
-            LinearGradient(
-                gradient: Gradient(colors: [Color.blue.opacity(0.1), Color.purple.opacity(0.05)]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-
-            VStack(spacing: 40) {
+            VStack(spacing: DesignTokens.Spacing.xxxl) {
                 Spacer()
 
                 // Icon/Logo area
-                VStack(spacing: 16) {
+                VStack(spacing: DesignTokens.Spacing.md) {
                     Image(systemName: "chart.line.uptrend.xyaxis.circle.fill")
                         .font(.system(size: 100))
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [.blue, .purple],
+                                colors: [DesignTokens.Colors.accentPrimary, DesignTokens.Colors.accentSecondary],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -31,59 +23,39 @@ struct WelcomePageView: View {
                     Text("CAPIUM")
                         .font(.system(size: 24, weight: .bold, design: .rounded))
                         .tracking(4)
-                        .foregroundColor(.blue)
+                        .foregroundColor(DesignTokens.Colors.accentPrimary)
                 }
-                .padding(.bottom, 20)
+                .padding(.bottom, DesignTokens.Spacing.lg)
 
                 // Main content
-                VStack(spacing: 24) {
+                VStack(spacing: DesignTokens.Spacing.xl) {
                     // Heading
                     Text("Tired of managing your personal finances?")
-                        .font(.system(size: 32, weight: .bold))
+                        .displayStyle()
                         .multilineTextAlignment(.center)
                         .lineSpacing(4)
-                        .padding(.horizontal, 32)
+                        .padding(.horizontal, DesignTokens.Spacing.xxl)
 
                     // Description
                     Text("Join Capium. Sophisticated income allocation and wealth management for high-income earners.")
-                        .font(.body)
-                        .foregroundColor(.secondary)
+                        .bodyStyle()
                         .multilineTextAlignment(.center)
                         .lineSpacing(6)
-                        .padding(.horizontal, 40)
+                        .padding(.horizontal, DesignTokens.Spacing.xxxl)
                 }
 
                 Spacer()
 
                 // Call to action button
-                Button {
-                    isPresented = true  // Mark as seen to proceed to main app
-                } label: {
-                    HStack(spacing: 12) {
-                        Text("Join for free")
-                            .font(.headline)
-                            .fontWeight(.semibold)
-
-                        Image(systemName: "arrow.right.circle.fill")
-                            .font(.system(size: 20))
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 18)
-                    .background(
-                        LinearGradient(
-                            colors: [.blue, .blue.opacity(0.8)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .cornerRadius(16)
-                    .shadow(color: .blue.opacity(0.3), radius: 10, x: 0, y: 5)
+                PrimaryButton(title: "Join for free") {
+                    isPresented = true
                 }
-                .padding(.horizontal, 32)
-                .padding(.bottom, 50)
+                .padding(.horizontal, DesignTokens.Spacing.xxl)
+                .padding(.bottom, DesignTokens.Spacing.xxxl)
             }
         }
+        .primaryBackgroundGradient()
+        .preferredColorScheme(.dark)
     }
 }
 

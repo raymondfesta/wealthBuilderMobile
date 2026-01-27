@@ -21,6 +21,9 @@ struct ExpenseBreakdown: Codable, Equatable {
     /// Recurring subscriptions (streaming, gym, software, memberships)
     let subscriptions: Double
 
+    /// Healthcare expenses (medical, dental, prescriptions)
+    let healthcare: Double
+
     /// Other essential expenses that don't fit above categories
     let other: Double
 
@@ -30,7 +33,7 @@ struct ExpenseBreakdown: Codable, Equatable {
 
     /// Total of all expense categories
     var total: Double {
-        housing + food + transportation + utilities + insurance + subscriptions + other
+        housing + food + transportation + utilities + insurance + subscriptions + healthcare + other
     }
 
     /// Breakdown as array for UI iteration
@@ -42,6 +45,7 @@ struct ExpenseBreakdown: Codable, Equatable {
             ExpenseCategory(name: "Utilities", amount: utilities, icon: "bolt.fill", color: "yellow"),
             ExpenseCategory(name: "Insurance", amount: insurance, icon: "shield.fill", color: "purple"),
             ExpenseCategory(name: "Subscriptions", amount: subscriptions, icon: "repeat.circle.fill", color: "pink"),
+            ExpenseCategory(name: "Healthcare", amount: healthcare, icon: "heart.fill", color: "red"),
             ExpenseCategory(name: "Other", amount: other, icon: "ellipsis.circle.fill", color: "gray")
         ].filter { $0.amount > 0 }
     }
@@ -62,7 +66,7 @@ struct ExpenseBreakdown: Codable, Equatable {
     static var empty: ExpenseBreakdown {
         ExpenseBreakdown(
             housing: 0, food: 0, transportation: 0, utilities: 0,
-            insurance: 0, subscriptions: 0, other: 0, confidence: 0
+            insurance: 0, subscriptions: 0, healthcare: 0, other: 0, confidence: 0
         )
     }
 }

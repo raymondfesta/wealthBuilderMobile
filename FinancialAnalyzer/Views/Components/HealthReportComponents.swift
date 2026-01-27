@@ -15,21 +15,20 @@ struct MetricCard: View {
     @State private var showExplanation = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
             // Header with icon, title, value
-            HStack(spacing: 12) {
+            HStack(spacing: DesignTokens.Spacing.sm) {
                 Image(systemName: icon)
                     .font(.title2)
                     .foregroundStyle(iconColor.gradient)
                     .frame(width: 40)
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                     Text(title)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .subheadlineStyle()
 
                     Text(value)
-                        .font(.title2)
+                        .title3Style()
                         .fontWeight(.bold)
                 }
 
@@ -43,14 +42,13 @@ struct MetricCard: View {
                 } label: {
                     Image(systemName: showExplanation ? "info.circle.fill" : "info.circle")
                         .font(.title3)
-                        .foregroundColor(showExplanation ? iconColor : .secondary)
+                        .foregroundColor(showExplanation ? iconColor : DesignTokens.Colors.textSecondary)
                 }
             }
 
             // Subtitle (context)
             Text(subtitle)
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .captionStyle()
 
             // Progress bar if provided
             if let progress = progress {
@@ -60,17 +58,15 @@ struct MetricCard: View {
             // Expandable explanation
             if showExplanation {
                 Text(explanation)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(12)
-                    .background(Color(.tertiarySystemBackground))
-                    .cornerRadius(8)
+                    .captionStyle()
+                    .padding(DesignTokens.Spacing.sm)
+                    .background(DesignTokens.Colors.cardOverlay1)
+                    .cornerRadius(DesignTokens.CornerRadius.sm)
                     .transition(.scale.combined(with: .opacity))
             }
         }
-        .padding()
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(16)
+        .padding(DesignTokens.Spacing.md)
+        .primaryCardStyle()
     }
 }
 
@@ -92,15 +88,15 @@ struct ProgressBar: View {
     let color: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     // Background
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(.tertiarySystemBackground))
+                    RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
+                        .fill(DesignTokens.Colors.cardOverlay1)
 
                     // Progress fill
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
                         .fill(color.gradient)
                         .frame(width: geometry.size.width * progressPercentage)
                 }
@@ -111,13 +107,13 @@ struct ProgressBar: View {
             HStack {
                 Text(data.reversed ? "Starting point" : "Current")
                     .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(DesignTokens.Colors.textSecondary)
 
                 Spacer()
 
                 Text(targetText)
                     .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(DesignTokens.Colors.textSecondary)
             }
         }
     }
@@ -156,7 +152,7 @@ struct SpendingBreakdownRow: View {
     let description: String
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: DesignTokens.Spacing.xs) {
             // Header with label and amount
             HStack {
                 Circle()
@@ -164,25 +160,25 @@ struct SpendingBreakdownRow: View {
                     .frame(width: 8, height: 8)
 
                 Text(label)
-                    .font(.subheadline)
+                    .subheadlineStyle(color: DesignTokens.Colors.textPrimary)
                     .fontWeight(.medium)
 
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(formatCurrency(amount))
-                        .font(.subheadline)
+                        .subheadlineStyle(color: DesignTokens.Colors.textPrimary)
                         .fontWeight(.semibold)
 
                     Text("\(percentage)%")
                         .font(.caption2)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(DesignTokens.Colors.textSecondary)
                 }
             }
 
             // Visual bar
             GeometryReader { geometry in
-                RoundedRectangle(cornerRadius: 4)
+                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm / 2)
                     .fill(color.opacity(0.3))
                     .frame(width: geometry.size.width * (amount / total))
             }
@@ -190,8 +186,7 @@ struct SpendingBreakdownRow: View {
 
             // Description
             Text(description)
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .captionStyle()
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -215,11 +210,11 @@ struct SpendingBreakdownRow: View {
 struct HealthReportComponents_Previews: PreviewProvider {
     static var previews: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: DesignTokens.Spacing.lg) {
                 // Metric Card Example
                 MetricCard(
                     icon: "arrow.up.circle.fill",
-                    iconColor: .progressGreen,
+                    iconColor: DesignTokens.Colors.progressGreen,
                     title: "Monthly Savings",
                     value: "$450",
                     subtitle: "↑ Up from $300 last month",
@@ -230,7 +225,7 @@ struct HealthReportComponents_Previews: PreviewProvider {
                 // Metric Card with Progress
                 MetricCard(
                     icon: "shield.fill",
-                    iconColor: .stableBlue,
+                    iconColor: DesignTokens.Colors.stableBlue,
                     title: "Emergency Fund",
                     value: "3.5 months",
                     subtitle: "Covers 3.5 months of essential expenses",
@@ -243,41 +238,38 @@ struct HealthReportComponents_Previews: PreviewProvider {
                 )
 
                 // Spending Breakdown Example
-                VStack(spacing: 12) {
-                    Text("Spending Breakdown")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                GlassmorphicCard(title: "Spending Breakdown") {
+                    VStack(spacing: DesignTokens.Spacing.sm) {
+                        SpendingBreakdownRow(
+                            label: "Essential Expenses",
+                            amount: 2500,
+                            total: 5000,
+                            color: DesignTokens.Colors.stableBlue,
+                            description: "Housing, groceries, utilities, transportation"
+                        )
 
-                    SpendingBreakdownRow(
-                        label: "Essential Expenses",
-                        amount: 2500,
-                        total: 5000,
-                        color: .stableBlue,
-                        description: "Housing, groceries, utilities, transportation"
-                    )
+                        SpendingBreakdownRow(
+                            label: "Discretionary Spending",
+                            amount: 800,
+                            total: 5000,
+                            color: DesignTokens.Colors.opportunityOrange,
+                            description: "Entertainment, dining, shopping, hobbies"
+                        )
 
-                    SpendingBreakdownRow(
-                        label: "Discretionary Spending",
-                        amount: 800,
-                        total: 5000,
-                        color: .opportunityOrange,
-                        description: "Entertainment, dining, shopping, hobbies"
-                    )
-
-                    SpendingBreakdownRow(
-                        label: "Savings",
-                        amount: 450,
-                        total: 5000,
-                        color: .progressGreen,
-                        description: "Available for goals and future needs"
-                    )
+                        SpendingBreakdownRow(
+                            label: "Savings",
+                            amount: 450,
+                            total: 5000,
+                            color: DesignTokens.Colors.progressGreen,
+                            description: "Available for goals and future needs"
+                        )
+                    }
                 }
-                .padding()
-                .background(Color(.secondarySystemBackground))
-                .cornerRadius(16)
             }
-            .padding()
+            .padding(DesignTokens.Spacing.md)
         }
+        .primaryBackgroundGradient()
+        .preferredColorScheme(.dark)
     }
 }
 #endif

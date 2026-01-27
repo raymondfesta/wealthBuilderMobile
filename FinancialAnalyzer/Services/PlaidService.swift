@@ -164,6 +164,9 @@ class PlaidService: ObservableObject {
             for: tokenResponse.itemId
         )
         print("✅ [PlaidService] Access token saved to Keychain for itemId: \(tokenResponse.itemId)")
+
+        // Trigger transaction refresh so Plaid populates transactions
+        await refreshTransactions(accessToken: tokenResponse.accessToken)
     }
 
     // MARK: - Fetch Accounts
@@ -254,13 +257,63 @@ class PlaidService: ObservableObject {
 
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
-            print("❌ [PlaidService] Transaction fetch failed with status: \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let responseBody = String(data: data, encoding: .utf8) ?? "(no body)"
+            print("❌ [PlaidService] Transaction fetch failed with status: \(statusCode)")
+            print("❌ [PlaidService] Response: \(responseBody)")
             throw PlaidError.transactionFetchFailed
         }
 
+        // Log raw response size for debugging
+        print("📊 [PlaidService] Response size: \(data.count) bytes")
+
         let transactionsResponse = try JSONDecoder().decode(TransactionsResponse.self, from: data)
-        print("✅ [PlaidService] Successfully fetched \(transactionsResponse.transactions.count) transactions")
+        print("✅ [PlaidService] Successfully fetched \(transactionsResponse.transactions.count) transactions (total reported: \(transactionsResponse.totalTransactions))")
         return transactionsResponse.transactions
+    }
+
+    // MARK: - Refresh Transactions
+
+    /// Triggers Plaid to refresh transactions for an item
+    /// Call after token exchange to ensure transactions are populated
+    func refreshTransactions(accessToken: String) async {
+        print("🔄 [PlaidService] Triggering transaction refresh...")
+
+        guard let url = URL(string: "\(baseURL)/api/plaid/transactions/refresh") else {
+            print("❌ [PlaidService] Invalid refresh URL: \(baseURL)/api/plaid/transactions/refresh")
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        do {
+            request.httpBody = try JSONEncoder().encode(["access_token": accessToken])
+        } catch {
+            print("❌ [PlaidService] Failed to encode refresh request: \(error)")
+            return
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [PlaidService] Invalid HTTP response for refresh")
+                return
+            }
+
+            let statusCode = httpResponse.statusCode
+            let responseStr = String(data: data, encoding: .utf8) ?? "(no body)"
+
+            if statusCode == 202 {
+                print("✅ [PlaidService] Transactions refresh triggered (status: \(statusCode))")
+            } else {
+                print("⚠️ [PlaidService] Transactions refresh returned status \(statusCode): \(responseStr)")
+            }
+        } catch {
+            print("❌ [PlaidService] Transactions refresh network error: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - Remove Account
@@ -322,6 +375,12 @@ private struct AccountsResponse: Decodable {
 
 private struct TransactionsResponse: Decodable {
     let transactions: [Transaction]
+    let totalTransactions: Int
+
+    enum CodingKeys: String, CodingKey {
+        case transactions
+        case totalTransactions = "total_transactions"
+    }
 }
 
 private struct RemoveItemResponse: Decodable {

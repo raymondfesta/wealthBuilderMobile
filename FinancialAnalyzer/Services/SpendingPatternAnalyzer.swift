@@ -21,9 +21,9 @@ struct SpendingPatternAnalyzer {
         var categorySpending: [String: [Double]] = [:]
 
         for transaction in recentTransactions {
-            // Only process expenses (positive amounts)
+            // Use the new classification helpers - exclude investment contributions and transfers
             guard transaction.amount > 0,
-                  transaction.bucketCategory == .expenses else { continue }
+                  !TransactionAnalyzer.shouldExcludeFromBudget(transaction) else { continue }
 
             let category = transaction.category.first ?? "Uncategorized"
             categorySpending[category, default: []].append(transaction.amount)

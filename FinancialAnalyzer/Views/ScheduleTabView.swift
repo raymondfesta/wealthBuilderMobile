@@ -43,52 +43,40 @@ struct ScheduleTabView: View {
                     PaycheckScheduleEditorView(viewModel: viewModel, config: config)
                 }
             }
+            .preferredColorScheme(.dark)
         }
     }
 
     // MARK: - Setup Prompt View
 
     private var setupPromptView: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: DesignTokens.Spacing.xl) {
             Spacer()
 
             // Icon
             Image(systemName: "calendar.badge.clock")
                 .font(.system(size: 80))
-                .foregroundColor(.blue.opacity(0.6))
+                .foregroundColor(DesignTokens.Colors.accentSecondary.opacity(0.6))
 
-            VStack(spacing: 12) {
+            VStack(spacing: DesignTokens.Spacing.sm) {
                 Text("No Schedule Yet")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .title3Style()
 
                 Text("Set up your paycheck schedule to see when your allocations are due.")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .subheadlineStyle()
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
+                    .padding(.horizontal, DesignTokens.Spacing.xxl)
             }
 
-            Button {
+            PrimaryButton(title: "Set Up Schedule") {
                 showingSetup = true
-            } label: {
-                HStack {
-                    Image(systemName: "plus.circle.fill")
-                    Text("Set Up Schedule")
-                }
-                .font(.headline)
-                .foregroundColor(.white)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 14)
-                .background(Color.blue)
-                .cornerRadius(12)
-                .shadow(color: Color.blue.opacity(0.3), radius: 8, x: 0, y: 4)
             }
+            .padding(.horizontal, DesignTokens.Spacing.xxl)
 
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
+        .primaryBackgroundGradient()
     }
 
     // MARK: - Main Content View
@@ -102,7 +90,7 @@ struct ScheduleTabView: View {
                 }
             }
             .pickerStyle(.segmented)
-            .padding()
+            .padding(DesignTokens.Spacing.md)
 
             // Content based on selection
             switch selectedSegment {
@@ -112,6 +100,7 @@ struct ScheduleTabView: View {
                 AllocationHistoryView(viewModel: viewModel)
             }
         }
+        .primaryBackgroundGradient()
     }
 }
 

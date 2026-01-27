@@ -201,6 +201,7 @@ struct AnalysisCompleteView_Previews: PreviewProvider {
                         utilities: 100,
                         insurance: 50,
                         subscriptions: 30,
+                        healthcare: 50,
                         other: 12,
                         confidence: 0.85
                     ),
@@ -217,6 +218,7 @@ struct AnalysisCompleteView_Previews: PreviewProvider {
                     accountsConnected: 3,
                     transactionsAnalyzed: 1000,
                     transactionsNeedingValidation: 0,
+                    overallConfidence: 0.85,
                     lastUpdated: Date()
                 )
             ),

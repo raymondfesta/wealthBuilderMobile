@@ -57,6 +57,19 @@ final class Transaction: Identifiable {
         return personalFinanceCategory?.confidenceLevel ?? .unknown
     }
 
+    /// Numeric confidence score from PFC (plan compatibility)
+    /// Returns 0.0-1.0 based on Plaid confidence level
+    var categoryConfidence: Double? {
+        switch personalFinanceCategory?.confidenceLevel {
+        case .veryHigh: return 0.98
+        case .high: return 0.90
+        case .medium: return 0.75
+        case .low: return 0.50
+        case .unknown: return 0.25
+        case .none: return nil
+        }
+    }
+
     init(
         id: String,
         accountId: String,

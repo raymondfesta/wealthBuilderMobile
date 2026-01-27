@@ -50,6 +50,8 @@ final class BankAccount: Identifiable {
     var currentBalance: Double?
     var availableBalance: Double?
     var limit: Double?
+    var minimumPayment: Double?
+    var apr: Double?
     var isoCurrencyCode: String?
     var lastSyncDate: Date?
 
@@ -67,6 +69,8 @@ final class BankAccount: Identifiable {
         currentBalance: Double? = nil,
         availableBalance: Double? = nil,
         limit: Double? = nil,
+        minimumPayment: Double? = nil,
+        apr: Double? = nil,
         isoCurrencyCode: String? = nil,
         lastSyncDate: Date? = nil
     ) {
@@ -80,6 +84,8 @@ final class BankAccount: Identifiable {
         self.currentBalance = currentBalance
         self.availableBalance = availableBalance
         self.limit = limit
+        self.minimumPayment = minimumPayment
+        self.apr = apr
         self.isoCurrencyCode = isoCurrencyCode
         self.lastSyncDate = lastSyncDate
     }
@@ -139,6 +145,8 @@ extension BankAccount: Codable {
         case currentBalance
         case availableBalance
         case limit
+        case minimumPayment
+        case apr
         case isoCurrencyCode
         case lastSyncDate
         case tags
@@ -174,6 +182,8 @@ extension BankAccount: Codable {
         try container.encodeIfPresent(currentBalance, forKey: .currentBalance)
         try container.encodeIfPresent(availableBalance, forKey: .availableBalance)
         try container.encodeIfPresent(limit, forKey: .limit)
+        try container.encodeIfPresent(minimumPayment, forKey: .minimumPayment)
+        try container.encodeIfPresent(apr, forKey: .apr)
         try container.encodeIfPresent(isoCurrencyCode, forKey: .isoCurrencyCode)
         try container.encodeIfPresent(lastSyncDate, forKey: .lastSyncDate)
         try container.encode(Array(tags), forKey: .tags) // Encode Set as Array
@@ -226,6 +236,8 @@ extension BankAccount: Codable {
         let currentBalance = try? container.decode(Double.self, forKey: .currentBalance)
         let availableBalance = try? container.decode(Double.self, forKey: .availableBalance)
         let limit = try? container.decode(Double.self, forKey: .limit)
+        let minimumPayment = try? container.decode(Double.self, forKey: .minimumPayment)
+        let apr = try? container.decode(Double.self, forKey: .apr)
         let isoCurrencyCode = try? container.decode(String.self, forKey: .isoCurrencyCode)
         let lastSyncDate = try? container.decode(Date.self, forKey: .lastSyncDate)
         let tagsArray = try container.decodeIfPresent([AccountTag].self, forKey: .tags) ?? []
@@ -241,6 +253,8 @@ extension BankAccount: Codable {
             currentBalance: currentBalance,
             availableBalance: availableBalance,
             limit: limit,
+            minimumPayment: minimumPayment,
+            apr: apr,
             isoCurrencyCode: isoCurrencyCode,
             lastSyncDate: lastSyncDate
         )

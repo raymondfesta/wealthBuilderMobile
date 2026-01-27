@@ -54,6 +54,22 @@ struct MonthlyFlow: Codable, Equatable {
         return (discretionaryIncome / income) * 100
     }
 
+    // MARK: - Plan Compatibility Aliases
+
+    /// Alias for discretionaryIncome (plan compatibility)
+    var disposableIncome: Double { discretionaryIncome }
+
+    /// Daily budget based on disposable income (30-day month)
+    var dailyDisposable: Double { discretionaryIncome / 30.0 }
+
+    /// Alias for isPositive (plan compatibility)
+    var hasPositiveDisposable: Bool { isPositive }
+
+    /// Empty flow for initialization/error states
+    static var empty: MonthlyFlow {
+        MonthlyFlow(income: 0, essentialExpenses: 0, debtMinimums: 0)
+    }
+
     // MARK: - Initializers
 
     /// Full initializer with expense breakdown

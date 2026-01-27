@@ -3,7 +3,7 @@ import SwiftUI
 
 @MainActor
 class FinancialViewModel: ObservableObject {
-    @Published var summary: FinancialSummary?
+    @Published var summary: AnalysisSnapshot?
     @Published var accounts: [BankAccount] = []
     @Published var transactions: [Transaction] = []
     @Published var isLoading = false
@@ -321,6 +321,10 @@ class FinancialViewModel: ObservableObject {
             let endDate = Date()
             let startDate = Calendar.current.date(byAdding: .month, value: -6, to: endDate) ?? endDate
 
+            // Allow Plaid time to sync transactions after initial connection
+            print("⏳ [Analyze Finances] Waiting 3s for Plaid to sync transactions...")
+            try await Task.sleep(nanoseconds: 3_000_000_000)
+
             for itemId in itemIds {
                 print("📊 [Analyze Finances] Fetching transactions for itemId: \(itemId)...")
 
@@ -347,18 +351,18 @@ class FinancialViewModel: ObservableObject {
             // Update transactions
             self.transactions = allTransactions
 
-            // Calculate financial summary
-            let calculatedSummary = TransactionAnalyzer.calculateSummary(
+            // Calculate financial snapshot
+            let calculatedSnapshot = TransactionAnalyzer.generateSnapshot(
                 transactions: allTransactions,
                 accounts: accounts
             )
-            self.summary = calculatedSummary
+            self.summary = calculatedSnapshot
 
             // Calculate health metrics for allocation planning
             // Note: This does NOT show the health report UI (that's a separate feature accessed via toolbar)
             print("📊 [Analyze Finances] Calculating health metrics for allocation planning...")
             self.healthMetrics = FinancialHealthCalculator.calculateHealthMetrics(
-                summary: calculatedSummary,
+                snapshot: calculatedSnapshot,
                 transactions: allTransactions,
                 accounts: accounts
             )
@@ -719,8 +723,8 @@ class FinancialViewModel: ObservableObject {
             self.accounts = allAccounts
             self.transactions = allTransactions
 
-            // Calculate summary
-            self.summary = TransactionAnalyzer.calculateSummary(
+            // Calculate snapshot
+            self.summary = TransactionAnalyzer.generateSnapshot(
                 transactions: allTransactions,
                 accounts: allAccounts
             )
@@ -844,10 +848,10 @@ class FinancialViewModel: ObservableObject {
                 objectWillChange.send()
             }
 
-            // Recalculate summary with remaining data
+            // Recalculate snapshot with remaining data
             if !accounts.isEmpty {
-                print("🗑️ [Account Removal] Recalculating summary with remaining \(accounts.count) account(s)")
-                summary = TransactionAnalyzer.calculateSummary(
+                print("🗑️ [Account Removal] Recalculating snapshot with remaining \(accounts.count) account(s)")
+                summary = TransactionAnalyzer.generateSnapshot(
                     transactions: transactions,
                     accounts: accounts
                 )
@@ -905,7 +909,7 @@ class FinancialViewModel: ObservableObject {
             budgets: budgetManager.budgets,
             goals: budgetManager.goals,
             transactions: transactions,
-            availableToSpend: summary?.availableToSpend ?? 0
+            disposableIncome: summary?.disposableIncome ?? 0
         )
 
         if let alert = alerts.first {
@@ -1060,7 +1064,7 @@ class FinancialViewModel: ObservableObject {
         // Calculate health metrics using tagged accounts
         print("🏥 [Health Setup] Calculating health metrics with tagged accounts...")
         self.healthMetrics = FinancialHealthCalculator.calculateHealthMetrics(
-            summary: summary,
+            snapshot: summary,
             transactions: transactions,
             accounts: accounts
         )
@@ -1146,7 +1150,7 @@ class FinancialViewModel: ObservableObject {
 
         // Recalculate health metrics
         self.healthMetrics = FinancialHealthCalculator.calculateHealthMetrics(
-            summary: summary,
+            snapshot: summary,
             transactions: transactions,
             accounts: accounts
         )
@@ -1476,7 +1480,7 @@ class FinancialViewModel: ObservableObject {
         // Load summary
         if let summaryData = UserDefaults.standard.data(forKey: "cached_summary") {
             print("💾 [Cache Load] Found cached summary data (\(summaryData.count) bytes)")
-            if let summary = try? decoder.decode(FinancialSummary.self, from: summaryData) {
+            if let summary = try? decoder.decode(AnalysisSnapshot.self, from: summaryData) {
                 self.summary = summary
                 print("💾 [Cache Load] ✅ Decoded summary from cache")
             } else {

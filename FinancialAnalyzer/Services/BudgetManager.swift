@@ -59,8 +59,9 @@ class BudgetManager: ObservableObject {
 
     /// Updates spent amount for a budget when a transaction occurs
     func recordTransaction(_ transaction: Transaction) {
+        // Only record actual expenses, not investments or transfers
         guard transaction.amount > 0,
-              transaction.bucketCategory == .expenses else { return }
+              !TransactionAnalyzer.shouldExcludeFromBudget(transaction) else { return }
 
         let category = transaction.category.first ?? "Uncategorized"
         let currentMonth = Date().startOfMonth
@@ -473,7 +474,7 @@ class BudgetManager: ObservableObject {
     }
 
     /// Identifies which goals should be prioritized based on current financial state
-    func recommendGoalPriority(availableToSpend: Double) -> [Goal] {
+    func recommendGoalPriority(disposableIncome: Double) -> [Goal] {
         // Sort by priority and completion percentage
         return goals
             .filter { $0.isActive && !$0.isComplete }
