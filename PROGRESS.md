@@ -1,6 +1,6 @@
 # Project Progress Tracker
 
-Last Updated: 2026-01-27 (Fix fetchAccountsOnly state preservation)
+Last Updated: 2026-01-27 (Silent background recovery for returning users)
 
 ## Current State
 
@@ -26,6 +26,7 @@ Last Updated: 2026-01-27 (Fix fetchAccountsOnly state preservation)
 - Smart data refresh based on cache age (balances-only vs full refresh)
 - Offline mode detection with graceful degradation
 - Backend allocation plan storage (survives reinstall)
+- **Silent background recovery** (returning users see instant dashboard, no loading UI)
 
 ### In Progress 🔨
 - Sign in with Apple capability setup (requires Apple Developer portal)
@@ -65,6 +66,38 @@ Last Updated: 2026-01-27 (Fix fetchAccountsOnly state preservation)
 ## Completed This Session
 
 ### 2026-01-27
+
+- ✓ **Refactor: Simplified Dashboard UI**
+  - Removed "Your Financial Summary" header section
+  - Removed "Budget Status" section (horizontal budget cards)
+  - Removed "Recent Transactions" section
+  - Dashboard now shows only: allocation buckets + financial buckets grid
+  - File reduced from 275 → 157 lines
+  - **File:** [DashboardView.swift](FinancialAnalyzer/Views/DashboardView.swift)
+
+- ✓ **Feat: Silent background recovery for returning users**
+  - **Issue:** Returning users saw visible loading indicators ("Fetching accounts...", "Analyzing...") when they should see instant dashboard
+  - **Root cause:** `handleDataRecovery()` for `.planCreated` called `fetchAccountsOnly()` and `performSmartRefresh()` with full loading UI, and re-analyzed data even when cached summary existed
+  - **Solution:** Created `performBackgroundRefresh()` method that refreshes data silently without loading indicators
+  - **Changes:**
+    - `performBackgroundRefresh(itemIds:)` - NEW - silent refresh without isLoading/showLoadingOverlay flags
+    - `handleDataRecovery()` - `.planCreated` case now uses `performBackgroundRefresh()` instead of `fetchAccountsOnly()` + `performSmartRefresh()`
+    - `updateSpendingProgress(from:)` - NEW in BudgetManager - updates budget progress without regenerating budgets
+    - `saveBudgetsToCache()` - NEW public method in BudgetManager
+  - **Expected logs after fix:**
+    ```
+    📍 [State] Applied backend state: planCreated
+    🔄 [Recovery] Completed user - showing dashboard immediately
+    ✅ [Recovery] Using cached summary - skipping re-analysis
+    🔄 [Recovery] Starting silent background refresh...
+    ✅ [Background Refresh] Updated 34 account(s)
+    ✅ [Background Refresh] Updated 99 transaction(s)
+    ✅ [Background Refresh] Keeping cached summary (no re-analysis)
+    ✅ [Background Refresh] Complete - dashboard data updated silently
+    ```
+  - **UX improvement:** Dashboard appears instantly with cached data; balances/transactions update silently in background
+  - **Files:** [FinancialViewModel.swift](FinancialAnalyzer/ViewModels/FinancialViewModel.swift), [BudgetManager.swift](FinancialAnalyzer/Services/BudgetManager.swift)
+  - **Build verified:** ✓
 
 - ✓ **Fix: State overwrite in fetchAccountsOnly() during recovery**
   - **Issue:** Completed users saw onboarding after login because `fetchAccountsOnly()` unconditionally set state to `.accountsConnected`

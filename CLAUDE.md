@@ -79,7 +79,7 @@ FinancialAnalyzer/
 │   ├── AuthRootView.swift     # Root auth router
 │   ├── LoginView.swift        # Sign in with Apple + email/password
 │   ├── ProfileView.swift      # User profile + logout
-│   ├── DashboardView.swift    # Post-onboarding dashboard only
+│   ├── DashboardView.swift    # Allocation plan + buckets grid (simplified)
 │   ├── ScheduleTabView.swift
 │   ├── Onboarding/            # Onboarding flow (separated from Dashboard)
 │   │   ├── OnboardingFlowView.swift    # Journey state router
@@ -122,7 +122,7 @@ backend/
 
 **ItemId-Based API:** iOS stores only itemIds in Keychain (not access tokens). Backend manages encrypted tokens in SQLite. All Plaid endpoints require auth and accept `item_id` instead of `access_token`.
 
-**Cache-First Loading:** For logged-in users, `setCurrentUser()` syncs itemIds from backend first, then loads from encrypted cache (<1s). If cache empty but backend has items, auto-fetches from Plaid. First sync takes 10-20s, subsequent loads instant within 24h.
+**Cache-First Loading:** For logged-in users, `setCurrentUser()` syncs itemIds from backend first, then loads from encrypted cache (<1s). If cache empty but backend has items, auto-fetches from Plaid. First sync takes 10-20s, subsequent loads instant within 24h. Returning users see dashboard instantly; data refreshes silently via `performBackgroundRefresh()` (no loading UI).
 
 **AI Data Minimization:** Only send aggregated summaries to OpenAI (totals, averages, patterns). Never raw transaction data.
 
@@ -280,6 +280,11 @@ Cmd+R to build and run
 ## Current Focus
 
 **Recent work (from git):**
+- Silent background recovery COMPLETE
+  - Returning users see instant dashboard (no loading spinners)
+  - `performBackgroundRefresh()` updates data without UI indicators
+  - Cached summary preserved (no re-analysis on login)
+  - Budget progress updated silently via `updateSpendingProgress()`
 - Login persistence fix COMPLETE
   - Accounts now load correctly after logout/login
   - Fixed init order: cache deferred to `setCurrentUser()` when user logged in
