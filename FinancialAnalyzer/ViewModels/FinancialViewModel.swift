@@ -33,6 +33,35 @@ class FinancialViewModel: ObservableObject {
     // Notification navigation
     var navigationCoordinator: NotificationNavigationCoordinator?
 
+    // MARK: - Refresh Service Integration
+
+    /// Cache metadata for refresh decisions
+    @Published var cacheMetadata: CacheMetadata = .empty
+
+    /// Reference to refresh service
+    private let refreshService = DataRefreshService.shared
+
+    /// Whether currently refreshing in background
+    var isBackgroundRefreshing: Bool {
+        refreshService.isRefreshing && !refreshService.currentStrategy.showsLoadingUI
+    }
+
+    /// Whether offline
+    var isOffline: Bool {
+        refreshService.isOffline
+    }
+
+    /// Last update description for UI
+    var lastUpdatedDescription: String? {
+        cacheMetadata.ageDescription
+    }
+
+    /// Whether data is stale (>4 hours old)
+    var isDataStale: Bool {
+        guard let age = cacheMetadata.transactionsAge else { return false }
+        return age > DataRefreshService.Thresholds.transactionsFresh
+    }
+
     /// Tracks user's progress through the financial planning flow
     @Published var userJourneyState: UserJourneyState = .noAccountsConnected {
         didSet {
@@ -87,6 +116,12 @@ class FinancialViewModel: ObservableObject {
         return "user_\(userId)_\(base)"
     }
 
+    /// Returns only Plaid itemIds from Keychain, filtering out internal keys (e.g. encryption key)
+    private func getPlaidItemIds() -> [String] {
+        let allKeys = (try? KeychainService.shared.allKeys()) ?? []
+        return allKeys.filter { !$0.contains("com.financial") }
+    }
+
     /// Migrates old global cache key to user-scoped key (one-time migration)
     private func migrateOldCacheKey(_ oldKey: String, to newKey: String) {
         // Only migrate if new key doesn't exist and old key does
@@ -107,7 +142,8 @@ class FinancialViewModel: ObservableObject {
         migrateOldCacheKey("cached_summary", to: cacheKey("summary"))
     }
 
-    /// Sets current user, syncs Plaid items from backend, and reloads cache
+    /// Sets current user, syncs state from backend, and restores data
+    /// This is the main entry point after login
     func setCurrentUser(_ userId: String) async {
         let isNewUser = currentUserId != userId
 
@@ -119,38 +155,217 @@ class FinancialViewModel: ObservableObject {
             print("👤 [ViewModel] Restoring session for user: \(userId.prefix(8))...")
         }
 
-        // ALWAYS sync itemIds from backend before loading cache
-        // This ensures Keychain has correct itemIds for this user
-        await syncPlaidItemsFromBackend()
+        // STEP 1: Sync from backend (source of truth for connection state)
+        let (itemIds, onboardingCompleted) = await syncPlaidItemsFromBackend()
 
+        // STEP 2: Determine journey state from BACKEND (not local cache!)
+        let journeyState = determineJourneyStateFromBackend(
+            itemIds: itemIds,
+            onboardingCompleted: onboardingCompleted
+        )
+
+        // STEP 3: Load local cache for data (if available)
         loadFromCache()
 
-        // Recovery: If we have backend itemIds but no cached accounts, fetch from Plaid
-        if accounts.isEmpty {
-            let itemIds = (try? KeychainService.shared.allKeys()) ?? []
-            // Filter out encryption key identifier
-            let plaidItemIds = itemIds.filter { !$0.contains("com.financial") }
-            if !plaidItemIds.isEmpty {
-                print("🔄 [Recovery] Have \(plaidItemIds.count) itemId(s) but no cached accounts, fetching...")
-                await fetchAccountsOnly()
+        // STEP 4: Apply the backend-determined journey state
+        // (This overrides any state that loadFromCache might have set)
+        await MainActor.run {
+            userJourneyState = journeyState
+            print("📍 [State] Applied backend state: \(journeyState.rawValue)")
+        }
+
+        // STEP 5: Refine onboarding state based on local cache data
+        // (If backend says not complete, check how far along we are locally)
+        if !onboardingCompleted && !itemIds.isEmpty {
+            await refineOnboardingState()
+        }
+
+        // STEP 6: Handle data recovery based on state
+        await handleDataRecovery(journeyState: userJourneyState, itemIds: itemIds)
+    }
+
+    /// Determines journey state based on backend sync result
+    /// This is the SOURCE OF TRUTH for navigation
+    private func determineJourneyStateFromBackend(
+        itemIds: [String],
+        onboardingCompleted: Bool
+    ) -> UserJourneyState {
+        // No connected accounts
+        if itemIds.isEmpty {
+            print("📍 [State] Backend: No items → .noAccountsConnected")
+            return .noAccountsConnected
+        }
+
+        // Has accounts AND completed onboarding → Dashboard
+        if onboardingCompleted {
+            print("📍 [State] Backend: Onboarding complete → .planCreated")
+            return .planCreated
+        }
+
+        // Has accounts but NOT completed onboarding → Resume onboarding
+        // Default to accountsConnected, will be refined after cache load
+        print("📍 [State] Backend: Has items, onboarding incomplete → will determine step")
+        return .accountsConnected
+    }
+
+    /// Refines onboarding state based on local cached data
+    /// Called when backend says "not complete" but we might be mid-flow
+    private func refineOnboardingState() async {
+        // If we have analysis, advance to analysis complete
+        if summary != nil && !accounts.isEmpty {
+            if !budgetManager.allocationBuckets.isEmpty {
+                await MainActor.run {
+                    userJourneyState = .allocationPlanning
+                    print("📍 [State] Refined to .allocationPlanning (has buckets)")
+                }
+            } else {
+                await MainActor.run {
+                    userJourneyState = .analysisComplete
+                    print("📍 [State] Refined to .analysisComplete (has analysis)")
+                }
             }
         }
     }
 
+    /// Restores allocation plan from backend (after cache loss)
+    private func restoreAllocationPlanFromBackend() async {
+        print("🔄 [Restore] Fetching allocation plan from backend...")
+
+        do {
+            let response = try await plaidService.getAllocationPlan()
+
+            guard response.hasPlan else {
+                print("📋 [Restore] No saved plan in backend")
+                return
+            }
+
+            // Convert stored allocations to AllocationBucket models
+            var restoredBuckets: [AllocationBucket] = []
+            for stored in response.allocations {
+                if let bucket = stored.toAllocationBucket() {
+                    // Resolve linked account if ID provided
+                    if let accountId = stored.linkedAccountId {
+                        if let matchingAccount = accounts.first(where: { $0.id == accountId }) {
+                            bucket.linkedAccountIds = [accountId]
+                            bucket.currentBalanceFromAccounts = matchingAccount.currentBalance ?? 0
+                        }
+                    }
+                    restoredBuckets.append(bucket)
+                }
+            }
+
+            // Restore paycheck schedule
+            var restoredPaycheck: PaycheckSchedule?
+            if let stored = response.paycheckSchedule {
+                restoredPaycheck = stored.toPaycheckSchedule()
+            }
+
+            await MainActor.run {
+                // Update budget manager with restored allocations
+                budgetManager.allocationBuckets = restoredBuckets
+
+                // Update paycheck schedule if present
+                if let paycheck = restoredPaycheck {
+                    allocationScheduleConfig = AllocationScheduleConfig(paycheckSchedule: paycheck)
+                }
+
+                print("✅ [Restore] Restored \(restoredBuckets.count) allocation bucket(s)")
+            }
+        } catch {
+            print("⚠️ [Restore] Failed to restore allocation plan: \(error)")
+            // Not fatal - user can re-create plan
+        }
+    }
+
+    /// Clears all local cache data (Keychain itemIds, encrypted cache, UserDefaults)
+    private func clearAllLocalCache() {
+        print("🗑️ [Cache] Clearing all local cache...")
+
+        let keychainItemIds = getPlaidItemIds()
+
+        for itemId in keychainItemIds {
+            try? KeychainService.shared.delete(for: itemId)
+            SecureTransactionCache.shared.invalidateCache(for: itemId)
+        }
+
+        UserDefaults.standard.removeObject(forKey: cacheKey("summary"))
+        UserDefaults.standard.removeObject(forKey: cacheKey("journey_state"))
+
+        if let userId = currentUserId {
+            SecureTransactionCache.shared.invalidateAccountCache(for: userId)
+        }
+
+        // Clear in-memory state
+        accounts = []
+        transactions = []
+        summary = nil
+
+        print("🗑️ [Cache] Local cache cleared (\(keychainItemIds.count) items)")
+    }
+
+    /// Handles data recovery based on current journey state
+    /// Fetches data from Plaid if local cache is missing
+    private func handleDataRecovery(journeyState: UserJourneyState, itemIds: [String]) async {
+        switch journeyState {
+        case .noAccountsConnected:
+            // Nothing to recover
+            return
+
+        case .accountsConnected:
+            // Fetch accounts if we don't have them
+            if accounts.isEmpty && !itemIds.isEmpty {
+                print("🔄 [Recovery] Have itemIds but no cached accounts, fetching...")
+                await fetchAccountsOnly()
+            }
+
+        case .analysisComplete, .allocationPlanning:
+            // Mid-onboarding - fetch data if missing
+            if accounts.isEmpty && !itemIds.isEmpty {
+                print("🔄 [Recovery] Resuming onboarding, fetching accounts...")
+                await fetchAccountsOnly()
+            }
+
+        case .planCreated:
+            // Completed onboarding - restore or refresh data
+            if accounts.isEmpty && !itemIds.isEmpty {
+                print("🔄 [Recovery] Completed user, fetching fresh data...")
+                await fetchAccountsOnly()
+            }
+
+            // Restore allocation plan if missing
+            if budgetManager.allocationBuckets.isEmpty {
+                await restoreAllocationPlanFromBackend()
+            }
+
+            // Regenerate analysis if we have transactions but no summary
+            if summary == nil && !transactions.isEmpty {
+                print("🔄 [Recovery] Regenerating analysis from cached transactions...")
+                summary = TransactionAnalyzer.generateSnapshot(
+                    transactions: transactions,
+                    accounts: accounts
+                )
+            }
+
+            // Trigger smart refresh for fresh data
+            await performSmartRefresh(isAppLaunch: true)
+        }
+    }
+
     /// Syncs Plaid itemIds from backend to local Keychain
-    /// Ensures cache uses correct itemIds for authenticated user
-    private func syncPlaidItemsFromBackend() async {
+    /// Returns the onboarding status from backend
+    @discardableResult
+    private func syncPlaidItemsFromBackend() async -> (itemIds: [String], onboardingCompleted: Bool) {
         print("🔄 [Sync] Syncing Plaid items from backend...")
 
         do {
-            // Fetch user's actual Plaid items from backend
-            let backendItems = try await plaidService.getPlaidItems()
-            let backendItemIds = Set(backendItems.map { $0.itemId })
-            print("🔄 [Sync] Backend has \(backendItemIds.count) item(s)")
+            // Fetch user's actual Plaid items with onboarding status
+            let response = try await plaidService.getPlaidItemsWithStatus()
+            let backendItemIds = Set(response.items.map { $0.itemId })
+            print("🔄 [Sync] Backend has \(backendItemIds.count) item(s), onboarding: \(response.onboardingCompleted)")
 
-            // Get current Keychain itemIds
-            let keychainItemIds = Set((try? KeychainService.shared.allKeys()) ?? [])
-            print("🔄 [Sync] Keychain has \(keychainItemIds.count) item(s)")
+            // Get current Keychain itemIds (filter out encryption key identifier)
+            let keychainItemIds = Set(getPlaidItemIds())
+            print("🔄 [Sync] Keychain has \(keychainItemIds.count) Plaid item(s)")
 
             // Remove stale itemIds from Keychain (not in backend)
             let staleIds = keychainItemIds.subtracting(backendItemIds)
@@ -168,23 +383,18 @@ class FinancialViewModel: ObservableObject {
             }
 
             // If backend has no items, clear all local cache
-            if backendItems.isEmpty && !keychainItemIds.isEmpty {
+            if response.items.isEmpty && !keychainItemIds.isEmpty {
                 print("🗑️ [Sync] Backend has no items, clearing local cache")
-                for itemId in keychainItemIds {
-                    try? KeychainService.shared.delete(for: itemId)
-                    SecureTransactionCache.shared.invalidateCache(for: itemId)
-                }
-                // Also clear UserDefaults cache and account cache
-                UserDefaults.standard.removeObject(forKey: cacheKey("summary"))
-                if let userId = currentUserId {
-                    SecureTransactionCache.shared.invalidateAccountCache(for: userId)
-                }
+                clearAllLocalCache()
             }
 
             print("✅ [Sync] Sync complete - \(backendItemIds.count) item(s) synced")
+            return (Array(backendItemIds), response.onboardingCompleted)
+
         } catch {
-            // Fallback to existing Keychain itemIds if network fails
-            print("⚠️ [Sync] Backend sync failed, using existing Keychain: \(error.localizedDescription)")
+            print("⚠️ [Sync] Backend sync failed: \(error.localizedDescription)")
+            // Return empty with false on failure - will trigger proper state inference
+            return ([], false)
         }
     }
 
@@ -264,10 +474,10 @@ class FinancialViewModel: ObservableObject {
         }
 
         do {
-            // Get all stored itemIds from Keychain
+            // Get all stored Plaid itemIds from Keychain (filter out encryption key)
             print("🔄 [Fetch Accounts Only] Loading itemIds from Keychain...")
-            let itemIds = try KeychainService.shared.allKeys()
-            print("🔄 [Fetch Accounts Only] Found \(itemIds.count) stored itemId(s): \(itemIds)")
+            let itemIds = getPlaidItemIds()
+            print("🔄 [Fetch Accounts Only] Found \(itemIds.count) Plaid itemId(s): \(itemIds)")
 
             var allAccounts: [BankAccount] = []
 
@@ -420,8 +630,8 @@ class FinancialViewModel: ObservableObject {
         }
 
         do {
-            let itemIds = try KeychainService.shared.allKeys()
-            print("📊 [Analyze Finances] Analyzing \(itemIds.count) account connection(s)")
+            let itemIds = getPlaidItemIds()
+            print("📊 [Analyze Finances] Analyzing \(itemIds.count) Plaid item(s)")
 
             var allTransactions: [Transaction] = []
 
@@ -661,13 +871,34 @@ class FinancialViewModel: ObservableObject {
             )
         }
 
-        // 4. Save everything
+        // 4. Save everything locally
         saveToCache()
 
-        // 5. Transition to plan created
+        // 5. Save allocation plan to BACKEND (survives reinstall)
+        do {
+            try await plaidService.saveAllocationPlan(
+                allocations: buckets,
+                paycheckSchedule: allocationScheduleConfig?.paycheckSchedule
+            )
+            print("✅ [Confirm Plan] Allocation plan saved to backend")
+        } catch {
+            print("⚠️ [Confirm Plan] Failed to save plan to backend: \(error)")
+            // Continue anyway - local state is correct
+        }
+
+        // 6. Mark onboarding complete in BACKEND (source of truth)
+        do {
+            try await plaidService.completeOnboarding()
+            print("✅ [Confirm Plan] Onboarding marked complete in backend")
+        } catch {
+            print("⚠️ [Confirm Plan] Failed to mark onboarding complete: \(error)")
+            // Continue anyway - local state is correct, backend will sync eventually
+        }
+
+        // 7. Transition to plan created
         userJourneyState = .planCreated
 
-        // 6. Show success
+        // 8. Show success
         successMessage = "Financial plan created with \(buckets.count) allocation buckets!"
         showSuccessBanner = true
 
@@ -679,7 +910,7 @@ class FinancialViewModel: ObservableObject {
             }
         }
 
-        // 7. Check for savings opportunities
+        // 9. Check for savings opportunities
         if let savingsAlert = AlertRulesEngine.evaluateSavingsOpportunity(
             budgets: budgetManager.budgets,
             goals: budgetManager.goals,
@@ -732,10 +963,10 @@ class FinancialViewModel: ObservableObject {
         }
 
         do {
-            // Get all stored access tokens
+            // Get all stored Plaid itemIds from Keychain (filter out encryption key)
             print("🔄 [Refresh All Data] Loading itemIds from Keychain...")
-            let itemIds = try KeychainService.shared.allKeys()
-            print("🔄 [Refresh All Data] Found \(itemIds.count) stored itemId(s): \(itemIds)")
+            let itemIds = getPlaidItemIds()
+            print("🔄 [Refresh All Data] Found \(itemIds.count) Plaid itemId(s): \(itemIds)")
 
             var allAccounts: [BankAccount] = []
             var allTransactions: [Transaction] = []
@@ -855,6 +1086,77 @@ class FinancialViewModel: ObservableObject {
             // Only set error if we couldn't load ANY accounts
             // (Individual account failures are handled in the loop above)
             self.error = error
+        }
+    }
+
+    // MARK: - Smart Refresh
+
+    /// Performs smart refresh based on cache age
+    /// - Parameters:
+    ///   - isAppLaunch: Whether this is during app launch
+    ///   - isUserInitiated: Whether user manually triggered refresh
+    func performSmartRefresh(isAppLaunch: Bool = false, isUserInitiated: Bool = false) async {
+        let itemIds = getPlaidItemIds()
+
+        guard !itemIds.isEmpty else {
+            print("📊 [SmartRefresh] No itemIds, skipping refresh")
+            return
+        }
+
+        // Check cache freshness (only refresh if data is >24h old or user requested)
+        var needsRefresh = isUserInitiated
+
+        if !needsRefresh {
+            for itemId in itemIds {
+                if let age = SecureTransactionCache.shared.cacheAge(for: itemId) {
+                    if age > 24 * 60 * 60 { // 24 hours
+                        needsRefresh = true
+                        print("🔄 [SmartRefresh] Cache for \(itemId.prefix(8))... is stale (\(Int(age / 3600))h old)")
+                        break
+                    }
+                } else {
+                    // No cache exists, need refresh
+                    needsRefresh = true
+                    break
+                }
+            }
+        }
+
+        guard needsRefresh else {
+            print("✅ [SmartRefresh] Cache is fresh, skipping refresh")
+            return
+        }
+
+        // Show loading UI if user initiated
+        if isUserInitiated {
+            isLoading = true
+            showLoadingOverlay = true
+            loadingStep = .fetchingAccounts
+        }
+
+        defer {
+            if isUserInitiated {
+                isLoading = false
+                showLoadingOverlay = false
+                loadingStep = .idle
+            }
+        }
+
+        // Execute refresh
+        print("🔄 [SmartRefresh] Starting refresh...")
+        await refreshAllData()
+
+        // Show result feedback for user-initiated refresh
+        if isUserInitiated {
+            successMessage = "Data refreshed"
+            showSuccessBanner = true
+
+            Task {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                await MainActor.run {
+                    showSuccessBanner = false
+                }
+            }
         }
     }
 
@@ -1268,28 +1570,23 @@ class FinancialViewModel: ObservableObject {
     private func validateAndFixAccountItemIds() {
         guard !accounts.isEmpty else { return }
 
-        do {
-            let storedItemIds = try KeychainService.shared.allKeys()
-            print("🔍 [ItemId Validation] Checking \(accounts.count) cached accounts against \(storedItemIds.count) stored itemIds")
+        let storedItemIds = getPlaidItemIds()
+        print("🔍 [ItemId Validation] Checking \(accounts.count) cached accounts against \(storedItemIds.count) Plaid itemIds")
 
-            // Check for accounts with missing itemIds
-            let accountsWithoutItemId = accounts.filter { $0.itemId.isEmpty }
-            if !accountsWithoutItemId.isEmpty {
-                print("⚠️ [ItemId Validation] Found \(accountsWithoutItemId.count) accounts with empty itemId")
-                print("⚠️ [ItemId Validation] This should not happen with the new decoder, but handling gracefully")
+        // Check for accounts with missing itemIds
+        let accountsWithoutItemId = accounts.filter { $0.itemId.isEmpty }
+        if !accountsWithoutItemId.isEmpty {
+            print("⚠️ [ItemId Validation] Found \(accountsWithoutItemId.count) accounts with empty itemId")
+            print("⚠️ [ItemId Validation] This should not happen with the new decoder, but handling gracefully")
+        }
+
+        // Log itemId status for all accounts
+        for account in accounts {
+            if account.itemId.isEmpty {
+                print("❌ [ItemId Validation] Account '\(account.name)' (id: \(account.id)) has EMPTY itemId")
+            } else {
+                print("✅ [ItemId Validation] Account '\(account.name)' (id: \(account.id)) has itemId: \(account.itemId)")
             }
-
-            // Log itemId status for all accounts
-            for account in accounts {
-                if account.itemId.isEmpty {
-                    print("❌ [ItemId Validation] Account '\(account.name)' (id: \(account.id)) has EMPTY itemId")
-                } else {
-                    print("✅ [ItemId Validation] Account '\(account.name)' (id: \(account.id)) has itemId: \(account.itemId)")
-                }
-            }
-
-        } catch {
-            print("⚠️ [ItemId Validation] Failed to validate itemIds: \(error)")
         }
     }
 
@@ -1369,24 +1666,22 @@ class FinancialViewModel: ObservableObject {
 
         // If no legacy data, try loading from encrypted cache
         if loadedAccounts.isEmpty {
-            // Load accounts from encrypted cache using known itemIds from Keychain
-            if let itemIds = try? KeychainService.shared.allKeys() {
-                for itemId in itemIds {
-                    if let cached = SecureTransactionCache.shared.loadAccounts(for: itemId) {
-                        loadedAccounts.append(contentsOf: cached.accounts)
-                    }
+            // Load accounts from encrypted cache using Plaid itemIds from Keychain
+            let itemIds = getPlaidItemIds()
+            for itemId in itemIds {
+                if let cached = SecureTransactionCache.shared.loadAccounts(for: itemId) {
+                    loadedAccounts.append(contentsOf: cached.accounts)
                 }
             }
             print("💾 [Cache Load] Loaded \(loadedAccounts.count) account(s) from encrypted cache")
         }
 
         if loadedTransactions.isEmpty {
-            // Load transactions from encrypted cache using known itemIds from Keychain
-            if let itemIds = try? KeychainService.shared.allKeys() {
-                for itemId in itemIds {
-                    if let cached = SecureTransactionCache.shared.loadTransactions(for: itemId) {
-                        loadedTransactions.append(contentsOf: cached.transactions)
-                    }
+            // Load transactions from encrypted cache using Plaid itemIds from Keychain
+            let itemIds = getPlaidItemIds()
+            for itemId in itemIds {
+                if let cached = SecureTransactionCache.shared.loadTransactions(for: itemId) {
+                    loadedTransactions.append(contentsOf: cached.transactions)
                 }
             }
             print("💾 [Cache Load] Loaded \(loadedTransactions.count) transaction(s) from encrypted cache")
@@ -1442,9 +1737,9 @@ class FinancialViewModel: ObservableObject {
             print("💾 [Cache Load] No transactions available for budget generation")
         }
 
-        // Always infer journey state from actual cached data to ensure consistency
-        // This prevents stale journey state from being restored without matching data
-        inferStateFromCache()
+        // NOTE: Do NOT call inferStateFromCache() here!
+        // Journey state is determined by setCurrentUser() from backend.
+        // inferStateFromCache() is only used as a fallback when backend is unavailable.
 
         // Load allocation schedule
         allocationScheduleConfig = AllocationScheduleConfig.load()
@@ -1454,9 +1749,12 @@ class FinancialViewModel: ObservableObject {
         print("💾 [Cache Load] Cache load complete - Accounts: \(accounts.count), Transactions: \(transactions.count)")
     }
 
-    /// Infers user journey state from cached data (for existing users after app update)
+    /// DEPRECATED: Journey state should come from backend via setCurrentUser()
+    /// This method is kept only as a fallback when backend is unavailable.
+    /// Do NOT call this from loadFromCache() - it will override backend state.
+    @available(*, deprecated, message: "Use backend onboarding flag instead")
     private func inferStateFromCache() {
-        print("🔍 [State] Inferring state from cached data...")
+        print("⚠️ [State] Using DEPRECATED cache inference (backend unavailable?)")
         print("   - Accounts: \(accounts.count)")
         print("   - Summary: \(summary != nil ? "exists" : "nil")")
         print("   - Budgets: \(budgetManager.budgets.count)")

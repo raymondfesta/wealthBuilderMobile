@@ -353,9 +353,52 @@ class PlaidService: ObservableObject {
 
     func getPlaidItems() async throws -> [PlaidItem] {
         print("📋 [PlaidService] Fetching user's Plaid items...")
-        let endpoint = "\(baseURL)/api/plaid/items"
+        let response = try await getPlaidItemsWithStatus()
+        return response.items.map { item in
+            PlaidItem(
+                itemId: item.itemId,
+                institutionName: item.institutionName,
+                createdAt: item.createdAt
+            )
+        }
+    }
 
-        guard let url = URL(string: endpoint) else {
+    /// Fetches user's Plaid items with onboarding status from backend
+    func getPlaidItemsWithStatus() async throws -> PlaidItemsWithStatusResponse {
+        print("📋 [PlaidService] Fetching user's Plaid items with status...")
+
+        guard let url = URL(string: "\(baseURL)/api/plaid/items") else {
+            throw PlaidError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        addAuthHeader(to: &request)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw PlaidError.networkError
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            let responseStr = String(data: data, encoding: .utf8) ?? "(no body)"
+            print("❌ [PlaidService] Get items failed: \(responseStr)")
+            throw PlaidError.serverError("Status: \(httpResponse.statusCode)")
+        }
+
+        let result = try JSONDecoder().decode(PlaidItemsWithStatusResponse.self, from: data)
+        print("✅ [PlaidService] Found \(result.items.count) Plaid item(s), onboarding: \(result.onboardingCompleted)")
+        return result
+    }
+
+    // MARK: - Allocation Plan
+
+    /// Fetches user's allocation plan from backend
+    func getAllocationPlan() async throws -> AllocationPlanResponse {
+        print("📋 [PlaidService] Fetching allocation plan...")
+
+        guard let url = URL(string: "\(baseURL)/api/user/allocation-plan") else {
             throw PlaidError.invalidURL
         }
 
@@ -367,14 +410,99 @@ class PlaidService: ObservableObject {
 
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
-            let responseStr = String(data: data, encoding: .utf8) ?? "(no body)"
-            print("❌ [PlaidService] Get items failed: \(responseStr)")
-            throw PlaidError.accountFetchFailed
+            throw PlaidError.serverError("Failed to fetch allocation plan")
         }
 
-        let itemsResponse = try JSONDecoder().decode(PlaidItemsResponse.self, from: data)
-        print("✅ [PlaidService] Found \(itemsResponse.items.count) Plaid item(s)")
-        return itemsResponse.items
+        let decoder = JSONDecoder()
+        let result = try decoder.decode(AllocationPlanResponse.self, from: data)
+
+        print("✅ [PlaidService] Fetched \(result.allocations.count) allocation(s), hasPlan: \(result.hasPlan)")
+        return result
+    }
+
+    /// Saves user's allocation plan to backend
+    func saveAllocationPlan(allocations: [AllocationBucket], paycheckSchedule: PaycheckSchedule?) async throws {
+        print("💾 [PlaidService] Saving allocation plan...")
+
+        guard let url = URL(string: "\(baseURL)/api/user/allocation-plan") else {
+            throw PlaidError.invalidURL
+        }
+
+        // Convert to request format
+        let allocationsToSave = allocations.map { bucket in
+            AllocationToSave(
+                bucketType: bucket.type.rawValue,
+                percentage: bucket.percentageOfIncome,
+                targetAmount: bucket.targetAmount,
+                linkedAccountId: bucket.linkedAccountIds.first,
+                linkedAccountName: nil, // Account name resolved on restore
+                isCustomized: bucket.changeFromOriginal != 0,
+                presetTier: bucket.selectedPresetTier.rawValue
+            )
+        }
+
+        var paycheckToSave: PaycheckScheduleToSave?
+        if let schedule = paycheckSchedule {
+            let formatter = ISO8601DateFormatter()
+            let nextDates = schedule.nextPaycheckDates(from: Date(), count: 1)
+            paycheckToSave = PaycheckScheduleToSave(
+                frequency: schedule.frequency.rawValue,
+                estimatedAmount: schedule.estimatedAmount,
+                nextPaycheckDate: nextDates.first.map { formatter.string(from: $0) },
+                isConfirmed: schedule.isUserConfirmed,
+                detectedEmployer: nil
+            )
+        }
+
+        let requestBody = SaveAllocationPlanRequest(
+            allocations: allocationsToSave,
+            paycheckSchedule: paycheckToSave
+        )
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        addAuthHeader(to: &request)
+
+        let encoder = JSONEncoder()
+        request.httpBody = try encoder.encode(requestBody)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw PlaidError.serverError("Failed to save allocation plan: \(errorBody)")
+        }
+
+        print("✅ [PlaidService] Allocation plan saved")
+    }
+
+    /// Marks onboarding as complete in backend
+    func completeOnboarding() async throws {
+        print("🎯 [PlaidService] Marking onboarding complete...")
+
+        guard let url = URL(string: "\(baseURL)/api/user/complete-onboarding") else {
+            throw PlaidError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        addAuthHeader(to: &request)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw PlaidError.networkError
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw PlaidError.serverError("Failed to complete onboarding: \(errorBody)")
+        }
+
+        print("✅ [PlaidService] Onboarding marked complete")
     }
 }
 
@@ -412,9 +540,7 @@ private struct ExchangeTokenResponse: Decodable {
     }
 }
 
-private struct PlaidItemsResponse: Decodable {
-    let items: [PlaidItem]
-}
+// PlaidItemsWithStatusResponse is now defined in Models/UserStatus.swift
 
 private struct AccountsResponse: Decodable {
     let accounts: [BankAccount]
@@ -452,6 +578,7 @@ enum PlaidError: LocalizedError {
     case linkCreationFailed(String)
     case linkExited(String)
     case userCancelled
+    case serverError(String)
 
     var errorDescription: String? {
         switch self {
@@ -473,6 +600,8 @@ enum PlaidError: LocalizedError {
             return "Link exited: \(message)"
         case .userCancelled:
             return "User cancelled the link process"
+        case .serverError(let message):
+            return "Server error: \(message)"
         }
     }
 }

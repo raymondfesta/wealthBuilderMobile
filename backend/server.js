@@ -290,19 +290,236 @@ app.post('/api/plaid/exchange_public_token', requireAuth, async (req, res) => {
 // Get user's Plaid items (for iOS to enumerate linked accounts)
 app.get('/api/plaid/items', requireAuth, async (req, res) => {
   try {
+    const db = getDb();
     const items = findPlaidItemsByUserId(req.userId);
     console.log(`📋 [Items] Found ${items.length} item(s) for user: ${req.userId}`);
 
+    // Get user's onboarding status
+    const user = db.prepare(`
+      SELECT onboarding_completed, onboarding_completed_at
+      FROM users
+      WHERE id = ?
+    `).get(req.userId);
+
     res.json({
       items: items.map(item => ({
-        item_id: item.item_id,
-        institution_name: item.institution_name,
-        created_at: item.created_at,
+        itemId: item.item_id,
+        institutionName: item.institution_name,
+        createdAt: item.created_at,
       })),
+      onboardingCompleted: user?.onboarding_completed === 1,
+      onboardingCompletedAt: user?.onboarding_completed_at || null,
     });
   } catch (error) {
     console.error('❌ [Items] Error listing items:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Mark onboarding as complete
+app.post('/api/user/complete-onboarding', requireAuth, async (req, res) => {
+  try {
+    const db = getDb();
+    const now = new Date().toISOString();
+
+    db.prepare(`
+      UPDATE users
+      SET onboarding_completed = 1,
+          onboarding_completed_at = ?,
+          updated_at = ?
+      WHERE id = ?
+    `).run(now, now, req.userId);
+
+    console.log(`✅ [Onboarding] User ${req.userId} completed onboarding`);
+
+    res.json({
+      success: true,
+      completedAt: now,
+    });
+  } catch (error) {
+    console.error('❌ [Onboarding] Error completing onboarding:', error);
+    res.status(500).json({ error: 'Failed to complete onboarding' });
+  }
+});
+
+// Get user status (for app launch)
+app.get('/api/user/status', requireAuth, async (req, res) => {
+  try {
+    const db = getDb();
+    const user = db.prepare(`
+      SELECT id, email, onboarding_completed, onboarding_completed_at, created_at
+      FROM users
+      WHERE id = ?
+    `).get(req.userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const items = findPlaidItemsByUserId(req.userId);
+
+    res.json({
+      userId: user.id,
+      email: user.email,
+      onboardingCompleted: user.onboarding_completed === 1,
+      onboardingCompletedAt: user.onboarding_completed_at,
+      connectedAccountsCount: items.length,
+      createdAt: user.created_at,
+    });
+  } catch (error) {
+    console.error('❌ [UserStatus] Error fetching user status:', error);
+    res.status(500).json({ error: 'Failed to fetch user status' });
+  }
+});
+
+// ============================================================================
+// ALLOCATION PLAN ENDPOINTS
+// ============================================================================
+
+// Get user's allocation plan
+app.get('/api/user/allocation-plan', requireAuth, async (req, res) => {
+  try {
+    const db = getDb();
+
+    const allocations = db.prepare(`
+      SELECT * FROM user_allocation_plans
+      WHERE user_id = ?
+      ORDER BY bucket_type
+    `).all(req.userId);
+
+    const paycheck = db.prepare(`
+      SELECT * FROM user_paycheck_schedules
+      WHERE user_id = ?
+    `).get(req.userId);
+
+    res.json({
+      allocations: allocations.map(a => ({
+        id: a.id,
+        bucketType: a.bucket_type,
+        percentage: a.percentage,
+        targetAmount: a.target_amount,
+        linkedAccountId: a.linked_account_id,
+        linkedAccountName: a.linked_account_name,
+        isCustomized: a.is_customized === 1,
+        presetTier: a.preset_tier,
+        createdAt: a.created_at,
+        updatedAt: a.updated_at
+      })),
+      paycheckSchedule: paycheck ? {
+        id: paycheck.id,
+        frequency: paycheck.frequency,
+        estimatedAmount: paycheck.estimated_amount,
+        nextPaycheckDate: paycheck.next_paycheck_date,
+        isConfirmed: paycheck.is_confirmed === 1,
+        detectedEmployer: paycheck.detected_employer
+      } : null,
+      hasPlan: allocations.length > 0
+    });
+  } catch (error) {
+    console.error('Error fetching allocation plan:', error);
+    res.status(500).json({ error: 'Failed to fetch allocation plan' });
+  }
+});
+
+// Save/update user's allocation plan
+app.post('/api/user/allocation-plan', requireAuth, async (req, res) => {
+  try {
+    const db = getDb();
+    const { allocations, paycheckSchedule } = req.body;
+    const now = new Date().toISOString();
+
+    // Validate allocations sum to ~100%
+    if (allocations && allocations.length > 0) {
+      const totalPercentage = allocations.reduce((sum, a) => sum + (a.percentage || 0), 0);
+      if (Math.abs(totalPercentage - 100) > 1) {
+        return res.status(400).json({
+          error: `Allocations must sum to 100% (got ${totalPercentage.toFixed(1)}%)`
+        });
+      }
+    }
+
+    // Transaction for atomic updates
+    const saveAllocations = db.transaction(() => {
+      // Clear existing allocations for this user
+      db.prepare('DELETE FROM user_allocation_plans WHERE user_id = ?').run(req.userId);
+
+      // Insert new allocations
+      const insertStmt = db.prepare(`
+        INSERT INTO user_allocation_plans
+        (id, user_id, bucket_type, percentage, target_amount, linked_account_id,
+         linked_account_name, is_customized, preset_tier, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      for (const allocation of allocations) {
+        const id = `alloc_${req.userId}_${allocation.bucketType}`;
+        insertStmt.run(
+          id,
+          req.userId,
+          allocation.bucketType,
+          allocation.percentage,
+          allocation.targetAmount || null,
+          allocation.linkedAccountId || null,
+          allocation.linkedAccountName || null,
+          allocation.isCustomized ? 1 : 0,
+          allocation.presetTier || null,
+          now,
+          now
+        );
+      }
+
+      // Save paycheck schedule if provided
+      if (paycheckSchedule) {
+        db.prepare('DELETE FROM user_paycheck_schedules WHERE user_id = ?').run(req.userId);
+
+        const paycheckId = `paycheck_${req.userId}`;
+        db.prepare(`
+          INSERT INTO user_paycheck_schedules
+          (id, user_id, frequency, estimated_amount, next_paycheck_date,
+           is_confirmed, detected_employer, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          paycheckId,
+          req.userId,
+          paycheckSchedule.frequency,
+          paycheckSchedule.estimatedAmount || null,
+          paycheckSchedule.nextPaycheckDate || null,
+          paycheckSchedule.isConfirmed ? 1 : 0,
+          paycheckSchedule.detectedEmployer || null,
+          now,
+          now
+        );
+      }
+    });
+
+    saveAllocations();
+
+    console.log(`✅ [AllocationPlan] Saved ${allocations.length} allocations for user ${req.userId}`);
+
+    res.json({
+      success: true,
+      savedAt: now,
+      allocationCount: allocations.length
+    });
+  } catch (error) {
+    console.error('Error saving allocation plan:', error);
+    res.status(500).json({ error: 'Failed to save allocation plan' });
+  }
+});
+
+// Delete user's allocation plan (for testing/reset)
+app.delete('/api/user/allocation-plan', requireAuth, async (req, res) => {
+  try {
+    const db = getDb();
+    db.prepare('DELETE FROM user_allocation_plans WHERE user_id = ?').run(req.userId);
+    db.prepare('DELETE FROM user_paycheck_schedules WHERE user_id = ?').run(req.userId);
+
+    console.log(`🗑️ [AllocationPlan] Deleted plan for user ${req.userId}`);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting allocation plan:', error);
+    res.status(500).json({ error: 'Failed to delete allocation plan' });
   }
 });
 

@@ -24,6 +24,71 @@ function runMigrations(database) {
   const schemaPath = path.join(__dirname, 'schema.sql');
   const schema = fs.readFileSync(schemaPath, 'utf8');
   database.exec(schema);
+
+  // Migration: Add onboarding_completed columns if they don't exist
+  try {
+    const columns = database.pragma('table_info(users)');
+    const hasOnboardingCompleted = columns.some(c => c.name === 'onboarding_completed');
+    if (!hasOnboardingCompleted) {
+      console.log('🔄 Adding onboarding_completed columns to users table...');
+      database.exec(`ALTER TABLE users ADD COLUMN onboarding_completed INTEGER DEFAULT 0`);
+      database.exec(`ALTER TABLE users ADD COLUMN onboarding_completed_at TEXT`);
+      console.log('✅ Added onboarding columns');
+    }
+  } catch (err) {
+    // Ignore if columns already exist
+    if (!err.message.includes('duplicate column')) {
+      console.error('⚠️ Migration warning:', err.message);
+    }
+  }
+
+  // Migration: Add allocation plan tables if they don't exist
+  try {
+    const tables = database.prepare(`
+      SELECT name FROM sqlite_master WHERE type='table' AND name='user_allocation_plans'
+    `).get();
+    if (!tables) {
+      console.log('🔄 Creating user_allocation_plans and user_paycheck_schedules tables...');
+      database.exec(`
+        CREATE TABLE IF NOT EXISTS user_allocation_plans (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          bucket_type TEXT NOT NULL,
+          percentage REAL NOT NULL,
+          target_amount REAL,
+          linked_account_id TEXT,
+          linked_account_name TEXT,
+          is_customized INTEGER DEFAULT 0,
+          preset_tier TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(user_id, bucket_type),
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS user_paycheck_schedules (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          frequency TEXT NOT NULL,
+          estimated_amount REAL,
+          next_paycheck_date TEXT,
+          is_confirmed INTEGER DEFAULT 0,
+          detected_employer TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(user_id),
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_allocation_plans_user ON user_allocation_plans(user_id);
+        CREATE INDEX IF NOT EXISTS idx_paycheck_schedules_user ON user_paycheck_schedules(user_id);
+      `);
+      console.log('✅ Created allocation plan tables');
+    }
+  } catch (err) {
+    console.error('⚠️ Allocation plan migration warning:', err.message);
+  }
+
   console.log('✅ Database migrations complete');
 }
 

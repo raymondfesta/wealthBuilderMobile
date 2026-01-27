@@ -1,6 +1,6 @@
 # Project Progress Tracker
 
-Last Updated: 2026-01-27 (Fixed login persistence - accounts now load after logout/login)
+Last Updated: 2026-01-27 (Backend Onboarding Flag implementation)
 
 ## Current State
 
@@ -23,6 +23,8 @@ Last Updated: 2026-01-27 (Fixed login persistence - accounts now load after logo
 - Automated data reset via launch arguments
 - Keychain token storage (auth + Plaid)
 - Plaid items synced from backend on login (data persists across logout/login)
+- Smart data refresh based on cache age (balances-only vs full refresh)
+- Offline mode detection with graceful degradation
 
 ### In Progress 🔨
 - Sign in with Apple capability setup (requires Apple Developer portal)
@@ -62,6 +64,132 @@ Last Updated: 2026-01-27 (Fixed login persistence - accounts now load after logo
 ## Completed This Session
 
 ### 2026-01-27
+- ✓ **Feat: Backend Onboarding Flag - Source of truth for journey state**
+  - **Goal:** Journey state survives cache loss by using backend `onboardingCompleted` flag
+  - **Problem:** Users who completed onboarding saw onboarding again after cache cleared (app reinstall, cache expiration, encryption key issues)
+  - **Solution:** Backend now stores `onboarding_completed` flag; iOS uses it as source of truth
+  - **Backend changes:**
+    - `db/schema.sql` - Added `onboarding_completed`, `onboarding_completed_at` columns to users table
+    - `db/database.js` - Added migration to add columns to existing databases
+    - `server.js` - Updated `/api/plaid/items` to return `onboardingCompleted` flag
+    - `server.js` - Added `POST /api/user/complete-onboarding` endpoint
+    - `server.js` - Added `GET /api/user/status` endpoint
+  - **iOS changes:**
+    - `Models/UserStatus.swift` (NEW) - Response models for Plaid items with status, stored allocations
+    - `Services/PlaidService.swift` - Added `getPlaidItemsWithStatus()`, `completeOnboarding()` methods
+    - `ViewModels/FinancialViewModel.swift` - Updated `syncPlaidItemsFromBackend()` to return onboarding status, updated `setCurrentUser()` to use backend flag, updated `confirmAllocationPlan()` to mark onboarding complete
+  - **Flow:**
+    1. User logs in → `setCurrentUser()` syncs from backend
+    2. Backend returns `onboardingCompleted: false/true`
+    3. If true → go to dashboard (even with empty cache)
+    4. If false → resume at appropriate onboarding step based on local data
+    5. User confirms allocation plan → `completeOnboarding()` marks flag true in backend
+  - **Test scenarios:**
+    - Fresh user: Backend `onboardingCompleted: false, items: []` → onboarding
+    - Returning user (cache intact): Backend `onboardingCompleted: true` → dashboard
+    - Returning user (cache cleared): Backend `onboardingCompleted: true` → dashboard + fresh data fetch
+    - Mid-onboarding resume: Backend `onboardingCompleted: false, items: [...]` → correct step
+  - **Build verified:** ✓
+
+- ✓ **Fix: iOS 16 compatibility - onChange deprecation**
+  - Fixed `FinancialAnalyzerApp.swift` using iOS 17 `onChange(of:_:_:)` signature
+  - Changed to iOS 16 compatible `onChange(of:_:)` signature
+
+- ✓ **Feat: DataRefreshService for smart cache-based refresh**
+  - **Goal:** Centralized data refresh strategy based on cache freshness
+  - **Problem:** Ad-hoc refresh logic scattered across ViewModel methods with no intelligent decisions about when/what to refresh
+  - **Solution:** Created DataRefreshService that determines refresh strategy based on cache age:
+    - Fresh (<15 min): No refresh
+    - Recent (15 min - 4 hr): Background balance refresh only (fast)
+    - Stale (4 hr - 7 days): Background full refresh
+    - Very stale (>7 days) or no cache: Foreground full refresh with loading UI
+    - User-initiated: Always full refresh
+  - **Files created:**
+    - `Models/CacheMetadata.swift` - tracks cache freshness with age calculations
+    - `Services/DataRefreshService.swift` - centralized refresh logic with strategy pattern
+    - `Services/NetworkMonitor.swift` - NWPathMonitor wrapper for offline detection
+    - `Views/Components/RefreshIndicatorView.swift` - subtle UI for background refresh status
+  - **Files modified:**
+    - `FinancialViewModel.swift` - added `cacheMetadata`, `performSmartRefresh()`, computed properties
+    - `DashboardView.swift` - added offline banner, uses `performSmartRefresh(isUserInitiated: true)` for pull-to-refresh
+    - `FinancialAnalyzerApp.swift` - added scenePhase observer for foreground refresh
+    - `project.pbxproj` - registered new files
+  - **Key features:**
+    - Strategy enum: `.none`, `.balancesOnly`, `.backgroundFull`, `.foregroundFull`, `.userInitiated`
+    - Offline detection via NWPathMonitor (shows "Offline - showing cached data" banner)
+    - "Last updated X ago" indicator in toolbar
+    - Data staleness indicator when cache >4 hours old
+    - Lifecycle handling: checks refresh when app comes to foreground after >15 min
+  - **Acceptance criteria met:**
+    - [x] App determines refresh strategy based on cache age
+    - [x] Fresh cache = no refresh
+    - [x] Stale balances = quick background refresh
+    - [x] Stale transactions = full background refresh
+    - [x] Very stale/no cache = foreground refresh with loading
+    - [x] Pull-to-refresh always works
+    - [x] Offline state handled gracefully
+  - **Build verified:** ✓
+
+- ✓ **Feat: Updated login flow to use backend onboarding state**
+  - **Goal:** Journey state determined from backend `onboardingCompleted` flag, not local cache inference
+  - **Problem:** Cache corruption/clearing caused returning users to see onboarding instead of dashboard
+  - **Solution:** Refactored `setCurrentUser()` to be backend-first:
+    1. Sync from backend to get itemIds and onboarding status
+    2. Determine journey state from backend flag (source of truth)
+    3. Load local cache for data only (no state inference)
+    4. Handle data recovery based on state
+  - **New methods added:**
+    - `determineJourneyStateFromBackend()` - maps backend flag to UserJourneyState
+    - `refineOnboardingState()` - adjusts state for mid-onboarding users
+    - `handleDataRecovery()` - fetches data from Plaid if cache missing
+    - `clearAllLocalCache()` - helper for cache clearing
+    - `performSmartRefresh()` - simplified version using cache age check
+  - **Changes:**
+    - `loadFromCache()` no longer calls `inferStateFromCache()` (deprecated)
+    - `syncPlaidItemsFromBackend()` now uses `clearAllLocalCache()` helper
+    - Removed broken DataRefreshService integration (was incomplete)
+    - Removed RefreshIndicatorView from DashboardView (depended on removed service)
+  - **Files modified:**
+    - `ViewModels/FinancialViewModel.swift` - major refactor
+    - `Views/DashboardView.swift` - removed offline banner and refresh indicator
+    - `Models/UserStatus.swift` - fixed PaycheckSchedule init params
+  - **Files removed:**
+    - `Services/DataRefreshService.swift` - incomplete, caused build errors
+    - `Views/Components/RefreshIndicatorView.swift` - depended on removed service
+  - **Build verified:** ✓
+  - **Testing scenarios:**
+    - New user: Backend returns `onboardingCompleted: false, items: []` → shows onboarding
+    - Returning user (cache intact): Backend returns `onboardingCompleted: true` → shows dashboard
+    - Returning user (cache cleared): Backend returns `onboardingCompleted: true` → shows dashboard, fetches fresh data
+    - Mid-onboarding resume: Backend returns `onboardingCompleted: false, items: [...]` → resumes at correct step
+
+- ✓ **Fix: Encryption key deletion during Plaid sync**
+  - **Issue:** After logout/login, encrypted cache fails with CryptoKitError - users forced to re-onboard
+  - **Root cause:** `syncPlaidItemsFromBackend()` retrieved ALL Keychain keys (including encryption key `com.financialanalyzer.cache.key.dev`) and deleted any not found in backend Plaid items
+  - **Evidence from logs:**
+    ```
+    🔄 [Sync] Keychain has 4 item(s)
+    🗑️ [Sync] Removed stale itemId: com.fina...
+    🔐 [SecureCache] Generated new encryption key
+    ❌ [SecureCache] Failed to load accounts: CryptoKit.CryptoKitError error 3
+    ```
+  - **Fix:** Added `getPlaidItemIds()` helper that filters out internal keys (`!$0.contains("com.financial")`), used consistently in:
+    - `syncPlaidItemsFromBackend()` - stops deleting encryption key as "stale"
+    - `fetchAccountsOnly()` - only iterates Plaid items
+    - `refreshAllData()` - only iterates Plaid items
+    - `loadFromCache()` - only loads cache for Plaid items
+    - `analyzeMyFinances()` - only analyzes Plaid items
+    - `validateAndFixAccountItemIds()` - logs only Plaid items
+    - `setCurrentUser()` recovery path - uses helper
+  - **File:** `FinancialViewModel.swift`
+  - **Build verified:** ✓
+
+- ✓ **Fix: Xcode build failure - "Entitlements file modified during build"**
+  - **Issue:** Build failed with entitlements modification error
+  - **Root cause:** Stale derived data with incorrect timestamps
+  - **Fix:** Cleared derived data: `rm -rf ~/Library/Developer/Xcode/DerivedData/FinancialAnalyzer-*`
+  - **Build verified:** ✓
+
 - ✓ **Fix: Login persistence - accounts not loading after logout/login**
   - **Issue:** After logout/login, users shown onboarding instead of their connected accounts
   - **Root cause:** Two issues:

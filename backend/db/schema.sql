@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS users (
     apple_user_id TEXT UNIQUE,
     display_name TEXT,
     email_verified INTEGER DEFAULT 0,
+    onboarding_completed INTEGER DEFAULT 0,
+    onboarding_completed_at TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
@@ -46,9 +48,43 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- User allocation plans (bucket configuration)
+CREATE TABLE IF NOT EXISTS user_allocation_plans (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    bucket_type TEXT NOT NULL,
+    percentage REAL NOT NULL,
+    target_amount REAL,
+    linked_account_id TEXT,
+    linked_account_name TEXT,
+    is_customized INTEGER DEFAULT 0,
+    preset_tier TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, bucket_type),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- User paycheck schedules
+CREATE TABLE IF NOT EXISTS user_paycheck_schedules (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    frequency TEXT NOT NULL,
+    estimated_amount REAL,
+    next_paycheck_date TEXT,
+    is_confirmed INTEGER DEFAULT 0,
+    detected_employer TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_plaid_items_user_id ON plaid_items(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_refresh_token ON sessions(refresh_token_hash);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_apple_id ON users(apple_user_id);
+CREATE INDEX IF NOT EXISTS idx_allocation_plans_user ON user_allocation_plans(user_id);
+CREATE INDEX IF NOT EXISTS idx_paycheck_schedules_user ON user_paycheck_schedules(user_id);

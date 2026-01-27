@@ -15,8 +15,10 @@ struct FinancialAnalyzerApp: App {
 struct ContentView: View {
     @StateObject private var viewModel: FinancialViewModel
     @StateObject private var navigationCoordinator = NotificationNavigationCoordinator()
+    @Environment(\.scenePhase) private var scenePhase
     @State private var hasPerformedLaunchReset = false
     @State private var showProfile = false
+    @State private var lastActiveTime: Date?
 
     init() {
         _viewModel = StateObject(wrappedValue: FinancialViewModel())
@@ -117,6 +119,34 @@ struct ContentView: View {
 
                     print("🔄 [Launch] Automatic reset complete, app ready with fresh data")
                 }
+            }
+        }
+        .onChange(of: scenePhase) { newPhase in
+            switch newPhase {
+            case .active:
+                // App came to foreground
+                if let lastActive = lastActiveTime {
+                    let timeSinceActive = Date().timeIntervalSince(lastActive)
+                    // Only refresh if app was in background for >15 minutes
+                    if timeSinceActive > 15 * 60 {
+                        print("🔄 [Lifecycle] App foregrounded after \(Int(timeSinceActive / 60))m, checking refresh")
+                        Task {
+                            await viewModel.performSmartRefresh(isAppLaunch: false)
+                        }
+                    }
+                }
+
+            case .background:
+                // Record when we went to background
+                lastActiveTime = Date()
+                print("📴 [Lifecycle] App backgrounded")
+
+            case .inactive:
+                // Transitioning state, no action needed
+                break
+
+            @unknown default:
+                break
             }
         }
     }

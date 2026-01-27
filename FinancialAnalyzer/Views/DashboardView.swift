@@ -13,9 +13,16 @@ struct DashboardView: View {
             NavigationStack {
                 ScrollView {
                     VStack(spacing: DesignTokens.Spacing.lg) {
+                        // Offline banner
+                        if viewModel.isOffline {
+                            OfflineBannerView()
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                        }
+
                         planActiveView
                     }
                     .padding(DesignTokens.Spacing.md)
+                    .animation(.easeInOut(duration: 0.3), value: viewModel.isOffline)
                 }
                 .primaryBackgroundGradient()
                 .navigationTitle("Financial Overview")
@@ -43,7 +50,7 @@ struct DashboardView: View {
                     }
                 }
                 .refreshable {
-                    await viewModel.refreshAllData()
+                    await viewModel.performSmartRefresh(isUserInitiated: true)
                 }
                 .alert("Error", isPresented: .constant(viewModel.error != nil)) {
                     Button("OK") {
@@ -98,9 +105,6 @@ struct DashboardView: View {
 
             // Recent Transactions
             recentTransactionsSection
-
-            // Refresh Button
-            refreshButton
         }
     }
 
@@ -130,14 +134,22 @@ struct DashboardView: View {
 
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-            Text("Your Financial Summary")
-                .headlineStyle(color: .white)
+            HStack {
+                Text("Your Financial Summary")
+                    .headlineStyle(color: .white)
+
+                Spacer()
+
+                RefreshIndicatorView(
+                    isRefreshing: viewModel.isBackgroundRefreshing,
+                    strategy: DataRefreshService.shared.currentStrategy,
+                    lastUpdated: viewModel.lastUpdatedDescription,
+                    isStale: viewModel.isDataStale
+                )
+            }
 
             if let summary = viewModel.summary {
                 Text("Analysis of \(summary.totalTransactions) transactions over \(summary.monthsAnalyzed) months")
-                    .captionStyle()
-
-                Text("Last updated: \(summary.lastUpdated, style: .relative) ago")
                     .captionStyle()
             }
         }
@@ -247,14 +259,6 @@ struct DashboardView: View {
                     Text("View All Transactions")
                         .subheadlineStyle(color: DesignTokens.Colors.accentPrimary)
                 }
-            }
-        }
-    }
-
-    private var refreshButton: some View {
-        SecondaryButton(title: viewModel.isLoading ? "Refreshing..." : "Refresh Data", isDisabled: viewModel.isLoading) {
-            Task {
-                await viewModel.refreshAllData()
             }
         }
     }
