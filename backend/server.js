@@ -93,36 +93,7 @@ const openai = new OpenAI({
   timeout: 30000, // 30 second timeout for API calls
 });
 
-// Persistent storage for access tokens
-const TOKENS_FILE = path.join(__dirname, 'plaid_tokens.json');
-
-// Load tokens from file on startup
-function loadTokens() {
-  try {
-    if (fs.existsSync(TOKENS_FILE)) {
-      const data = fs.readFileSync(TOKENS_FILE, 'utf8');
-      const parsed = JSON.parse(data);
-      return new Map(Object.entries(parsed));
-    }
-  } catch (error) {
-    console.error('Error loading tokens from file:', error);
-  }
-  return new Map();
-}
-
-// Save tokens to file
-function saveTokens(tokens) {
-  try {
-    const obj = Object.fromEntries(tokens);
-    fs.writeFileSync(TOKENS_FILE, JSON.stringify(obj, null, 2), 'utf8');
-  } catch (error) {
-    console.error('Error saving tokens to file:', error);
-  }
-}
-
-// Initialize token storage (legacy - will be migrated to SQLite)
-const accessTokens = loadTokens();
-console.log(`💾 Loaded ${accessTokens.size} stored access token(s)`);
+// Token storage is now SQLite-only (see db/database.js)
 
 // Initialize SQLite database
 try {
@@ -142,53 +113,60 @@ app.get('/health', (req, res) => {
 // Mount auth routes
 app.use('/auth', authRoutes);
 
-// Debug endpoint to list all stored items
+// Debug endpoint to list all stored items (from SQLite)
 app.get('/api/debug/items', (req, res) => {
-  const items = Array.from(accessTokens.keys());
-  res.json({
-    count: items.length,
-    itemIds: items
-  });
+  try {
+    const db = getDb();
+    const items = db.prepare('SELECT item_id, user_id, institution_name, created_at FROM plaid_items').all();
+    res.json({
+      count: items.length,
+      items: items
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // ========== DEVELOPER ENDPOINTS (for development environment only) ==========
 
 // Get development environment status
 app.get('/api/dev/status', (req, res) => {
-  const items = Array.from(accessTokens.keys());
-  res.json({
-    status: 'ok',
-    environment: process.env.PLAID_ENV || 'sandbox',
-    timestamp: new Date().toISOString(),
-    tokens: {
-      count: items.length,
-      itemIds: items
-    }
-  });
+  try {
+    const db = getDb();
+    const items = db.prepare('SELECT item_id FROM plaid_items').all();
+    res.json({
+      status: 'ok',
+      environment: process.env.PLAID_ENV || 'sandbox',
+      timestamp: new Date().toISOString(),
+      tokens: {
+        count: items.length,
+        itemIds: items.map(i => i.item_id)
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-// Reset all tokens (clears plaid_tokens.json)
+// Reset all Plaid items (clears plaid_items table)
 app.post('/api/dev/reset-all', (req, res) => {
   try {
-    console.log('🔄 [Dev] Resetting all tokens...');
+    console.log('🔄 [Dev] Resetting all Plaid items...');
 
-    const beforeCount = accessTokens.size;
+    const db = getDb();
+    const beforeCount = db.prepare('SELECT COUNT(*) as count FROM plaid_items').get().count;
 
-    // Clear in-memory map
-    accessTokens.clear();
+    db.prepare('DELETE FROM plaid_items').run();
 
-    // Clear file storage
-    fs.writeFileSync(TOKENS_FILE, JSON.stringify({}), 'utf8');
-
-    console.log(`✅ [Dev] Reset complete. Removed ${beforeCount} tokens.`);
+    console.log(`✅ [Dev] Reset complete. Removed ${beforeCount} items.`);
 
     res.json({
       success: true,
-      message: `Reset complete. Removed ${beforeCount} tokens.`,
+      message: `Reset complete. Removed ${beforeCount} items.`,
       cleared: beforeCount
     });
   } catch (error) {
-    console.error('❌ [Dev] Error resetting tokens:', error);
+    console.error('❌ [Dev] Error resetting items:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -196,7 +174,7 @@ app.post('/api/dev/reset-all', (req, res) => {
   }
 });
 
-// Reset specific item token
+// Reset specific item
 app.post('/api/dev/reset-item/:itemId', (req, res) => {
   try {
     const { itemId } = req.params;
@@ -208,28 +186,24 @@ app.post('/api/dev/reset-item/:itemId', (req, res) => {
       });
     }
 
-    console.log(`🔄 [Dev] Removing token for item: ${itemId}`);
+    console.log(`🔄 [Dev] Removing item: ${itemId}`);
 
-    const existed = accessTokens.has(itemId);
+    const plaidItem = findPlaidItemByItemIdOnly(itemId);
 
-    if (!existed) {
+    if (!plaidItem) {
       return res.status(404).json({
         success: false,
         error: `Item ${itemId} not found`
       });
     }
 
-    // Remove from memory
-    accessTokens.delete(itemId);
+    deletePlaidItemByItemId(itemId);
 
-    // Save to file
-    saveTokens();
-
-    console.log(`✅ [Dev] Removed token for item: ${itemId}`);
+    console.log(`✅ [Dev] Removed item: ${itemId}`);
 
     res.json({
       success: true,
-      message: `Token for item ${itemId} removed`,
+      message: `Item ${itemId} removed`,
       itemId
     });
   } catch (error) {
@@ -244,11 +218,14 @@ app.post('/api/dev/reset-item/:itemId', (req, res) => {
 // ========== END DEVELOPER ENDPOINTS ==========
 
 // Create Link Token
-app.post('/api/plaid/create_link_token', async (req, res) => {
+app.post('/api/plaid/create_link_token', optionalAuth, async (req, res) => {
   try {
+    // Use authenticated userId or fallback to legacy 'user-id' for backwards compatibility
+    const userId = req.userId || 'user-id';
+
     const configs = {
       user: {
-        client_user_id: 'user-id', // In production, use actual user ID
+        client_user_id: userId,
       },
       client_name: 'Financial Analyzer',
       products: ['transactions'],
@@ -268,11 +245,11 @@ app.post('/api/plaid/create_link_token', async (req, res) => {
 });
 
 // Exchange Public Token for Access Token
-app.post('/api/plaid/exchange_public_token', async (req, res) => {
+app.post('/api/plaid/exchange_public_token', requireAuth, async (req, res) => {
   try {
     const { public_token } = req.body;
 
-    console.log(`🔄 [Token Exchange] Request received`);
+    console.log(`🔄 [Token Exchange] Request received for user: ${req.userId}`);
 
     if (!public_token) {
       console.error('❌ [Token Exchange] Missing public_token in request');
@@ -289,14 +266,18 @@ app.post('/api/plaid/exchange_public_token', async (req, res) => {
 
     console.log(`🔄 [Token Exchange] Exchange successful! ItemId: ${itemId}`);
 
-    // Store access token persistently
-    accessTokens.set(itemId, accessToken);
-    saveTokens(accessTokens);
-
-    console.log(`🔄 [Token Exchange] Token saved. Total stored tokens: ${accessTokens.size}`);
+    // Store in SQLite (encrypted)
+    const encryptedToken = encrypt(accessToken);
+    createPlaidItem({
+      id: uuidv4(),
+      userId: req.userId,
+      itemId,
+      accessTokenEncrypted: encryptedToken,
+      institutionName: null,
+    });
+    console.log(`🔄 [Token Exchange] Token saved to SQLite for user: ${req.userId}`);
 
     res.json({
-      access_token: accessToken,
       item_id: itemId,
     });
   } catch (error) {
@@ -306,17 +287,46 @@ app.post('/api/plaid/exchange_public_token', async (req, res) => {
   }
 });
 
-// Get Accounts
-app.post('/api/plaid/accounts', async (req, res) => {
+// Get user's Plaid items (for iOS to enumerate linked accounts)
+app.get('/api/plaid/items', requireAuth, async (req, res) => {
   try {
-    const { access_token } = req.body;
+    const items = findPlaidItemsByUserId(req.userId);
+    console.log(`📋 [Items] Found ${items.length} item(s) for user: ${req.userId}`);
 
-    console.log(`📊 [Accounts] Request received`);
+    res.json({
+      items: items.map(item => ({
+        item_id: item.item_id,
+        institution_name: item.institution_name,
+        created_at: item.created_at,
+      })),
+    });
+  } catch (error) {
+    console.error('❌ [Items] Error listing items:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
-    if (!access_token) {
-      console.error('❌ [Accounts] Missing access_token in request');
-      return res.status(400).json({ error: 'access_token is required' });
+// Get Accounts
+app.post('/api/plaid/accounts', requireAuth, async (req, res) => {
+  try {
+    const { item_id } = req.body;
+
+    console.log(`📊 [Accounts] Request received for user: ${req.userId}`);
+
+    if (!item_id) {
+      console.error('❌ [Accounts] Missing item_id in request');
+      return res.status(400).json({ error: 'item_id is required' });
     }
+
+    // Get token from SQLite
+    const plaidItem = findPlaidItemByItemId(req.userId, item_id);
+    if (!plaidItem) {
+      console.error(`❌ [Accounts] No Plaid item found for user ${req.userId}, item ${item_id}`);
+      return res.status(404).json({ error: 'Plaid item not found' });
+    }
+
+    const access_token = decrypt(plaidItem.access_token_encrypted);
+    console.log(`📊 [Accounts] Decrypted token for item: ${item_id}`);
 
     console.log(`📊 [Accounts] Calling Plaid accountsGet...`);
     const response = await plaidClient.accountsGet({
@@ -325,22 +335,13 @@ app.post('/api/plaid/accounts', async (req, res) => {
 
     console.log(`📊 [Accounts] Plaid returned ${response.data.accounts.length} account(s)`);
 
-    // Find the itemId for this access token
-    const itemId = Array.from(accessTokens.entries())
-      .find(([, token]) => token === access_token)?.[0];
-
-    console.log(`📊 [Accounts] Found itemId: ${itemId} for access token`);
-
     // Inject item_id into each account object so iOS can decode it
     const accountsWithItemId = response.data.accounts.map(account => ({
       ...account,
-      item_id: itemId || response.data.item.item_id
+      item_id: item_id
     }));
 
     console.log(`📊 [Accounts] Returning ${accountsWithItemId.length} account(s) with itemId injected`);
-    for (let i = 0; i < accountsWithItemId.length; i++) {
-      console.log(`📊 [Accounts]   Account ${i + 1}: ${accountsWithItemId[i].name} (id: ${accountsWithItemId[i].account_id}, item_id: ${accountsWithItemId[i].item_id})`);
-    }
 
     res.json({
       accounts: accountsWithItemId,
@@ -354,17 +355,27 @@ app.post('/api/plaid/accounts', async (req, res) => {
 });
 
 // Get Transactions
-app.post('/api/plaid/transactions', async (req, res) => {
+app.post('/api/plaid/transactions', requireAuth, async (req, res) => {
   try {
-    const { access_token, start_date, end_date } = req.body;
+    const { item_id, start_date, end_date } = req.body;
 
-    console.log(`[Transactions] Request: ${start_date} to ${end_date}`);
+    console.log(`[Transactions] Request: ${start_date} to ${end_date} for user: ${req.userId}`);
 
-    if (!access_token || !start_date || !end_date) {
+    if (!item_id || !start_date || !end_date) {
       return res.status(400).json({
-        error: 'access_token, start_date, and end_date are required',
+        error: 'item_id, start_date, and end_date are required',
       });
     }
+
+    // Get token from SQLite
+    const plaidItem = findPlaidItemByItemId(req.userId, item_id);
+    if (!plaidItem) {
+      console.error(`❌ [Transactions] No Plaid item found for user ${req.userId}, item ${item_id}`);
+      return res.status(404).json({ error: 'Plaid item not found' });
+    }
+
+    const access_token = decrypt(plaidItem.access_token_encrypted);
+    console.log(`[Transactions] Decrypted token for item: ${item_id}`);
 
     let allTransactions = [];
     let hasMore = true;
@@ -413,14 +424,21 @@ app.post('/api/plaid/transactions', async (req, res) => {
 });
 
 // Refresh Transactions (triggers Plaid to fetch new transactions)
-app.post('/api/plaid/transactions/refresh', async (req, res) => {
-  const { access_token } = req.body;
+app.post('/api/plaid/transactions/refresh', requireAuth, async (req, res) => {
+  const { item_id } = req.body;
 
-  if (!access_token) {
-    return res.status(400).json({ error: 'Missing access_token' });
+  if (!item_id) {
+    return res.status(400).json({ error: 'Missing item_id' });
   }
 
   try {
+    // Get token from SQLite
+    const plaidItem = findPlaidItemByItemId(req.userId, item_id);
+    if (!plaidItem) {
+      return res.status(404).json({ error: 'Plaid item not found' });
+    }
+
+    const access_token = decrypt(plaidItem.access_token_encrypted);
     const response = await plaidClient.transactionsRefresh({ access_token });
     console.log('[Plaid] Transactions refresh triggered:', response.data.request_id);
     res.status(202).json({ success: true, request_id: response.data.request_id });
@@ -431,14 +449,22 @@ app.post('/api/plaid/transactions/refresh', async (req, res) => {
 });
 
 // Check Sync Status - used by iOS cache to determine if data is ready
-app.post('/api/plaid/sync-status', async (req, res) => {
-  const { access_token } = req.body;
+app.post('/api/plaid/sync-status', requireAuth, async (req, res) => {
+  const { item_id } = req.body;
 
-  if (!access_token) {
-    return res.status(400).json({ error: 'Missing access_token' });
+  if (!item_id) {
+    return res.status(400).json({ error: 'Missing item_id' });
   }
 
   try {
+    // Get token from SQLite
+    const plaidItem = findPlaidItemByItemId(req.userId, item_id);
+    if (!plaidItem) {
+      return res.status(404).json({ error: 'Plaid item not found' });
+    }
+
+    const access_token = decrypt(plaidItem.access_token_encrypted);
+
     // Try transactionsSync with count:1 to check if transactions are available
     const response = await plaidClient.transactionsSync({
       access_token,
@@ -463,13 +489,21 @@ app.post('/api/plaid/sync-status', async (req, res) => {
 });
 
 // Get Account Balance
-app.post('/api/plaid/balance', async (req, res) => {
+app.post('/api/plaid/balance', requireAuth, async (req, res) => {
   try {
-    const { access_token } = req.body;
+    const { item_id } = req.body;
 
-    if (!access_token) {
-      return res.status(400).json({ error: 'access_token is required' });
+    if (!item_id) {
+      return res.status(400).json({ error: 'item_id is required' });
     }
+
+    // Get token from SQLite
+    const plaidItem = findPlaidItemByItemId(req.userId, item_id);
+    if (!plaidItem) {
+      return res.status(404).json({ error: 'Plaid item not found' });
+    }
+
+    const access_token = decrypt(plaidItem.access_token_encrypted);
 
     const response = await plaidClient.accountsBalanceGet({
       access_token,
@@ -485,28 +519,25 @@ app.post('/api/plaid/balance', async (req, res) => {
 });
 
 // Remove Item (disconnect bank account)
-app.post('/api/plaid/item/remove', async (req, res) => {
+app.post('/api/plaid/item/remove', requireAuth, async (req, res) => {
   try {
     console.log('🗑️ [Backend] Received account removal request');
-    const { access_token } = req.body;
+    const { item_id } = req.body;
 
-    if (!access_token) {
-      console.log('❌ [Backend] No access_token provided');
-      return res.status(400).json({ error: 'access_token is required' });
+    if (!item_id) {
+      console.log('❌ [Backend] No item_id provided');
+      return res.status(400).json({ error: 'item_id is required' });
     }
 
-    // Get itemId before removal
-    console.log('🗑️ [Backend] Looking up itemId in storage...');
-    console.log('🗑️ [Backend] Current stored items:', Array.from(accessTokens.keys()));
-
-    const itemId = Array.from(accessTokens.entries())
-      .find(([, token]) => token === access_token)?.[0];
-
-    if (itemId) {
-      console.log('✅ [Backend] Found itemId:', itemId);
-    } else {
-      console.log('⚠️ [Backend] ItemId not found in storage - access token may not match');
+    // Get token from SQLite
+    const plaidItem = findPlaidItemByItemId(req.userId, item_id);
+    if (!plaidItem) {
+      console.log(`❌ [Backend] No Plaid item found for user ${req.userId}, item ${item_id}`);
+      return res.status(404).json({ error: 'Plaid item not found' });
     }
+
+    const access_token = decrypt(plaidItem.access_token_encrypted);
+    console.log(`🗑️ [Backend] Found token for item: ${item_id}`);
 
     // Remove from Plaid
     console.log('🗑️ [Backend] Calling Plaid itemRemove API...');
@@ -515,18 +546,14 @@ app.post('/api/plaid/item/remove', async (req, res) => {
     });
     console.log('✅ [Backend] Plaid itemRemove successful');
 
-    // Remove from storage
-    if (itemId) {
-      console.log('🗑️ [Backend] Removing itemId from storage:', itemId);
-      accessTokens.delete(itemId);
-      saveTokens(accessTokens);
-      console.log('✅ [Backend] ItemId removed from storage');
-      console.log('🗑️ [Backend] Remaining items:', Array.from(accessTokens.keys()));
-    }
+    // Remove from SQLite
+    console.log('🗑️ [Backend] Removing item from database:', item_id);
+    deletePlaidItem(req.userId, item_id);
+    console.log('✅ [Backend] Item removed from database');
 
     const response = {
       removed: true,
-      item_id: itemId || null
+      item_id: item_id
     };
     console.log('✅ [Backend] Sending response:', response);
     res.json(response);

@@ -109,11 +109,12 @@ class DataResetManager {
         }
     }
 
-    /// Clear all Keychain access tokens
+    /// Clear all Keychain access tokens (Plaid + Auth)
     private static func clearKeychain() {
+        // Clear Plaid tokens
         do {
             let allKeys = try KeychainService.shared.allKeys()
-            print("🗑️ [Reset] Found \(allKeys.count) Keychain item(s) to delete")
+            print("🗑️ [Reset] Found \(allKeys.count) Plaid Keychain item(s) to delete")
 
             for key in allKeys {
                 do {
@@ -123,10 +124,14 @@ class DataResetManager {
                     print("🗑️ [Reset] ⚠️ Failed to delete Keychain item '\(key)': \(error)")
                 }
             }
-            print("🗑️ [Reset] Keychain cleared (\(allKeys.count) items removed)")
+            print("🗑️ [Reset] Plaid Keychain cleared (\(allKeys.count) items removed)")
         } catch {
             print("🗑️ [Reset] ⚠️ Error listing Keychain keys: \(error)")
         }
+
+        // Clear auth tokens
+        SecureTokenStorage.shared.clearAll()
+        print("🗑️ [Reset] Auth tokens cleared")
     }
 
     /// Clear encrypted transaction and account caches

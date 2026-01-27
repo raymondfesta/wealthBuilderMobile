@@ -7,12 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AU001001 /* AuthState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AU002001 /* AuthState.swift */; };
-		AU001002 /* AuthUser.swift in Sources */ = {isa = PBXBuildFile; fileRef = AU002002 /* AuthUser.swift */; };
-		AU001003 /* SecureTokenStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = AU002003 /* SecureTokenStorage.swift */; };
-		AU001004 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AU002004 /* AuthService.swift */; };
-		AU001005 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AU002005 /* LoginView.swift */; };
-		AU001006 /* AuthRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AU002006 /* AuthRootView.swift */; };
 		991CAD642EAD528200000EDB /* FinancialHealthMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD612EAD528200000EDB /* FinancialHealthMetrics.swift */; };
 		991CAD652EAD528200000EDB /* LoadingStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD622EAD528200000EDB /* LoadingStep.swift */; };
 		991CAD662EAD528200000EDB /* PersonalFinanceCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991CAD632EAD528200000EDB /* PersonalFinanceCategory.swift */; };
@@ -86,6 +80,13 @@
 		AA001034 /* RebalanceToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA005007 /* RebalanceToast.swift */; };
 		AA006001 /* ExpenseBreakdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA006002 /* ExpenseBreakdown.swift */; };
 		AA006003 /* ExpenseBreakdownSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA006004 /* ExpenseBreakdownSheet.swift */; };
+		AU001001 /* AuthState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AU002001 /* AuthState.swift */; };
+		AU001002 /* AuthUser.swift in Sources */ = {isa = PBXBuildFile; fileRef = AU002002 /* AuthUser.swift */; };
+		AU001003 /* SecureTokenStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = AU002003 /* SecureTokenStorage.swift */; };
+		AU001004 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AU002004 /* AuthService.swift */; };
+		AU001005 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AU002005 /* LoginView.swift */; };
+		AU001006 /* AuthRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AU002006 /* AuthRootView.swift */; };
+		AU001007 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AU002008 /* ProfileView.swift */; };
 		DS001001 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = DS002001 /* DesignTokens.swift */; };
 		DS001002 /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = DS002002 /* Typography.swift */; };
 		DS001003 /* GlassmorphicCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DS002003 /* GlassmorphicCard.swift */; };
@@ -110,15 +111,16 @@
 		FA001018 /* UserJourneyState.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA002005 /* UserJourneyState.swift */; };
 		FA001019 /* SecureTransactionCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA003010 /* SecureTransactionCache.swift */; };
 		FA001020 /* TransactionFetchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA003011 /* TransactionFetchService.swift */; };
+		OB001001 /* OnboardingFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = OB002001 /* OnboardingFlowView.swift */; };
+		OB001002 /* WelcomeConnectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = OB002002 /* WelcomeConnectView.swift */; };
+		OB001003 /* AccountsConnectedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = OB002003 /* AccountsConnectedView.swift */; };
+		CP001001 /* BucketCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CP002001 /* BucketCard.swift */; };
+		CP001002 /* TransactionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = CP002002 /* TransactionRow.swift */; };
+		CP001003 /* BudgetStatusCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CP002003 /* BudgetStatusCard.swift */; };
+		CP001004 /* AllocationBucketSummaryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CP002004 /* AllocationBucketSummaryCard.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		AU002001 /* AuthState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthState.swift; sourceTree = "<group>"; };
-		AU002002 /* AuthUser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthUser.swift; sourceTree = "<group>"; };
-		AU002003 /* SecureTokenStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureTokenStorage.swift; sourceTree = "<group>"; };
-		AU002004 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
-		AU002005 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
-		AU002006 /* AuthRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthRootView.swift; sourceTree = "<group>"; };
 		991CAD612EAD528200000EDB /* FinancialHealthMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialHealthMetrics.swift; sourceTree = "<group>"; };
 		991CAD622EAD528200000EDB /* LoadingStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingStep.swift; sourceTree = "<group>"; };
 		991CAD632EAD528200000EDB /* PersonalFinanceCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalFinanceCategory.swift; sourceTree = "<group>"; };
@@ -192,6 +194,14 @@
 		AA005007 /* RebalanceToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RebalanceToast.swift; sourceTree = "<group>"; };
 		AA006002 /* ExpenseBreakdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpenseBreakdown.swift; sourceTree = "<group>"; };
 		AA006004 /* ExpenseBreakdownSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpenseBreakdownSheet.swift; sourceTree = "<group>"; };
+		AU002001 /* AuthState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthState.swift; sourceTree = "<group>"; };
+		AU002002 /* AuthUser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthUser.swift; sourceTree = "<group>"; };
+		AU002003 /* SecureTokenStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureTokenStorage.swift; sourceTree = "<group>"; };
+		AU002004 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
+		AU002005 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		AU002006 /* AuthRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthRootView.swift; sourceTree = "<group>"; };
+		AU002007 /* FinancialAnalyzer.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FinancialAnalyzer.entitlements; sourceTree = "<group>"; };
+		AU002008 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		DS002001 /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
 		DS002002 /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typography.swift; sourceTree = "<group>"; };
 		DS002003 /* GlassmorphicCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassmorphicCard.swift; sourceTree = "<group>"; };
@@ -216,6 +226,13 @@
 		FA005005 /* CategoryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryDetailView.swift; sourceTree = "<group>"; };
 		FA005006 /* WelcomePageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomePageView.swift; sourceTree = "<group>"; };
 		FA006000 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
+		OB002001 /* OnboardingFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlowView.swift; sourceTree = "<group>"; };
+		OB002002 /* WelcomeConnectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeConnectView.swift; sourceTree = "<group>"; };
+		OB002003 /* AccountsConnectedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsConnectedView.swift; sourceTree = "<group>"; };
+		CP002001 /* BucketCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BucketCard.swift; sourceTree = "<group>"; };
+		CP002002 /* TransactionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionRow.swift; sourceTree = "<group>"; };
+		CP002003 /* BudgetStatusCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetStatusCard.swift; sourceTree = "<group>"; };
+		CP002004 /* AllocationBucketSummaryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationBucketSummaryCard.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -241,8 +258,24 @@
 				AA005005 /* EmergencyFundDurationPicker.swift */,
 				AA005006 /* InvestmentProjectionView.swift */,
 				AA005007 /* RebalanceToast.swift */,
+				CP002001 /* BucketCard.swift */,
+				CP002002 /* TransactionRow.swift */,
+				CP002003 /* BudgetStatusCard.swift */,
+				CP002004 /* AllocationBucketSummaryCard.swift */,
 			);
 			path = Components;
+			sourceTree = "<group>";
+		};
+		OB003000 /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				OB002001 /* OnboardingFlowView.swift */,
+				OB002002 /* WelcomeConnectView.swift */,
+				OB002003 /* AccountsConnectedView.swift */,
+				AA004003 /* AnalysisCompleteView.swift */,
+				9978B8FA2EA839BB0065A5FE /* AllocationPlannerView.swift */,
+			);
+			path = Onboarding;
 			sourceTree = "<group>";
 		};
 		991CAD842EAD537200000EDB /* Extensions */ = {
@@ -285,6 +318,7 @@
 		FA000003 /* FinancialAnalyzer */ = {
 			isa = PBXGroup;
 			children = (
+				AU002007 /* FinancialAnalyzer.entitlements */,
 				991CAD842EAD537200000EDB /* Extensions */,
 				DS003000 /* DesignSystem */,
 				FA001000 /* FinancialAnalyzerApp.swift */,
@@ -372,6 +406,10 @@
 			isa = PBXGroup;
 			children = (
 				991CAD7A2EAD533300000EDB /* Components */,
+				OB003000 /* Onboarding */,
+				AU002005 /* LoginView.swift */,
+				AU002006 /* AuthRootView.swift */,
+				AU002008 /* ProfileView.swift */,
 				9978B8F02EA811860065A5FE /* AddBudgetSheet.swift */,
 				9978B8F12EA811860065A5FE /* LoadingOverlay.swift */,
 				9978B8F22EA811860065A5FE /* SuccessBanner.swift */,
@@ -395,10 +433,8 @@
 				FA005005 /* CategoryDetailView.swift */,
 				9978B8F82EA839BB0065A5FE /* AllocationBucketCard.swift */,
 				9978B8F92EA839BB0065A5FE /* AllocationBucketDetailView.swift */,
-				9978B8FA2EA839BB0065A5FE /* AllocationPlannerView.swift */,
 				AA004001 /* AllocationHistoryView.swift */,
 				AA004002 /* AllocationReminderSheet.swift */,
-				AA004003 /* AnalysisCompleteView.swift */,
 				AA004004 /* AnalysisDrillDownSheets.swift */,
 				AA004005 /* CurrencyTextField.swift */,
 				AA004006 /* HealthTabView.swift */,
@@ -494,6 +530,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AU001001 /* AuthState.swift in Sources */,
+				AU001002 /* AuthUser.swift in Sources */,
+				AU001003 /* SecureTokenStorage.swift in Sources */,
+				AU001004 /* AuthService.swift in Sources */,
+				AU001005 /* LoginView.swift in Sources */,
+				AU001006 /* AuthRootView.swift in Sources */,
+				AU001007 /* ProfileView.swift in Sources */,
 				DS001001 /* DesignTokens.swift in Sources */,
 				DS001002 /* Typography.swift in Sources */,
 				DS001003 /* GlassmorphicCard.swift in Sources */,
@@ -590,6 +633,13 @@
 				991CAD7B2EAD533300000EDB /* HealthReportComponents.swift in Sources */,
 				AA006001 /* ExpenseBreakdown.swift in Sources */,
 				AA006003 /* ExpenseBreakdownSheet.swift in Sources */,
+				OB001001 /* OnboardingFlowView.swift in Sources */,
+				OB001002 /* WelcomeConnectView.swift in Sources */,
+				OB001003 /* AccountsConnectedView.swift in Sources */,
+				CP001001 /* BucketCard.swift in Sources */,
+				CP001002 /* TransactionRow.swift in Sources */,
+				CP001003 /* BudgetStatusCard.swift in Sources */,
+				CP001004 /* AllocationBucketSummaryCard.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -717,6 +767,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = FinancialAnalyzer/FinancialAnalyzer.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
@@ -747,6 +798,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = FinancialAnalyzer/FinancialAnalyzer.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";

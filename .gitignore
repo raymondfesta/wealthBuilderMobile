@@ -103,3 +103,8 @@ Secrets.plist
 
 # Backend - Plaid access tokens
 backend/plaid_tokens.json
+
+# SQLite database files
+backend/db/*.db
+backend/db/*.db-shm
+backend/db/*.db-wal

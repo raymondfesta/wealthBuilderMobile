@@ -21,15 +21,19 @@ Native iOS financial app (SwiftUI) with Node.js backend. Connects bank accounts 
 - MVVM architecture
 - Plaid Link SDK 5.0+ (via SPM)
 - iOS 16.0+ target
-- Keychain for secure token storage
+- Keychain for secure token storage (auth + Plaid tokens)
 - Encrypted transaction cache (AES-256-GCM)
+- Sign in with Apple + email/password auth
 
 ### Backend (Node.js)
 - Express 4.18.2
 - Plaid SDK 21.0.0
 - OpenAI 6.2.0
+- SQLite (better-sqlite3) for user/session storage
+- JWT auth (jsonwebtoken) - 15min access, 30d refresh
+- AES-256-GCM encryption for Plaid tokens
+- bcrypt for password hashing
 - Rate limiting (express-rate-limit)
-- JWT handling (jose, jsonwebtoken)
 
 ### Testing
 - XCTest for unit tests
@@ -46,7 +50,9 @@ Native iOS financial app (SwiftUI) with Node.js backend. Connects bank accounts 
 ### Project Structure
 ```
 FinancialAnalyzer/
-├── Models/                    # 24 data models
+├── Models/                    # 26 data models
+│   ├── AuthState.swift        # Auth state enum (loading/unauthenticated/authenticated)
+│   ├── AuthUser.swift         # User model + auth response structs
 │   ├── Transaction.swift      # Plaid transaction + categoryConfidence
 │   ├── BankAccount.swift      # Account with itemId, minimumPayment, apr
 │   ├── FinancialPosition.swift # Balances + DebtAccount[], DebtType
@@ -58,7 +64,8 @@ FinancialAnalyzer/
 │   ├── AllocationBucket.swift # 4-5 allocation buckets
 │   ├── PaycheckSchedule.swift
 │   └── UserJourneyState.swift # Onboarding state machine
-├── Services/                  # 16 service files
+├── Services/                  # 17 service files
+│   ├── AuthService.swift      # Apple + email/password auth
 │   ├── PlaidService.swift     # Plaid API + link token caching
 │   ├── SecureTransactionCache.swift # AES-256-GCM encrypted cache
 │   ├── TransactionFetchService.swift # Cache-first fetching
@@ -71,21 +78,45 @@ FinancialAnalyzer/
 ├── ViewModels/
 │   ├── FinancialViewModel.swift # Central state coordinator
 │   └── AllocationEditorViewModel.swift
-├── Views/                     # 40+ SwiftUI views
-│   ├── DashboardView.swift
-│   ├── AllocationPlannerView.swift
+├── Views/                     # 50+ SwiftUI views
+│   ├── AuthRootView.swift     # Root auth router
+│   ├── LoginView.swift        # Sign in with Apple + email/password
+│   ├── ProfileView.swift      # User profile + logout
+│   ├── DashboardView.swift    # Post-onboarding dashboard only
 │   ├── ScheduleTabView.swift
+│   ├── Onboarding/            # Onboarding flow (separated from Dashboard)
+│   │   ├── OnboardingFlowView.swift    # Journey state router
+│   │   ├── WelcomeConnectView.swift    # Connect bank CTA
+│   │   ├── AccountsConnectedView.swift # Analyze CTA
+│   │   ├── AnalysisCompleteView.swift  # Analysis results + drill-downs
+│   │   └── AllocationPlannerView.swift # Plan creation
 │   └── Components/            # Reusable UI
+│       ├── BucketCard.swift
+│       ├── TransactionRow.swift
+│       ├── BudgetStatusCard.swift
+│       └── AllocationBucketSummaryCard.swift
 ├── DesignSystem/              # Glassmorphic components
 └── Utilities/
     ├── KeychainService.swift
+    ├── SecureTokenStorage.swift # Auth token keychain storage
     └── DataResetManager.swift
 
 backend/
 ├── server.js                  # Express server (~1800 lines)
 ├── package.json
-├── .env                       # Plaid + OpenAI keys
-└── plaid_tokens.json          # Token storage (gitignored)
+├── .env                       # Plaid, OpenAI, JWT, encryption keys
+├── db/
+│   ├── database.js            # SQLite connection + migrations
+│   └── schema.sql             # Users, plaid_items, sessions tables
+├── routes/
+│   └── auth.js                # Auth endpoints (register, login, apple, refresh)
+├── middleware/
+│   └── auth.js                # requireAuth/optionalAuth middleware
+├── services/
+│   ├── encryption.js          # AES-256-GCM for Plaid tokens
+│   └── token.js               # JWT generation/validation
+└── data/
+    └── wealth.db              # SQLite database (gitignored)
 ```
 
 ### Key Patterns
@@ -252,28 +283,30 @@ Cmd+R to build and run
 ## Current Focus
 
 **Recent work (from git):**
+- User authentication system COMPLETE
+  - Sign in with Apple + email/password
+  - SQLite database (users, plaid_items, sessions tables)
+  - JWT auth (15min access, 30d refresh tokens)
+  - AES-256-GCM encrypted Plaid token storage
+  - bcrypt password hashing
+  - Multi-user data scoping
 - Session cache implementation (encrypted local caching)
   - `SecureTransactionCache.swift` - AES-256-GCM encrypted file cache
-  - `TransactionFetchService.swift` - Cache-first fetching with retry
-  - Backend: `/api/plaid/sync-status` endpoint, `days_requested: 90`
-  - 3-month history (reduced from 6 for faster sync)
   - 24h cache expiration with background refresh
 - TASK 1-6: TransactionAnalyzer implementation plan COMPLETE
 - Design system (glassmorphic components)
-- Expense breakdown feature
-- Swift 6 concurrency fixes
 
 **Next priorities:**
-- User authentication system
-- Production database (replace JSON storage)
+- Sign in with Apple capability (requires Apple Developer portal setup)
 - CI/CD pipeline
+- Production deployment prep
 
 ## Known Constraints
 
 - iOS 16.0+ minimum
 - Backend: localhost:3000 (dev only)
 - No CI/CD (manual Xcode builds)
-- No user authentication (single-user dev mode)
+- Sign in with Apple requires Apple Developer portal setup
 - Plaid sandbox: 10 accounts max per custom user
 
 ## Common Issues & Solutions
@@ -312,6 +345,9 @@ PLAID_SECRET=your_sandbox_secret
 PLAID_ENV=sandbox
 PORT=3000
 OPENAI_API_KEY=sk-your-key
+JWT_SECRET=<256-bit-secret>
+ENCRYPTION_KEY=<32-byte-hex-key>
+APPLE_BUNDLE_ID=com.yourcompany.FinancialAnalyzer
 ```
 
 ### iOS Configuration
@@ -341,9 +377,9 @@ OPENAI_API_KEY=sk-your-key
 **Trade-offs:** Large ViewModel; could split if complexity grows
 
 ### 2025-01: Token Storage
-**Decision:** Keychain (iOS) + JSON file (backend)
-**Rationale:** Keychain is secure for mobile. JSON is MVP-simple for backend.
-**Trade-offs:** JSON not production-ready; migrate to encrypted DB
+**Decision:** Keychain (iOS) + SQLite with AES-256-GCM encryption (backend)
+**Rationale:** Keychain for auth tokens. SQLite for user data. Plaid tokens encrypted at rest.
+**Trade-offs:** SQLite not horizontally scalable; acceptable for MVP
 
 ### 2025-01: Health Score Privacy
 **Decision:** Health score (0-100) never shown to users
@@ -364,8 +400,9 @@ OPENAI_API_KEY=sk-your-key
 
 - [ ] Switch PLAID_ENV=development
 - [ ] Update baseURL to production API
-- [ ] Implement user authentication (OAuth/JWT)
-- [ ] Replace JSON with encrypted database
+- [x] Implement user authentication (JWT + Apple Sign In)
+- [x] Replace JSON with encrypted database (SQLite + AES-256-GCM)
+- [ ] Configure Sign in with Apple in Apple Developer portal
 - [ ] Add rate limiting on all endpoints
 - [ ] Set up HTTPS
 - [ ] Configure App Store privacy policy

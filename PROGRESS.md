@@ -1,10 +1,14 @@
 # Project Progress Tracker
 
-Last Updated: 2026-01-26 (Session cache implementation)
+Last Updated: 2026-01-26 (View structure refactoring)
 
 ## Current State
 
 ### What's Working ✓
+- **User authentication** (Sign in with Apple + email/password)
+- **SQLite database** (users, plaid_items, sessions tables)
+- **Encrypted Plaid tokens** (AES-256-GCM at rest)
+- JWT auth (15min access, 30d refresh tokens)
 - Plaid bank account connection (sandbox)
 - Transaction fetching and categorization
 - Financial health metrics calculation
@@ -18,50 +22,87 @@ Last Updated: 2026-01-26 (Session cache implementation)
 - Encrypted session cache (AES-256-GCM, 24h expiry)
 - Cache-first loading (<1s repeat analysis)
 - Automated data reset via launch arguments
-- Keychain token storage
+- Keychain token storage (auth + Plaid)
 
 ### In Progress 🔨
-- User authentication system
-- Production database (replace JSON storage)
+- Sign in with Apple capability setup (requires Apple Developer portal)
 - CI/CD pipeline
 
 ### Blocked/Waiting ⏸
 - Production Plaid credentials (development env pending)
-- App Store submission (needs auth + privacy policy)
+- App Store submission (needs privacy policy)
+- Sign in with Apple (needs Apple Developer portal configuration)
 
 ---
 
 ## Next Up
 
-**Priority 1: User Authentication**
-- OAuth or JWT-based auth flow
-- Secure session management
-- Multi-user support
-- Files: New `AuthService.swift`, `LoginView.swift`, backend auth routes
-- Tests: Login, logout, token refresh, invalid credentials
+**Priority 1: Sign in with Apple Setup**
+- Configure App ID in Apple Developer portal
+- Enable Sign in with Apple capability in Xcode
+- Test Apple auth flow end-to-end
 
-**Priority 2: Production Database**
-- Replace `plaid_tokens.json` with encrypted DB
-- PostgreSQL or SQLite for backend
-- Migration scripts for existing data
-- Files: `backend/server.js`, new DB config
-
-**Priority 3: CI/CD Pipeline**
+**Priority 2: CI/CD Pipeline**
 - GitHub Actions for automated tests
 - Automated build validation
 - Xcode Cloud or Fastlane for iOS builds
 
-**Priority 4: Push Notifications**
+**Priority 3: Push Notifications**
 - Paycheck detection alerts
 - Allocation reminders
 - Budget threshold warnings
-- Files: `NotificationService.swift`, backend push integration
+
+**Priority 4: Production Deployment**
+- Switch PLAID_ENV=development
+- Set up HTTPS
+- Configure App Store privacy policy
 
 ---
 
 ## Completed This Session
 
 ### 2026-01-26
+- ✓ **User Authentication System**
+  - **Goal:** Multi-user auth with Sign in with Apple + email/password
+  - **Backend files created:**
+    - `db/database.js` - SQLite connection, migrations, CRUD
+    - `db/schema.sql` - users, plaid_items, sessions tables
+    - `services/encryption.js` - AES-256-GCM for Plaid tokens
+    - `services/token.js` - JWT generation/validation
+    - `middleware/auth.js` - requireAuth/optionalAuth
+    - `routes/auth.js` - register, login, apple, refresh, logout
+  - **iOS files created:**
+    - `AuthState.swift`, `AuthUser.swift` - Auth models
+    - `AuthService.swift` - Apple + email/password auth
+    - `SecureTokenStorage.swift` - Keychain for auth tokens
+    - `LoginView.swift`, `AuthRootView.swift`, `ProfileView.swift`
+  - **Modified:** server.js, PlaidService.swift, DashboardView.swift, DataResetManager.swift, FinancialAnalyzerApp.swift
+  - **Database:** 4 tables, bcrypt passwords, AES-256-GCM Plaid tokens
+  - **Build verified:** ✓ Backend + iOS compile successfully
+
+- ✓ **View Structure Refactoring (Separation of Concerns)**
+  - **Goal:** Separate onboarding flow from post-onboarding dashboard
+  - **Problem:** DashboardView conflated two responsibilities - handling journey states 1-4 (onboarding) AND state 5 (planCreated dashboard)
+  - **Files created:**
+    - `Views/Onboarding/OnboardingFlowView.swift` - Router for onboarding states
+    - `Views/Onboarding/WelcomeConnectView.swift` - Connect bank CTA (extracted)
+    - `Views/Onboarding/AccountsConnectedView.swift` - Analyze CTA (extracted)
+    - `Views/Components/BucketCard.swift` - Extracted inline component
+    - `Views/Components/TransactionRow.swift` - Extracted inline component
+    - `Views/Components/BudgetStatusCard.swift` - Extracted inline component
+    - `Views/Components/AllocationBucketSummaryCard.swift` - Extracted inline component
+  - **Files moved:**
+    - `AnalysisCompleteView.swift` → `Views/Onboarding/`
+    - `AllocationPlannerView.swift` → `Views/Onboarding/`
+  - **Files modified:**
+    - `DashboardView.swift` - Reduced from ~833 to ~333 lines
+    - `FinancialAnalyzerApp.swift` - Uses OnboardingFlowView during onboarding
+    - `project.pbxproj` - Updated file references
+  - **Architecture:**
+    - Onboarding: OnboardingFlowView routes journey states 1-4
+    - Post-onboarding: TabView with DashboardView (only planActiveView)
+  - **Build verified:** ✓ Compiled successfully
+
 - ✓ **Session Cache Implementation (Encrypted Local Caching)**
   - **Goal:** Instant app loads after first analysis, zero server-side storage
   - **Files created:**
@@ -271,15 +312,10 @@ Last Updated: 2026-01-26 (Session cache implementation)
 (none)
 
 ### Important 🟡
-- **No user authentication**
-  - Single-user dev mode only
-  - Blocks production deployment
-  - Impact: Cannot deploy to App Store
-
-- **Backend uses JSON file storage**
-  - `plaid_tokens.json` not suitable for production
-  - No encryption at rest
-  - Impact: Security concern for production
+- **Sign in with Apple needs Apple Developer portal setup**
+  - Capability not yet configured
+  - Email/password auth works as fallback
+  - Impact: Apple Sign In button will fail until configured
 
 ### Minor 🟢
 - Plaid sandbox limited to 10 accounts per custom user
@@ -291,15 +327,10 @@ Last Updated: 2026-01-26 (Session cache implementation)
 ## Technical Debt
 
 ### High Priority
-- **Backend needs database migration**
-  - JSON storage → PostgreSQL/SQLite
-  - Add encryption for sensitive data
-  - File: `backend/server.js` (~1800 lines, needs refactor)
-
-- **Add user authentication**
-  - Currently no auth layer
-  - Need OAuth or JWT implementation
-  - Security requirement for production
+- **Configure Sign in with Apple**
+  - Needs Apple Developer portal setup
+  - Add capability to App ID
+  - Test Apple auth flow end-to-end
 
 ### Medium Priority
 - **Test coverage needs improvement**
@@ -374,6 +405,20 @@ Enable `-ResetDataOnLaunch` in Xcode scheme for clean state on each run.
 
 ## Architecture Decisions Log
 
+### 2026-01-26: User Authentication System
+**Decision:** JWT auth with Sign in with Apple + email/password, SQLite database
+**Rationale:** Multi-user support required for production; SQLite simple for MVP
+**Implementation:** 15min access tokens, 30d refresh tokens, bcrypt passwords, AES-256-GCM Plaid tokens
+**Files:** `db/`, `routes/auth.js`, `AuthService.swift`, `LoginView.swift`, `AuthRootView.swift`
+**Trade-off:** SQLite not horizontally scalable; acceptable for MVP
+
+### 2026-01-26: View Structure Refactoring
+**Decision:** Separate onboarding flow into dedicated router, extract inline components
+**Rationale:** DashboardView conflated onboarding (journey states 1-4) and dashboard (state 5); violated single responsibility
+**Implementation:** OnboardingFlowView routes pre-dashboard states; DashboardView handles only post-onboarding
+**Files:** `Views/Onboarding/` (5 files), `Views/Components/` (4 extracted components)
+**Trade-off:** More files but cleaner separation; each page has dedicated view
+
 ### 2026-01-26: Session Cache Implementation
 **Decision:** Encrypted local caching of transactions/accounts with 24h expiry
 **Rationale:** Instant repeat loads (<1s vs 15-30s), zero server-side financial data storage
@@ -419,13 +464,14 @@ Enable `-ResetDataOnLaunch` in Xcode scheme for clean state on each run.
 ## Notes for Future Sessions
 
 ### Immediate Priorities
-1. User authentication (blocks production)
-2. Replace JSON storage with database
+1. Configure Sign in with Apple (Apple Developer portal)
+2. CI/CD pipeline setup
 3. Improve test coverage
 
 ### Before Launch Checklist
-- [ ] User authentication
-- [ ] Production database
+- [x] User authentication (JWT + Apple Sign In)
+- [x] Production database (SQLite + encrypted Plaid tokens)
+- [ ] Sign in with Apple capability configuration
 - [ ] HTTPS in production
 - [ ] Privacy policy
 - [ ] App Store assets
@@ -434,9 +480,8 @@ Enable `-ResetDataOnLaunch` in Xcode scheme for clean state on each run.
 - [ ] Plaid development credentials
 
 ### Questions to Resolve
-- OAuth vs JWT for auth?
-- PostgreSQL vs SQLite for backend DB?
 - Which error monitoring service?
+- Xcode Cloud vs Fastlane for CI/CD?
 
 ---
 

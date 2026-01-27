@@ -8,6 +8,7 @@ class PlaidService: ObservableObject {
 
     private let baseURL: String
     private var linkHandler: Handler?
+    private let tokenStorage = SecureTokenStorage.shared
 
     // Link token caching
     private var cachedLinkToken: String?
@@ -16,6 +17,15 @@ class PlaidService: ObservableObject {
 
     init(baseURL: String = "http://192.168.1.8:3000") {
         self.baseURL = baseURL
+    }
+
+    // MARK: - Auth Header Helper
+
+    /// Adds Authorization header if user is authenticated
+    private func addAuthHeader(to request: inout URLRequest) {
+        if let accessToken = tokenStorage.accessToken {
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        }
     }
 
     // MARK: - Link Token Creation
@@ -58,6 +68,7 @@ class PlaidService: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        addAuthHeader(to: &request)
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -123,7 +134,7 @@ class PlaidService: ObservableObject {
     // MARK: - Token Exchange
 
     private func exchangePublicToken(_ publicToken: String) async throws {
-        print("🔄 [PlaidService] Exchanging public token for access token...")
+        print("🔄 [PlaidService] Exchanging public token...")
         let endpoint = "\(baseURL)/api/plaid/exchange_public_token"
 
         guard let url = URL(string: endpoint) else {
@@ -134,6 +145,7 @@ class PlaidService: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        addAuthHeader(to: &request)
 
         let body = ["public_token": publicToken]
         request.httpBody = try JSONEncoder().encode(body)
@@ -155,24 +167,22 @@ class PlaidService: ObservableObject {
             throw PlaidError.tokenExchangeFailed
         }
 
-        let tokenResponse = try JSONDecoder().decode(AccessTokenResponse.self, from: data)
+        let tokenResponse = try JSONDecoder().decode(ExchangeTokenResponse.self, from: data)
         print("✅ [PlaidService] Token exchanged successfully, itemId: \(tokenResponse.itemId)")
 
-        // Store access token securely
-        try KeychainService.shared.save(
-            tokenResponse.accessToken,
-            for: tokenResponse.itemId
-        )
-        print("✅ [PlaidService] Access token saved to Keychain for itemId: \(tokenResponse.itemId)")
+        // Store itemId in Keychain (backend now handles access tokens)
+        // We use a placeholder value since backend stores the actual token
+        try KeychainService.shared.save("backend-managed", for: tokenResponse.itemId)
+        print("✅ [PlaidService] ItemId saved to Keychain: \(tokenResponse.itemId)")
 
         // Trigger transaction refresh so Plaid populates transactions
-        await refreshTransactions(accessToken: tokenResponse.accessToken)
+        await refreshTransactions(itemId: tokenResponse.itemId)
     }
 
     // MARK: - Fetch Accounts
 
-    func fetchAccounts(accessToken: String) async throws -> [BankAccount] {
-        print("🔄 [PlaidService] Fetching accounts...")
+    func fetchAccounts(itemId: String) async throws -> [BankAccount] {
+        print("🔄 [PlaidService] Fetching accounts for item: \(itemId)")
         let endpoint = "\(baseURL)/api/plaid/accounts"
 
         guard let url = URL(string: endpoint) else {
@@ -183,12 +193,12 @@ class PlaidService: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        addAuthHeader(to: &request)
 
-        let body = ["access_token": accessToken]
+        let body = ["item_id": itemId]
         request.httpBody = try JSONEncoder().encode(body)
 
         print("🔄 [PlaidService] Calling \(endpoint)...")
-        print("🔄 [PlaidService] Access token (first 10 chars): \(String(accessToken.prefix(10)))...")
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -206,18 +216,8 @@ class PlaidService: ObservableObject {
             throw PlaidError.accountFetchFailed
         }
 
-        // Log raw response for debugging
-        if let responseStr = String(data: data, encoding: .utf8) {
-            print("🔄 [PlaidService] Raw response: \(responseStr)")
-        }
-
         let accountsResponse = try JSONDecoder().decode(AccountsResponse.self, from: data)
         print("✅ [PlaidService] Fetched \(accountsResponse.accounts.count) account(s)")
-
-        // Log details about each account
-        for (index, account) in accountsResponse.accounts.enumerated() {
-            print("✅ [PlaidService]   Account \(index + 1): \(account.name) (id: \(account.id), itemId: \(account.itemId))")
-        }
 
         return accountsResponse.accounts
     }
@@ -225,7 +225,7 @@ class PlaidService: ObservableObject {
     // MARK: - Fetch Transactions
 
     func fetchTransactions(
-        accessToken: String,
+        itemId: String,
         startDate: Date,
         endDate: Date
     ) async throws -> [Transaction] {
@@ -238,6 +238,7 @@ class PlaidService: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        addAuthHeader(to: &request)
         // Increase timeout to 120 seconds for transaction fetching (can be slow on first sync)
         request.timeoutInterval = 120
 
@@ -245,13 +246,13 @@ class PlaidService: ObservableObject {
         dateFormatter.dateFormat = "yyyy-MM-dd"
 
         let body: [String: String] = [
-            "access_token": accessToken,
+            "item_id": itemId,
             "start_date": dateFormatter.string(from: startDate),
             "end_date": dateFormatter.string(from: endDate)
         ]
         request.httpBody = try JSONEncoder().encode(body)
 
-        print("🔄 [PlaidService] Fetching transactions from \(dateFormatter.string(from: startDate)) to \(dateFormatter.string(from: endDate))...")
+        print("🔄 [PlaidService] Fetching transactions for item \(itemId) from \(dateFormatter.string(from: startDate)) to \(dateFormatter.string(from: endDate))...")
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -264,11 +265,8 @@ class PlaidService: ObservableObject {
             throw PlaidError.transactionFetchFailed
         }
 
-        // Log raw response size for debugging
-        print("📊 [PlaidService] Response size: \(data.count) bytes")
-
         let transactionsResponse = try JSONDecoder().decode(TransactionsResponse.self, from: data)
-        print("✅ [PlaidService] Successfully fetched \(transactionsResponse.transactions.count) transactions (total reported: \(transactionsResponse.totalTransactions))")
+        print("✅ [PlaidService] Successfully fetched \(transactionsResponse.transactions.count) transactions")
         return transactionsResponse.transactions
     }
 
@@ -276,20 +274,21 @@ class PlaidService: ObservableObject {
 
     /// Triggers Plaid to refresh transactions for an item
     /// Call after token exchange to ensure transactions are populated
-    func refreshTransactions(accessToken: String) async {
-        print("🔄 [PlaidService] Triggering transaction refresh...")
+    func refreshTransactions(itemId: String) async {
+        print("🔄 [PlaidService] Triggering transaction refresh for item: \(itemId)")
 
         guard let url = URL(string: "\(baseURL)/api/plaid/transactions/refresh") else {
-            print("❌ [PlaidService] Invalid refresh URL: \(baseURL)/api/plaid/transactions/refresh")
+            print("❌ [PlaidService] Invalid refresh URL")
             return
         }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        addAuthHeader(to: &request)
 
         do {
-            request.httpBody = try JSONEncoder().encode(["access_token": accessToken])
+            request.httpBody = try JSONEncoder().encode(["item_id": itemId])
         } catch {
             print("❌ [PlaidService] Failed to encode refresh request: \(error)")
             return
@@ -307,7 +306,7 @@ class PlaidService: ObservableObject {
             let responseStr = String(data: data, encoding: .utf8) ?? "(no body)"
 
             if statusCode == 202 {
-                print("✅ [PlaidService] Transactions refresh triggered (status: \(statusCode))")
+                print("✅ [PlaidService] Transactions refresh triggered")
             } else {
                 print("⚠️ [PlaidService] Transactions refresh returned status \(statusCode): \(responseStr)")
             }
@@ -318,7 +317,8 @@ class PlaidService: ObservableObject {
 
     // MARK: - Remove Account
 
-    func removeAccount(accessToken: String) async throws -> String {
+    func removeAccount(itemId: String) async throws {
+        print("🗑️ [PlaidService] Removing item: \(itemId)")
         let endpoint = "\(baseURL)/api/plaid/item/remove"
 
         guard let url = URL(string: endpoint) else {
@@ -328,24 +328,66 @@ class PlaidService: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        addAuthHeader(to: &request)
 
-        let body = ["access_token": accessToken]
+        let body = ["item_id": itemId]
         request.httpBody = try JSONEncoder().encode(body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
+            let responseStr = String(data: data, encoding: .utf8) ?? "(no body)"
+            print("❌ [PlaidService] Remove failed: \(responseStr)")
             throw PlaidError.accountRemovalFailed
         }
 
         let removeResponse = try JSONDecoder().decode(RemoveItemResponse.self, from: data)
+        print("✅ [PlaidService] Item removed: \(removeResponse.itemId ?? itemId)")
+    }
 
-        guard let itemId = removeResponse.itemId else {
-            throw PlaidError.accountRemovalFailed
+    // MARK: - Get User's Plaid Items
+
+    func getPlaidItems() async throws -> [PlaidItem] {
+        print("📋 [PlaidService] Fetching user's Plaid items...")
+        let endpoint = "\(baseURL)/api/plaid/items"
+
+        guard let url = URL(string: endpoint) else {
+            throw PlaidError.invalidURL
         }
 
-        return itemId
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        addAuthHeader(to: &request)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            let responseStr = String(data: data, encoding: .utf8) ?? "(no body)"
+            print("❌ [PlaidService] Get items failed: \(responseStr)")
+            throw PlaidError.accountFetchFailed
+        }
+
+        let itemsResponse = try JSONDecoder().decode(PlaidItemsResponse.self, from: data)
+        print("✅ [PlaidService] Found \(itemsResponse.items.count) Plaid item(s)")
+        return itemsResponse.items
+    }
+}
+
+// MARK: - Plaid Item Model
+
+struct PlaidItem: Decodable, Identifiable {
+    let itemId: String
+    let institutionName: String?
+    let createdAt: String?
+
+    var id: String { itemId }
+
+    enum CodingKeys: String, CodingKey {
+        case itemId = "item_id"
+        case institutionName = "institution_name"
+        case createdAt = "created_at"
     }
 }
 
@@ -359,14 +401,16 @@ private struct LinkTokenResponse: Decodable {
     }
 }
 
-private struct AccessTokenResponse: Decodable {
-    let accessToken: String
+private struct ExchangeTokenResponse: Decodable {
     let itemId: String
 
     enum CodingKeys: String, CodingKey {
-        case accessToken = "access_token"
         case itemId = "item_id"
     }
+}
+
+private struct PlaidItemsResponse: Decodable {
+    let items: [PlaidItem]
 }
 
 private struct AccountsResponse: Decodable {

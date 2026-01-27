@@ -4,15 +4,10 @@ import UserNotifications
 @main
 struct FinancialAnalyzerApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @AppStorage("hasSeenWelcome") private var hasSeenWelcome = false
 
     var body: some Scene {
         WindowGroup {
-            if !hasSeenWelcome {
-                WelcomePageView(isPresented: $hasSeenWelcome)
-            } else {
-                ContentView()
-            }
+            AuthRootView()
         }
     }
 }
@@ -21,6 +16,7 @@ struct ContentView: View {
     @StateObject private var viewModel: FinancialViewModel
     @StateObject private var navigationCoordinator = NotificationNavigationCoordinator()
     @State private var hasPerformedLaunchReset = false
+    @State private var showProfile = false
 
     init() {
         _viewModel = StateObject(wrappedValue: FinancialViewModel())
@@ -88,8 +84,8 @@ struct ContentView: View {
                     // #endif
                 }
             } else {
-                // Show only dashboard during onboarding (no bottom navigation)
-                DashboardView(viewModel: viewModel)
+                // Show onboarding flow (no bottom navigation)
+                OnboardingFlowView(viewModel: viewModel)
             }
         }
         .preferredColorScheme(.light)
