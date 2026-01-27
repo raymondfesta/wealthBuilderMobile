@@ -1,6 +1,6 @@
 # Project Progress Tracker
 
-Last Updated: 2026-01-27 (Backend Onboarding Flag implementation)
+Last Updated: 2026-01-27 (Fix fetchAccountsOnly state preservation)
 
 ## Current State
 
@@ -25,6 +25,7 @@ Last Updated: 2026-01-27 (Backend Onboarding Flag implementation)
 - Plaid items synced from backend on login (data persists across logout/login)
 - Smart data refresh based on cache age (balances-only vs full refresh)
 - Offline mode detection with graceful degradation
+- Backend allocation plan storage (survives reinstall)
 
 ### In Progress 🔨
 - Sign in with Apple capability setup (requires Apple Developer portal)
@@ -64,6 +65,51 @@ Last Updated: 2026-01-27 (Backend Onboarding Flag implementation)
 ## Completed This Session
 
 ### 2026-01-27
+
+- ✓ **Fix: State overwrite in fetchAccountsOnly() during recovery**
+  - **Issue:** Completed users saw onboarding after login because `fetchAccountsOnly()` unconditionally set state to `.accountsConnected`
+  - **Root cause:** Method always called `self.userJourneyState = .accountsConnected` at line 576, regardless of context
+  - **Fix:** Added `preserveState: Bool = false` parameter; recovery paths now pass `true` to preserve backend-determined state
+  - **Changes:**
+    - `fetchAccountsOnly(preserveState:)` - conditionally sets state and shows success banner
+    - `handleDataRecovery()` - passes `preserveState: true` for `.analysisComplete`, `.allocationPlanning`, `.planCreated`
+  - **File:** [FinancialViewModel.swift](FinancialAnalyzer/ViewModels/FinancialViewModel.swift)
+  - **Build verified:** ✓
+
+- ✓ **Feat: Backend Allocation Plan Storage - Persist allocations across reinstalls**
+  - **Goal:** User's allocation plan survives app reinstall/cache loss
+  - **Problem:** Allocation percentages, account linkages, and paycheck schedule lost on cache clear
+  - **Solution:** Store allocation plan in backend SQLite database, restore on login
+  - **Database changes:**
+    - `db/schema.sql` - Added `user_allocation_plans` and `user_paycheck_schedules` tables
+    - `db/database.js` - Added migration to create tables on startup
+  - **Backend API endpoints (3 new):**
+    - `GET /api/user/allocation-plan` - Fetch user's saved plan
+    - `POST /api/user/allocation-plan` - Save/update plan (validates sum to 100%)
+    - `DELETE /api/user/allocation-plan` - Delete plan (for testing/reset)
+  - **iOS model reuse:**
+    - Models already existed in `UserStatus.swift`: `AllocationPlanResponse`, `StoredAllocation`, `StoredPaycheckSchedule`, `SaveAllocationPlanRequest`, etc.
+  - **iOS service methods (2 new):**
+    - `PlaidService.getAllocationPlan()` - Fetch from backend
+    - `PlaidService.saveAllocationPlan(allocations:paycheckSchedule:)` - Save to backend
+  - **iOS ViewModel changes:**
+    - `restoreAllocationPlanFromBackend()` - Called in `setCurrentUser()` when onboarding complete but buckets empty
+    - `confirmAllocationPlan()` - Now saves plan to backend before marking onboarding complete
+  - **Data persisted:**
+    - ✓ Bucket percentages and types
+    - ✓ Target amounts (e.g., emergency fund goal)
+    - ✓ Linked account IDs
+    - ✓ Preset tier selection
+    - ✓ Paycheck schedule (frequency, amount, next date)
+  - **Data NOT persisted (fresh from Plaid):**
+    - ✗ Transaction history
+    - ✗ Account balances
+    - ✗ Analysis snapshot
+  - **Flow:**
+    1. User confirms allocation plan → saved to backend
+    2. App reinstalled → login → `setCurrentUser()` → restore from backend
+    3. Custom percentages, linked accounts, paycheck schedule all restored
+  - **Build verified:** ✓
 - ✓ **Feat: Backend Onboarding Flag - Source of truth for journey state**
   - **Goal:** Journey state survives cache loss by using backend `onboardingCompleted` flag
   - **Problem:** Users who completed onboarding saw onboarding again after cache cleared (app reinstall, cache expiration, encryption key issues)
@@ -651,6 +697,13 @@ Enable `-ResetDataOnLaunch` in Xcode scheme for clean state on each run.
 ---
 
 ## Architecture Decisions Log
+
+### 2026-01-27: Backend Allocation Plan Storage
+**Decision:** Store allocation plan in backend SQLite, restore on login
+**Rationale:** Local cache can be cleared (reinstall, corruption, key issues); allocation plan is user-created data that should persist
+**Implementation:** New tables `user_allocation_plans` and `user_paycheck_schedules`; saved on plan confirmation, restored when onboarding complete but buckets empty
+**Files:** `db/schema.sql`, `db/database.js`, `server.js`, `PlaidService.swift`, `FinancialViewModel.swift`
+**Trade-off:** Additional API calls on save/restore; acceptable for data persistence guarantee
 
 ### 2026-01-26: Plaid Token Storage Migration
 **Decision:** SQLite-only token storage, removed JSON fallback

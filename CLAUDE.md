@@ -284,6 +284,7 @@ Cmd+R to build and run
   - Accounts now load correctly after logout/login
   - Fixed init order: cache deferred to `setCurrentUser()` when user logged in
   - Added recovery: fetch from Plaid if cache empty but backend has items
+  - Fixed `fetchAccountsOnly()` state overwrite: added `preserveState` parameter for recovery paths
 - User authentication system COMPLETE
   - Sign in with Apple + email/password
   - SQLite database (users, plaid_items, sessions tables)
@@ -338,6 +339,7 @@ Fixed in 2026-01-27. If this recurs, check:
 1. `setCurrentUser()` is called in `ContentView.task`
 2. `syncPlaidItemsFromBackend()` runs before `loadFromCache()`
 3. Recovery fetch triggers when cache empty but backend has items
+4. `fetchAccountsOnly(preserveState: true)` is used in recovery paths to prevent state overwrite
 
 ## External Dependencies
 

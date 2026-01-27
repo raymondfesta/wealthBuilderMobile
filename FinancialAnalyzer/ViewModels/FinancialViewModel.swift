@@ -315,21 +315,21 @@ class FinancialViewModel: ObservableObject {
             // Fetch accounts if we don't have them
             if accounts.isEmpty && !itemIds.isEmpty {
                 print("🔄 [Recovery] Have itemIds but no cached accounts, fetching...")
-                await fetchAccountsOnly()
+                await fetchAccountsOnly(preserveState: false)
             }
 
         case .analysisComplete, .allocationPlanning:
-            // Mid-onboarding - fetch data if missing
+            // Mid-onboarding - fetch data if missing but preserve state
             if accounts.isEmpty && !itemIds.isEmpty {
-                print("🔄 [Recovery] Resuming onboarding, fetching accounts...")
-                await fetchAccountsOnly()
+                print("🔄 [Recovery] Resuming mid-onboarding, fetching accounts...")
+                await fetchAccountsOnly(preserveState: true)
             }
 
         case .planCreated:
-            // Completed onboarding - restore or refresh data
+            // Completed onboarding - restore or refresh data, preserve state
             if accounts.isEmpty && !itemIds.isEmpty {
                 print("🔄 [Recovery] Completed user, fetching fresh data...")
-                await fetchAccountsOnly()
+                await fetchAccountsOnly(preserveState: true)
             }
 
             // Restore allocation plan if missing
@@ -462,7 +462,8 @@ class FinancialViewModel: ObservableObject {
 
     /// Fetches only account information without transactions or analysis
     /// Used after successful bank connection to show accounts immediately
-    func fetchAccountsOnly() async {
+    /// - Parameter preserveState: If true, don't change journey state (used during recovery for completed users)
+    func fetchAccountsOnly(preserveState: Bool = false) async {
         print("🔄 [Fetch Accounts Only] Starting account fetch...")
         isLoading = true
         showLoadingOverlay = true
@@ -571,14 +572,21 @@ class FinancialViewModel: ObservableObject {
                 // Save accounts to cache immediately while we have them
                 self.saveToCache()
 
-                // Transition state ONLY after accounts are set
-                print("🔄 [Fetch Accounts Only] Setting state to .accountsConnected")
-                self.userJourneyState = .accountsConnected
+                // Transition state ONLY if not preserving existing state
+                // preserveState=true is used during recovery for users who already completed onboarding
+                if preserveState {
+                    print("🔄 [Fetch Accounts Only] Preserving existing state: \(self.userJourneyState.rawValue)")
+                } else {
+                    print("🔄 [Fetch Accounts Only] Setting state to .accountsConnected")
+                    self.userJourneyState = .accountsConnected
+                }
 
-                // Show success message
-                self.successMessage = "Connected \(allAccounts.count) account(s)"
-                self.showSuccessBanner = true
-                print("🔄 [Fetch Accounts Only] Success banner shown with message: \(self.successMessage)")
+                // Show success message only during initial connection, not recovery
+                if !preserveState {
+                    self.successMessage = "Connected \(allAccounts.count) account(s)"
+                    self.showSuccessBanner = true
+                    print("🔄 [Fetch Accounts Only] Success banner shown with message: \(self.successMessage)")
+                }
 
                 // Clear errors on success
                 self.error = nil
