@@ -98,6 +98,7 @@ FinancialAnalyzer/
 │       └── AllocationBucketSummaryCard.swift
 ├── DesignSystem/              # Glassmorphic components
 └── Utilities/
+    ├── AppConfig.swift        # Centralized backend URL config
     ├── KeychainService.swift
     ├── SecureTokenStorage.swift # Auth token keychain storage
     └── DataResetManager.swift
@@ -214,9 +215,9 @@ cd backend && npm run dev
 Cmd+R to build and run
 ```
 
-### iOS Simulator Config
-- Use `http://localhost:3000` in PlaidService.swift
-- For physical device: Use Mac IP (`ipconfig getifaddr en0`)
+### iOS Simulator/Device Config
+- All services use `AppConfig.baseURL` (centralized in `Utilities/AppConfig.swift`)
+- For physical device: Update IP in `AppConfig.swift` (`ipconfig getifaddr en0`)
 
 ### Automated Testing Reset
 

@@ -1,6 +1,6 @@
 # Project Progress Tracker
 
-Last Updated: 2026-01-27 (Dark mode enforcement)
+Last Updated: 2026-01-27 (Centralized backend URL config)
 
 ## Current State
 
@@ -28,6 +28,7 @@ Last Updated: 2026-01-27 (Dark mode enforcement)
 - Backend allocation plan storage (survives reinstall)
 - **Silent background recovery** (returning users see instant dashboard, no loading UI)
 - **My Plan view** (4 allocation bucket cards replacing Dashboard, real-time plan adherence)
+- **Centralized backend URL config** (AppConfig.swift - single place to update IP for physical device)
 
 ### In Progress 🔨
 - Sign in with Apple capability setup (requires Apple Developer portal)
@@ -67,6 +68,22 @@ Last Updated: 2026-01-27 (Dark mode enforcement)
 ## Completed This Session
 
 ### 2026-01-27
+
+- ✓ **Feat: Centralized backend URL configuration**
+  - **Goal:** Single place to update backend URL for physical device testing
+  - **Problem:** 6 files had scattered hardcoded URLs; some used `localhost:3000` (simulator only), others used IP
+  - **Solution:** Created `AppConfig.swift` with centralized `baseURL`
+  - **Files created:**
+    - `Utilities/AppConfig.swift` - `#if DEBUG` conditional with Mac IP, else production URL
+  - **Files updated (6):**
+    - `PlaidService.swift` - uses `AppConfig.baseURL`
+    - `AuthService.swift` - removed inline #if DEBUG, uses `AppConfig.baseURL`
+    - `AIInsightService.swift` - uses `AppConfig.baseURL`
+    - `TransactionFetchService.swift` - removed inline #if DEBUG, uses `AppConfig.baseURL`
+    - `BudgetManager.swift` - uses `AppConfig.baseURL`
+    - `DebugView.swift` - uses `AppConfig.baseURL` (2 locations)
+  - **Usage:** Update IP in one file (`AppConfig.swift`) to run on physical device
+  - **Build verified:** ✓
 
 - ✓ **Fix: Enforce dark mode app-wide**
   - Changed `.preferredColorScheme(.light)` → `.preferredColorScheme(.dark)` in FinancialAnalyzerApp.swift:86
