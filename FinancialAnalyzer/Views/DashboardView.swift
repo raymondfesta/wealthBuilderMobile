@@ -5,7 +5,6 @@ import SwiftUI
 struct DashboardView: View {
     @ObservedObject var viewModel: FinancialViewModel
     @State private var selectedBucket: BucketCategory?
-    @State private var showAddBudgetSheet = false
     @State private var showProfileSheet = false
 
     var body: some View {
@@ -61,9 +60,6 @@ struct DashboardView: View {
                         Text(error.localizedDescription)
                     }
                 }
-                .sheet(isPresented: $showAddBudgetSheet) {
-                    AddBudgetSheet(budgetManager: viewModel.budgetManager)
-                }
                 .sheet(isPresented: $showProfileSheet) {
                     ProfileView(authService: AuthService.shared)
                 }
@@ -92,19 +88,10 @@ struct DashboardView: View {
                 allocationBucketsSection
             }
 
-            // Header
-            headerSection
-
             // Financial Buckets
             if let summary = viewModel.summary {
                 bucketsGrid(summary: summary)
             }
-
-            // Budget Status
-            budgetStatusSection
-
-            // Recent Transactions
-            recentTransactionsSection
         }
     }
 
@@ -132,30 +119,6 @@ struct DashboardView: View {
 
     // MARK: - Subviews
 
-    private var headerSection: some View {
-        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-            HStack {
-                Text("Your Financial Summary")
-                    .headlineStyle(color: .white)
-
-                Spacer()
-
-                RefreshIndicatorView(
-                    isRefreshing: viewModel.isBackgroundRefreshing,
-                    strategy: DataRefreshService.shared.currentStrategy,
-                    lastUpdated: viewModel.lastUpdatedDescription,
-                    isStale: viewModel.isDataStale
-                )
-            }
-
-            if let summary = viewModel.summary {
-                Text("Analysis of \(summary.totalTransactions) transactions over \(summary.monthsAnalyzed) months")
-                    .captionStyle()
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
     private func bucketsGrid(summary: AnalysisSnapshot) -> some View {
         LazyVGrid(columns: [
             GridItem(.flexible()),
@@ -177,87 +140,6 @@ struct DashboardView: View {
                         isSelected: selectedBucket == bucket,
                         needsValidationCount: viewModel.needsValidationCount(for: bucket)
                     )
-                }
-            }
-        }
-    }
-
-    private var budgetStatusSection: some View {
-        Group {
-            if !viewModel.budgetManager.budgets.isEmpty {
-                VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
-                    HStack {
-                        Text("Budget Status")
-                            .headlineStyle(color: .white)
-
-                        Spacer()
-
-                        Text("\(viewModel.budgetManager.budgets.count) budgets")
-                            .captionStyle()
-
-                        Button {
-                            showAddBudgetSheet = true
-                        } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.title3)
-                                .foregroundColor(DesignTokens.Colors.accentPrimary)
-                        }
-                    }
-
-                    // Budget cards
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: DesignTokens.Spacing.sm) {
-                            ForEach(viewModel.budgetManager.budgets.prefix(6)) { budget in
-                                BudgetStatusCard(budget: budget)
-                            }
-                        }
-                    }
-
-                    // Warning if approaching limits
-                    let warningBudgets = viewModel.budgetManager.budgets.filter {
-                        $0.status == .warning || $0.status == .exceeded
-                    }
-                    if !warningBudgets.isEmpty {
-                        HStack(spacing: DesignTokens.Spacing.xs) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(DesignTokens.Colors.opportunityOrange)
-                                .font(.caption)
-                            Text("\(warningBudgets.count) budget\(warningBudgets.count == 1 ? "" : "s") need attention")
-                                .captionStyle()
-                        }
-                    }
-                }
-            } else if !viewModel.transactions.isEmpty {
-                VStack(spacing: DesignTokens.Spacing.sm) {
-                    HStack {
-                        Text("Budget Status")
-                            .headlineStyle(color: .white)
-                        Spacer()
-                    }
-
-                    SecondaryButton(title: "Generate Budgets from Transactions") {
-                        viewModel.budgetManager.generateBudgets(from: viewModel.transactions)
-                    }
-                }
-            }
-        }
-    }
-
-    private var recentTransactionsSection: some View {
-        VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
-            Text("Recent Transactions")
-                .headlineStyle(color: .white)
-
-            ForEach(viewModel.recentTransactions(limit: 5), id: \.id) { transaction in
-                TransactionRow(transaction: transaction)
-            }
-
-            if !viewModel.transactions.isEmpty {
-                NavigationLink {
-                    TransactionsListView(transactions: viewModel.transactions)
-                } label: {
-                    Text("View All Transactions")
-                        .subheadlineStyle(color: DesignTokens.Colors.accentPrimary)
                 }
             }
         }
