@@ -10,9 +10,30 @@ class BudgetManager: ObservableObject {
     @Published var error: Error?
 
     private let baseURL: String
+    private var userId: String?
 
-    init(baseURL: String = "http://localhost:3000") {
+    init(baseURL: String = "http://localhost:3000", userId: String? = nil) {
         self.baseURL = baseURL
+        self.userId = userId
+        if let userId = userId {
+            print("👤 [BudgetManager] Init with user: \(userId.prefix(8))...")
+        }
+        loadFromCache()
+    }
+
+    // MARK: - User Session
+
+    /// Returns user-scoped cache key. Falls back to base key if no user set.
+    private func cacheKey(_ base: String) -> String {
+        guard let userId = userId, !userId.isEmpty else { return base }
+        return "user_\(userId)_\(base)"
+    }
+
+    /// Sets current user and reloads cache with user-scoped keys
+    func setUserId(_ userId: String) {
+        guard self.userId != userId else { return }
+        print("👤 [BudgetManager] Setting user: \(userId.prefix(8))...")
+        self.userId = userId
         loadFromCache()
     }
 
@@ -296,13 +317,11 @@ class BudgetManager: ObservableObject {
         currentSavings: Double,
         totalDebt: Double,
         categoryBreakdown: [String: Double],
-        healthMetrics: FinancialHealthMetrics,
         transactions: [Transaction],
         accounts: [BankAccount]
     ) async throws {
         print("💰 [BudgetManager] Generating allocation buckets...")
         print("💰 [BudgetManager] Input: income=$\(monthlyIncome), expenses=$\(monthlyExpenses), savings=$\(currentSavings), debt=$\(totalDebt)")
-        print("💰 [BudgetManager] Health Metrics: score=\(healthMetrics.healthScore), savingsRate=\(healthMetrics.savingsRate), emergencyFund=\(healthMetrics.emergencyFundMonthsCovered) months")
 
         isProcessing = true
         defer { isProcessing = false }
@@ -320,22 +339,12 @@ class BudgetManager: ObservableObject {
         request.timeoutInterval = 90 // AI requests can take longer, especially on physical devices with network latency
 
         // Build the request body matching backend API expectations
-        // Include health metrics to enable health-aware allocation recommendations
         let requestBody: [String: Any] = [
             "monthlyIncome": monthlyIncome,
             "monthlyExpenses": monthlyExpenses,
             "currentSavings": currentSavings,
             "totalDebt": totalDebt,
-            "categoryBreakdown": categoryBreakdown,
-            "healthMetrics": [
-                "healthScore": healthMetrics.healthScore,
-                "savingsRate": healthMetrics.savingsRate,
-                "emergencyFundMonthsCovered": healthMetrics.emergencyFundMonthsCovered,
-                "debtToIncomeRatio": healthMetrics.debtToIncomeRatio,
-                "incomeStability": healthMetrics.incomeStability.rawValue,
-                "monthlySavings": healthMetrics.monthlySavings,
-                "monthlySavingsTrend": healthMetrics.monthlySavingsTrend.rawValue
-            ]
+            "categoryBreakdown": categoryBreakdown
         ]
 
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
@@ -497,23 +506,25 @@ class BudgetManager: ObservableObject {
     private func saveToCache() {
         let encoder = JSONEncoder()
         if let budgetsData = try? encoder.encode(budgets) {
-            UserDefaults.standard.set(budgetsData, forKey: "cached_budgets")
+            UserDefaults.standard.set(budgetsData, forKey: cacheKey("budgets"))
         }
         if let goalsData = try? encoder.encode(goals) {
-            UserDefaults.standard.set(goalsData, forKey: "cached_goals")
+            UserDefaults.standard.set(goalsData, forKey: cacheKey("goals"))
         }
         saveAllocationBucketsToCache()
     }
 
     private func loadFromCache() {
         let decoder = JSONDecoder()
-        if let budgetsData = UserDefaults.standard.data(forKey: "cached_budgets"),
+        if let budgetsData = UserDefaults.standard.data(forKey: cacheKey("budgets")),
            let budgets = try? decoder.decode([Budget].self, from: budgetsData) {
             self.budgets = budgets
+            print("💰 [BudgetManager] Loaded \(budgets.count) budgets from cache")
         }
-        if let goalsData = UserDefaults.standard.data(forKey: "cached_goals"),
+        if let goalsData = UserDefaults.standard.data(forKey: cacheKey("goals")),
            let goals = try? decoder.decode([Goal].self, from: goalsData) {
             self.goals = goals
+            print("💰 [BudgetManager] Loaded \(goals.count) goals from cache")
         }
         loadAllocationBucketsFromCache()
     }
@@ -521,14 +532,14 @@ class BudgetManager: ObservableObject {
     private func saveAllocationBucketsToCache() {
         let encoder = JSONEncoder()
         if let data = try? encoder.encode(allocationBuckets) {
-            UserDefaults.standard.set(data, forKey: "cached_allocation_buckets")
+            UserDefaults.standard.set(data, forKey: cacheKey("allocation_buckets"))
             print("💰 [BudgetManager] Saved \(allocationBuckets.count) allocation buckets to cache")
         }
     }
 
     private func loadAllocationBucketsFromCache() {
         let decoder = JSONDecoder()
-        if let data = UserDefaults.standard.data(forKey: "cached_allocation_buckets"),
+        if let data = UserDefaults.standard.data(forKey: cacheKey("allocation_buckets")),
            let buckets = try? decoder.decode([AllocationBucket].self, from: data) {
             self.allocationBuckets = buckets
             print("💰 [BudgetManager] Loaded \(buckets.count) allocation buckets from cache")

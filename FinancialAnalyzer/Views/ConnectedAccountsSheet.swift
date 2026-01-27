@@ -63,13 +63,6 @@ struct ConnectedAccountsSheet: View {
 
                             // Persist changes
                             viewModel.saveAccounts()
-
-                            // Recalculate health if setup is complete
-                            if UserDefaults.standard.bool(forKey: "health_report_setup_completed") {
-                                Task {
-                                    await viewModel.recalculateHealth()
-                                }
-                            }
                         }
                     )
                 }

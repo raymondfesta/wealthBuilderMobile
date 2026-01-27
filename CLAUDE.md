@@ -6,10 +6,9 @@ Native iOS financial app (SwiftUI) with Node.js backend. Connects bank accounts 
 
 **Target Users:** Individuals wanting proactive help managing income allocation and building savings habits.
 
-**Key Value Proposition:** Analyzes transactions, calculates financial health metrics, and helps users allocate income across smart buckets (Essential, Emergency Fund, Discretionary, Investments, Debt Paydown) with AI-generated recommendations.
+**Key Value Proposition:** Analyzes transactions and helps users allocate income across smart buckets (Essential, Emergency Fund, Discretionary, Investments, Debt Paydown) with AI-generated recommendations.
 
 **Core Features:**
-- Financial Health Report with customer-friendly metrics
 - Interactive Allocation Planner (Low/Rec/High presets, account linking)
 - Allocation Schedule & Execution (paycheck detection, notifications, history)
 - Proactive Guidance via GPT-4o-mini
@@ -60,7 +59,6 @@ FinancialAnalyzer/
 │   ├── AnalysisSnapshot.swift # Combined flow + position + metadata
 │   ├── FinancialSnapshot.swift # Typealias for AnalysisSnapshot
 │   ├── ExpenseBreakdown.swift # 8 categories incl. healthcare
-│   ├── FinancialHealthMetrics.swift
 │   ├── AllocationBucket.swift # 4-5 allocation buckets
 │   ├── PaycheckSchedule.swift
 │   └── UserJourneyState.swift # Onboarding state machine
@@ -70,7 +68,6 @@ FinancialAnalyzer/
 │   ├── SecureTransactionCache.swift # AES-256-GCM encrypted cache
 │   ├── TransactionFetchService.swift # Cache-first fetching
 │   ├── TransactionAnalyzer.swift # Category mapping
-│   ├── FinancialHealthCalculator.swift
 │   ├── BudgetManager.swift
 │   ├── AllocationScheduler.swift
 │   ├── NotificationService.swift
@@ -123,7 +120,7 @@ backend/
 
 **Link Token Preloading:** PlaidService preloads tokens in background (refreshes every 15 min). Plaid Link opens instantly.
 
-**ItemId → AccessToken Mapping:** Keychain stores access_token keyed by item_id. Critical: Set `account.itemId` after fetching accounts (Plaid API doesn't return it).
+**ItemId-Based API:** iOS stores only itemIds in Keychain (not access tokens). Backend manages encrypted tokens in SQLite. All Plaid endpoints require auth and accept `item_id` instead of `access_token`.
 
 **Cache-First Loading:** Load cached accounts/transactions from encrypted cache on launch (<1s). First sync takes 10-20s, subsequent loads instant within 24h.
 
@@ -198,7 +195,7 @@ Cmd+U
 ```
 
 ### Test Coverage Goals
-- Critical paths (allocation, health calculation): High coverage
+- Critical paths (allocation): High coverage
 - Services: Unit tests for business logic
 - Views: Manual testing via simulator
 
@@ -363,7 +360,6 @@ APPLE_BUNDLE_ID=com.yourcompany.FinancialAnalyzer
 ### Testing Guides
 - [Allocation Planner Testing](ALLOCATION_PLANNER_TESTING_GUIDE.md) - 10 test scenarios
 - [Plaid Sandbox Testing](PLAID_SANDBOX_TESTING_GUIDE.md) - Custom user config
-- [Financial Health Scenarios](PLAID_SANDBOX_TESTING_GUIDE.md#testing-financial-health-scenarios)
 
 ### Quick References
 - [Adding Files to Xcode](ADD_NEW_FILES_TO_XCODE.md)
@@ -380,11 +376,6 @@ APPLE_BUNDLE_ID=com.yourcompany.FinancialAnalyzer
 **Decision:** Keychain (iOS) + SQLite with AES-256-GCM encryption (backend)
 **Rationale:** Keychain for auth tokens. SQLite for user data. Plaid tokens encrypted at rest.
 **Trade-offs:** SQLite not horizontally scalable; acceptable for MVP
-
-### 2025-01: Health Score Privacy
-**Decision:** Health score (0-100) never shown to users
-**Rationale:** Prevents judgment; score only used by backend AI for personalization
-**Trade-offs:** Less transparency; users see friendly metrics instead
 
 ### 2025-01: Allocation Rebalancing
 **Decision:** Priority-based auto-rebalancing (discretionary first, emergency fund last)

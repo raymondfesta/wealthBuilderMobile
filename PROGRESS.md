@@ -1,6 +1,6 @@
 # Project Progress Tracker
 
-Last Updated: 2026-01-26 (View structure refactoring)
+Last Updated: 2026-01-26 (User-scoped cache fix)
 
 ## Current State
 
@@ -11,7 +11,6 @@ Last Updated: 2026-01-26 (View structure refactoring)
 - JWT auth (15min access, 30d refresh tokens)
 - Plaid bank account connection (sandbox)
 - Transaction fetching and categorization
-- Financial health metrics calculation
 - Allocation bucket planner (5 buckets: Essential, Emergency, Discretionary, Investments, Debt)
 - Allocation schedule with paycheck detection
 - Proactive AI guidance via GPT-4o-mini
@@ -62,6 +61,67 @@ Last Updated: 2026-01-26 (View structure refactoring)
 ## Completed This Session
 
 ### 2026-01-26
+- ✓ **Fix: Returning users see onboarding instead of dashboard**
+  - **Issue:** After logout/login, users shown onboarding flow instead of their existing data (accounts, allocation plan, transactions)
+  - **Root cause:** Cache data in UserDefaults not scoped by userId. With multi-user auth, cache could be corrupted/overwritten. When FinancialViewModel created, cache loading failed or loaded wrong user's data.
+  - **Fix:** Scope all UserDefaults cache keys by userId prefix
+  - **Files modified:**
+    - `FinancialViewModel.swift` - added `currentUserId`, `cacheKey()` helper, `setCurrentUser()` method; updated `saveToCache()`/`loadFromCache()` to use user-scoped keys
+    - `BudgetManager.swift` - added `userId`, `cacheKey()` helper, `setUserId()` method; updated cache methods to use user-scoped keys
+    - `FinancialAnalyzerApp.swift` - added call to `viewModel.setCurrentUser(userId)` after auth
+    - `ProfileView.swift` - updated footer text to match actual behavior (data preserved on logout)
+  - **Cache keys now user-scoped:**
+    - `user_{userId}_summary`, `user_{userId}_journey_state`, `user_{userId}_budgets`, `user_{userId}_goals`, `user_{userId}_allocation_buckets`
+  - **Build verified:** ✓ Compiled successfully
+
+- ✓ **Removed Financial Health Feature (iOS + Backend)**
+  - **Goal:** Remove self-contained Financial Health functionality from app
+  - **Files deleted (8 iOS files):**
+    - `Models/FinancialHealthMetrics.swift`
+    - `Services/FinancialHealthCalculator.swift`
+    - `Views/HealthTabView.swift`
+    - `Views/FinancialHealthReportView.swift`
+    - `Views/FinancialHealthDashboardSection.swift`
+    - `Views/HealthReportEmptyStateView.swift`
+    - `Views/HealthReportSetupFlow.swift`
+    - `Views/Components/HealthReportComponents.swift`
+  - **Files modified (iOS):**
+    - `FinancialViewModel.swift` - removed healthMetrics properties, caching, recalculate methods
+    - `DashboardView.swift` - removed health toolbar button, sheets, dashboard section
+    - `FinancialAnalyzerApp.swift` - removed Health tab from TabView
+    - `BudgetManager.swift` - removed healthMetrics parameter from generateAllocationBuckets()
+    - `ConnectedAccountsSheet.swift` - removed recalculateHealth() call
+    - `project.pbxproj` - removed file references
+  - **Files modified (Backend):**
+    - `server.js` - removed healthMetrics from API request/response, simplified savings period calculation
+  - **Verification:** Build succeeds, no health references remain
+  - **Impact:** Allocation planning still works (uses emergency fund balance for savings period instead of health score)
+
+- ✓ **Fix: Plaid INVALID_ACCESS_TOKEN Error**
+  - **Issue:** Transaction fetch returned `INVALID_ACCESS_TOKEN - "provided access token is in an invalid format"`
+  - **Root cause:** Hybrid storage mismatch - backend stored tokens in SQLite for authenticated users but lookups only checked legacy JSON file
+  - **Backend fixes:**
+    - Updated all Plaid endpoints to use `requireAuth` + SQLite lookup via `findPlaidItemByItemId()`
+    - Removed JSON token storage (`accessTokens` Map, `loadTokens`, `saveTokens`)
+    - Added `GET /api/plaid/items` endpoint for listing user's Plaid items
+  - **iOS fixes:**
+    - Updated PlaidService to send `item_id` instead of `access_token`
+    - Token exchange now stores placeholder `"backend-managed"` (backend handles actual token)
+    - Added `getPlaidItems()` method and `PlaidItem` model
+    - Updated TransactionFetchService to use itemId-based API
+  - **Files modified:**
+    - `backend/server.js` - SQLite-only token lookup, removed JSON storage
+    - `PlaidService.swift` - itemId-based requests, `getPlaidItems()` method
+    - `TransactionFetchService.swift` - itemId parameter, added auth headers
+    - `FinancialViewModel.swift` - uses itemId for all Plaid operations
+    - `CLAUDE.md` - updated "ItemId-Based API" pattern documentation
+  - **Token flow (fixed):**
+    1. User authenticates → `req.userId` present
+    2. User links bank → token stored in SQLite (encrypted)
+    3. User fetches transactions → backend looks up token in SQLite by itemId
+    4. Plaid API called with correct token → success
+  - **Build verified:** ✓ Backend + iOS compile successfully
+
 - ✓ **User Authentication System**
   - **Goal:** Multi-user auth with Sign in with Apple + email/password
   - **Backend files created:**
@@ -209,7 +269,7 @@ Last Updated: 2026-01-26 (View structure refactoring)
 
   - **TASK 6: Migrated all consumers to AnalysisSnapshot**
     - `FinancialViewModel.swift` - uses `AnalysisSnapshot`, `generateSnapshot()`, `disposableIncome`
-    - `FinancialHealthCalculator.swift` - accepts `snapshot: AnalysisSnapshot` parameter
+    - (FinancialHealthCalculator.swift - removed in later session)
     - `DashboardView.swift` - uses `AnalysisSnapshot`
     - `CategoryDetailView.swift` - uses `AnalysisSnapshot`
     - `AllocationPlannerView.swift` - preview uses proper `AnalysisSnapshot` construction
@@ -246,9 +306,7 @@ Last Updated: 2026-01-26 (View structure refactoring)
     - `WelcomePageView.swift` - Now uses DesignTokens, Typography, PrimaryButton
     - `AllocationPlannerView.swift` - Now uses GlassmorphicCard, design tokens, typography
     - `AllocationBucketCard.swift` - Now uses primaryCardStyle(), design tokens
-    - `FinancialHealthReportView.swift` - Now uses GlassmorphicCard, design tokens
     - `ScheduleTabView.swift` - Now uses PrimaryButton, design tokens, background
-    - `HealthReportComponents.swift` - MetricCard, ProgressBar, SpendingBreakdownRow updated
   - **Patterns replaced:**
     - `Color(.systemBackground)` → `DesignTokens.Colors.backgroundPrimary`
     - `Color(.secondarySystemBackground)` → `primaryCardStyle()`
@@ -335,7 +393,7 @@ Last Updated: 2026-01-26 (View structure refactoring)
 ### Medium Priority
 - **Test coverage needs improvement**
   - Only `TransactionAnalyzerTests.swift` exists
-  - Need tests for: FinancialHealthCalculator, AllocationScheduler, BudgetManager
+  - Need tests for: AllocationScheduler, BudgetManager
   - Target: Critical services >80% coverage
 
 - **Backend error handling**
@@ -405,6 +463,13 @@ Enable `-ResetDataOnLaunch` in Xcode scheme for clean state on each run.
 
 ## Architecture Decisions Log
 
+### 2026-01-26: Plaid Token Storage Migration
+**Decision:** SQLite-only token storage, removed JSON fallback
+**Rationale:** Hybrid storage caused INVALID_ACCESS_TOKEN errors - authenticated users' tokens went to SQLite but lookups checked JSON
+**Implementation:** All Plaid endpoints use `requireAuth` + `findPlaidItemByItemId(userId, itemId)` lookup; iOS sends itemId instead of accessToken
+**Files:** `server.js` (removed JSON storage), `PlaidService.swift` (itemId-based API)
+**Trade-off:** Breaking change for unauthenticated flows; acceptable since auth now required
+
 ### 2026-01-26: User Authentication System
 **Decision:** JWT auth with Sign in with Apple + email/password, SQLite database
 **Rationale:** Multi-user support required for production; SQLite simple for MVP
@@ -430,7 +495,7 @@ Enable `-ResetDataOnLaunch` in Xcode scheme for clean state on each run.
 **Decision:** Replace `availableToSpend` with `disposableIncome`, delete `FinancialSummary`
 **Rationale:** Fixed 5 critical calculation errors - income/expense inflation, wrong formula, missing investment detection
 **Formula:** `Disposable Income = Income - Essential Expenses - Debt Minimums`
-**Files:** `TransactionAnalyzer.swift`, `FinancialViewModel.swift`, `FinancialHealthCalculator.swift`, deleted `FinancialSummary.swift`
+**Files:** `TransactionAnalyzer.swift`, `FinancialViewModel.swift`, deleted `FinancialSummary.swift`
 **Trade-off:** Breaking change to all consumers; mitigated with backward-compat properties on AnalysisSnapshot
 
 ### 2026-01-22: Financial Model Refactor (TASK 1)
@@ -448,11 +513,6 @@ Enable `-ResetDataOnLaunch` in Xcode scheme for clean state on each run.
 **Decision:** MVVM with centralized FinancialViewModel
 **Rationale:** SwiftUI native, single source of truth
 **Trade-off:** Large ViewModel; may split later
-
-### 2025-01: Health Score Privacy
-**Decision:** Never show 0-100 score to users
-**Rationale:** Prevent judgment; backend-only for AI personalization
-**Trade-off:** Less transparency
 
 ### 2025-01: Allocation Rebalancing
 **Decision:** Priority-based (discretionary first, emergency fund last)

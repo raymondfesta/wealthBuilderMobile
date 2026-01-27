@@ -6,7 +6,6 @@ struct DashboardView: View {
     @ObservedObject var viewModel: FinancialViewModel
     @State private var selectedBucket: BucketCategory?
     @State private var showAddBudgetSheet = false
-    @State private var showHealthSetupFlow = false
     @State private var showProfileSheet = false
 
     var body: some View {
@@ -21,28 +20,6 @@ struct DashboardView: View {
                 .primaryBackgroundGradient()
                 .navigationTitle("Financial Overview")
                 .toolbar {
-                    // Health Report Button
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button {
-                            UserDefaults.standard.set(true, forKey: "has_viewed_health_report")
-                            viewModel.showHealthReport = true
-                        } label: {
-                            ZStack(alignment: .topTrailing) {
-                                Image(systemName: "chart.line.uptrend.xyaxis")
-                                    .imageScale(.large)
-                                    .foregroundColor(DesignTokens.Colors.accentSecondary)
-
-                                if !UserDefaults.standard.bool(forKey: "has_viewed_health_report") {
-                                    Circle()
-                                        .fill(DesignTokens.Colors.opportunityOrange)
-                                        .frame(width: 8, height: 8)
-                                        .offset(x: 6, y: -6)
-                                }
-                            }
-                        }
-                        .accessibilityLabel("Financial Health Report")
-                    }
-
                     // Add account button
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button {
@@ -80,35 +57,6 @@ struct DashboardView: View {
                 .sheet(isPresented: $showAddBudgetSheet) {
                     AddBudgetSheet(budgetManager: viewModel.budgetManager)
                 }
-                .sheet(isPresented: $viewModel.showHealthReport) {
-                    NavigationStack {
-                        FinancialHealthReportView(
-                            healthMetrics: viewModel.healthMetrics,
-                            onSetupHealthReport: {
-                                viewModel.showHealthReport = false
-                                showHealthSetupFlow = true
-                            },
-                            onDismiss: {
-                                viewModel.showHealthReport = false
-                            }
-                        )
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarTrailing) {
-                                Button("Done") {
-                                    viewModel.showHealthReport = false
-                                }
-                            }
-                        }
-                    }
-                }
-                .sheet(isPresented: $showHealthSetupFlow) {
-                    HealthReportSetupFlow(viewModel: viewModel)
-                        .onDisappear {
-                            if viewModel.healthMetrics != nil {
-                                viewModel.showHealthReport = true
-                            }
-                        }
-                }
                 .sheet(isPresented: $showProfileSheet) {
                     ProfileView(authService: AuthService.shared)
                 }
@@ -132,17 +80,6 @@ struct DashboardView: View {
 
     private var planActiveView: some View {
         VStack(spacing: DesignTokens.Spacing.lg) {
-            // Financial Health Section
-            if let healthMetrics = viewModel.healthMetrics {
-                FinancialHealthDashboardSection(
-                    healthMetrics: healthMetrics,
-                    previousMetrics: viewModel.previousHealthMetrics,
-                    onViewFullReport: {
-                        viewModel.showHealthReport = true
-                    }
-                )
-            }
-
             // Allocation Buckets Section
             if !viewModel.budgetManager.allocationBuckets.isEmpty {
                 allocationBucketsSection

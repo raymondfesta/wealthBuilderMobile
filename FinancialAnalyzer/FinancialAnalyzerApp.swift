@@ -41,13 +41,6 @@ struct ContentView: View {
                             Label("Dashboard", systemImage: "chart.pie.fill")
                         }
 
-                    // Health tab - shows badge until first viewed
-                    HealthTabView(viewModel: viewModel)
-                        .tabItem {
-                            Label("Health", systemImage: "heart.text.square.fill")
-                        }
-                        .badge(viewModel.hasViewedHealthTab ? nil : "New")
-
                     // Schedule tab - allocation schedule and history
                     ScheduleTabView(viewModel: viewModel)
                         .tabItem {
@@ -104,6 +97,13 @@ struct ContentView: View {
                 navigationCoordinator.setViewModel(viewModel)
             }
 
+            // Set current user to load user-scoped cache data
+            if let userId = AuthService.shared.userId {
+                await MainActor.run {
+                    viewModel.setCurrentUser(userId)
+                }
+            }
+
             // Check for launch argument to auto-reset data
             // Note: UserDefaults was already cleared in AppDelegate before UI loaded
             if !hasPerformedLaunchReset {
@@ -147,11 +147,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                 "cached_budgets",
                 "cached_goals",
                 "cached_allocation_buckets",
-                "cached_health_metrics",
-                "cached_previous_health_metrics",
                 "cached_journey_state",
-                "health_report_setup_completed",
-                "has_viewed_health_tab",
                 "hasSeenWelcome",
                 "hasCompletedOnboarding"
             ]

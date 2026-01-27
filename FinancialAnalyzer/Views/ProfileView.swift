@@ -42,7 +42,7 @@ struct ProfileView: View {
                         }
                     }
                 } footer: {
-                    Text("Signing out will remove all local data. You can sign back in anytime.")
+                    Text("Your session will end. Your financial data remains saved for when you sign back in.")
                 }
 
                 // App Info Section
@@ -76,7 +76,7 @@ struct ProfileView: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("Are you sure you want to sign out? Your local data will be cleared.")
+                Text("Are you sure you want to sign out?")
             }
         }
     }

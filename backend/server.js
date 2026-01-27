@@ -1031,8 +1031,7 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
       currentSavings,
       totalDebt,
       categoryBreakdown,
-      healthMetrics,
-      accountBalances, // NEW: { emergency: 10000, investments: 25000, discretionary: 1200, essential: 2500, debt: 5000 }
+      accountBalances, // { emergency: 10000, investments: 25000, discretionary: 1200, essential: 2500, debt: 5000 }
     } = req.body;
 
     // Validate required fields
@@ -1087,16 +1086,10 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
 
     console.log(`🎯 [Allocation] Account Balances: Emergency=$${emergencyBalance}, Investments=$${investmentBalance}, Discretionary=$${discretionaryBalance}, Essential=$${essentialBalance}, Debt=$${debtBalance}`);
 
-    // Extract health metrics if provided
-    // During onboarding (before health setup), use conservative defaults
-    const healthScore = healthMetrics?.healthScore || 50; // Default to neutral
-    const savingsRate = healthMetrics?.savingsRate || 0;
-    const emergencyFundMonthsCovered = healthMetrics?.emergencyFundMonthsCovered || 0;
-    const debtToIncomeRatio = healthMetrics?.debtToIncomeRatio || 0;
-    const incomeStability = healthMetrics?.incomeStability || 'variable'; // Conservative: assume variable income without health data
+    // Use conservative defaults for income stability
+    const incomeStability = 'variable';
 
     console.log(`🎯 [Allocation] Processing: Income=$${monthlyIncome}, Expenses=$${expenses}, Savings=$${savings}, Debt=$${debt}`);
-    console.log(`🎯 [Allocation] Health Metrics: Score=${healthScore.toFixed(1)}, SavingsRate=${(savingsRate * 100).toFixed(1)}%, EmergencyFund=${emergencyFundMonthsCovered.toFixed(1)} months, DTI=${(debtToIncomeRatio * 100).toFixed(1)}%, Stability=${incomeStability}`);
 
     // Category mappings - define which categories are essential vs discretionary
     const essentialCategoryList = ['Groceries', 'Rent', 'Mortgage', 'Utilities', 'Transportation', 'Insurance', 'Healthcare', 'Childcare'];
@@ -1162,29 +1155,25 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
       }
     }
 
-    // Calculate Emergency Fund monthly allocation using health-aware savings-period approach
-    // This matches the frontend manual selection logic (target ÷ savingsPeriod months)
-    const SAVINGS_PERIOD_MONTHS = 24; // Default: 2 years to reach emergency fund target
+    // Calculate Emergency Fund monthly allocation
+    // Use standard savings period (2 years to reach emergency fund target)
+    const SAVINGS_PERIOD_MONTHS = 24;
     let savingsPeriod = SAVINGS_PERIOD_MONTHS;
 
-    // HEALTH-AWARE ADJUSTMENT: Use health score and financial metrics to determine urgency
-    // Health Score ranges: 0-40 (needs improvement), 41-70 (moderate), 71-100 (good)
+    // Adjust based on current emergency fund coverage
+    const currentEmergencyMonths = essentialSpendingBase > 0 ? emergencyBalance / essentialSpendingBase : 0;
 
-    if (healthScore < 40 || emergencyFundMonthsCovered < 3) {
-      // Low health score OR insufficient emergency fund: Aggressive savings period
+    if (currentEmergencyMonths < 3) {
+      // Insufficient emergency fund: Aggressive savings period
       savingsPeriod = 12; // 1 year - prioritize financial stability
-      console.log(`🎯 [Allocation] Using aggressive 12-month period (healthScore=${healthScore.toFixed(1)}, emergencyFund=${emergencyFundMonthsCovered.toFixed(1)} months)`);
-    } else if (healthScore < 70 || emergencyFundMonthsCovered < 4.5) {
-      // Moderate health score OR partial emergency fund: Moderate acceleration
+      console.log(`🎯 [Allocation] Using aggressive 12-month period (emergencyFund=${currentEmergencyMonths.toFixed(1)} months)`);
+    } else if (currentEmergencyMonths < 4.5 || debt > monthlyIncome * 3) {
+      // Partial emergency fund or high debt: Moderate acceleration
       savingsPeriod = 18; // 1.5 years - balanced approach
-      console.log(`🎯 [Allocation] Using moderate 18-month period (healthScore=${healthScore.toFixed(1)}, emergencyFund=${emergencyFundMonthsCovered.toFixed(1)} months)`);
-    } else if (debt > monthlyIncome * 3) {
-      // Good health score but high debt: Still prioritize emergency fund
-      savingsPeriod = 18;
-      console.log(`🎯 [Allocation] Using moderate 18-month period due to high debt (${(debtToIncomeRatio * 100).toFixed(1)}% DTI)`);
+      console.log(`🎯 [Allocation] Using moderate 18-month period (emergencyFund=${currentEmergencyMonths.toFixed(1)} months)`);
     } else {
-      // Good health score, adequate emergency fund: Standard savings period
-      console.log(`🎯 [Allocation] Using standard 24-month period (healthScore=${healthScore.toFixed(1)}, emergencyFund=${emergencyFundMonthsCovered.toFixed(1)} months)`);
+      // Adequate emergency fund: Standard savings period
+      console.log(`🎯 [Allocation] Using standard 24-month period (emergencyFund=${currentEmergencyMonths.toFixed(1)} months)`);
     }
 
     const emergencyFundAmount = Math.round(emergencyFundTarget / savingsPeriod);
@@ -1276,14 +1265,9 @@ app.post('/api/ai/allocation-recommendation', aiRateLimiter, async (req, res) =>
       savings,
       debt: debtBalance,
       emergencyFundTarget,
-      targetMonths, // Include target months based on income stability
-      healthMetrics: {
-        healthScore,
-        savingsRate,
-        emergencyFundMonthsCovered,
-        debtToIncomeRatio,
-        incomeStability
-      },
+      targetMonths,
+      incomeStability,
+      currentEmergencyMonths,
       allocations: allocationsForExplanations,
       includeDebt: shouldIncludeDebt,
     });
@@ -1516,9 +1500,10 @@ async function generateAllocationExplanations({
   debt,
   emergencyFundTarget,
   targetMonths,
-  healthMetrics,
+  incomeStability,
+  currentEmergencyMonths,
   allocations,
-  includeDebt = false, // NEW: whether to generate debt explanation
+  includeDebt = false,
 }) {
   try {
     // Prepare fallback explanations in OpenAI response format
@@ -1572,7 +1557,7 @@ async function generateAllocationExplanations({
             },
             {
               role: 'user',
-              content: `Explain why allocating $${allocations.emergencyFund.amount} (${allocations.emergencyFund.percentage}% of $${monthlyIncome} monthly income) to emergency fund makes sense. Current savings: $${savings}, Target: $${emergencyFundTarget} (${targetMonths || 6} months of essential expenses, recommended for ${healthMetrics?.incomeStability || 'stable'} income). Essential spending base: $${Math.round(emergencyFundTarget / (targetMonths || 6))}/month. ${debt > 0 ? `Current debt: $${debt}.` : ''} Current emergency fund covers ${healthMetrics?.emergencyFundMonthsCovered?.toFixed(1) || 0} months.`,
+              content: `Explain why allocating $${allocations.emergencyFund.amount} (${allocations.emergencyFund.percentage}% of $${monthlyIncome} monthly income) to emergency fund makes sense. Current savings: $${savings}, Target: $${emergencyFundTarget} (${targetMonths || 6} months of essential expenses, recommended for ${incomeStability || 'stable'} income). Essential spending base: $${Math.round(emergencyFundTarget / (targetMonths || 6))}/month. ${debt > 0 ? `Current debt: $${debt}.` : ''} Current emergency fund covers ${(currentEmergencyMonths || 0).toFixed(1)} months.`,
             },
           ],
           max_tokens: 120,

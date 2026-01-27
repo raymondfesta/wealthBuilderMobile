@@ -22,11 +22,6 @@ class FinancialViewModel: ObservableObject {
     @Published var currentAlert: ProactiveAlert?
     @Published var isShowingGuidance = false
 
-    // Financial health metrics
-    @Published var healthMetrics: FinancialHealthMetrics?
-    @Published var previousHealthMetrics: FinancialHealthMetrics?
-    @Published var showHealthReport = false
-
     // Analysis snapshot for Analysis Complete screen
     @Published var analysisSnapshot: AnalysisSnapshot?
 
@@ -50,9 +45,19 @@ class FinancialViewModel: ObservableObject {
     private let transactionFetchService = TransactionFetchService.shared
     private var linkTokenRefreshTask: Task<Void, Never>?
 
+    /// Current authenticated user ID for scoping cache data
+    private var currentUserId: String?
+
     init(plaidService: PlaidService = PlaidService()) {
         self.plaidService = plaidService
-        self.budgetManager = BudgetManager()
+
+        // Set userId BEFORE creating BudgetManager so cache keys are scoped correctly
+        if let userId = AuthService.shared.userId {
+            self.currentUserId = userId
+            print("👤 [ViewModel] Init with user: \(userId.prefix(8))...")
+        }
+
+        self.budgetManager = BudgetManager(userId: currentUserId)
 
         // Skip cache loading if auto-reset is enabled
         // This ensures we start with truly fresh data
@@ -70,6 +75,23 @@ class FinancialViewModel: ObservableObject {
     deinit {
         linkTokenRefreshTask?.cancel()
         NotificationCenter.default.removeObserver(self)
+    }
+
+    // MARK: - User Session Management
+
+    /// Returns user-scoped cache key. Falls back to base key if no user set.
+    private func cacheKey(_ base: String) -> String {
+        guard let userId = currentUserId, !userId.isEmpty else { return base }
+        return "user_\(userId)_\(base)"
+    }
+
+    /// Sets current user and reloads cache with user-scoped keys
+    func setCurrentUser(_ userId: String) {
+        guard currentUserId != userId else { return }
+        print("👤 [ViewModel] Setting current user: \(userId.prefix(8))...")
+        currentUserId = userId
+        budgetManager.setUserId(userId)
+        loadFromCache()
     }
 
     // MARK: - Link Token Preloading
@@ -148,7 +170,7 @@ class FinancialViewModel: ObservableObject {
         }
 
         do {
-            // Get all stored access tokens
+            // Get all stored itemIds from Keychain
             print("🔄 [Fetch Accounts Only] Loading itemIds from Keychain...")
             let itemIds = try KeychainService.shared.allKeys()
             print("🔄 [Fetch Accounts Only] Found \(itemIds.count) stored itemId(s): \(itemIds)")
@@ -160,9 +182,6 @@ class FinancialViewModel: ObservableObject {
                 print("🔄 [Fetch Accounts Only] Processing itemId: \(itemId)")
 
                 do {
-                    let accessToken = try KeychainService.shared.load(for: itemId)
-                    print("🔄 [Fetch Accounts Only] Access token loaded for itemId: \(itemId)")
-
                     // Fetch accounts with retry logic (Plaid sandbox may need time to sync)
                     var accounts: [BankAccount] = []
                     var lastError: Error?
@@ -171,7 +190,7 @@ class FinancialViewModel: ObservableObject {
                     for attempt in 1...maxRetries {
                         do {
                             print("🔄 [Fetch Accounts Only] Fetching accounts for itemId: \(itemId) (attempt \(attempt)/\(maxRetries))...")
-                            accounts = try await plaidService.fetchAccounts(accessToken: accessToken)
+                            accounts = try await plaidService.fetchAccounts(itemId: itemId)
                             print("🔄 [Fetch Accounts Only] Fetched \(accounts.count) account(s) for itemId: \(itemId)")
                             lastError = nil
                             break // Success - exit retry loop
@@ -200,16 +219,10 @@ class FinancialViewModel: ObservableObject {
                         throw error
                     }
 
-                    // Set itemId on each account
+                    // Set itemId on each account (should come from backend, but ensure it's set)
                     for account in accounts {
                         if account.itemId.isEmpty {
-                            print("⚠️ [Fetch Accounts Only] Account '\(account.name)' has EMPTY itemId - setting manually")
                             account.itemId = itemId
-                        } else if account.itemId != itemId {
-                            print("⚠️ [Fetch Accounts Only] Account '\(account.name)' has MISMATCHED itemId - fixing")
-                            account.itemId = itemId
-                        } else {
-                            print("✅ [Fetch Accounts Only] Account '\(account.name)' correctly has itemId: '\(itemId)'")
                         }
                     }
 
@@ -217,12 +230,12 @@ class FinancialViewModel: ObservableObject {
                     print("🔄 [Fetch Accounts Only] Total accounts so far: \(allAccounts.count)")
 
                 } catch {
-                    print("❌ [Fetch Accounts Only] Failed to fetch accounts for itemId \(itemId) after all retries: \(error.localizedDescription)")
+                    print("❌ [Fetch Accounts Only] Failed to fetch accounts for itemId \(itemId): \(error.localizedDescription)")
 
-                    // Clean up orphaned tokens
+                    // Clean up orphaned itemIds
                     let errorString = error.localizedDescription.lowercased()
                     if errorString.contains("item") && errorString.contains("not found") {
-                        print("⚠️ [Fetch Accounts Only] Item removed from Plaid, cleaning up itemId: \(itemId)")
+                        print("⚠️ [Fetch Accounts Only] Item not found, cleaning up itemId: \(itemId)")
                         try? KeychainService.shared.delete(for: itemId)
                     }
                 }
@@ -330,10 +343,7 @@ class FinancialViewModel: ObservableObject {
                 print("📊 [Analyze Finances] Fetching transactions for itemId: \(itemId)...")
 
                 do {
-                    let accessToken = try KeychainService.shared.load(for: itemId)
-
                     let (transactions, fromCache) = try await transactionFetchService.fetchTransactions(
-                        accessToken: accessToken,
                         itemId: itemId,
                         startDate: startDate,
                         endDate: endDate
@@ -360,19 +370,6 @@ class FinancialViewModel: ObservableObject {
                 accounts: accounts
             )
             self.summary = calculatedSnapshot
-
-            // Calculate health metrics for allocation planning
-            // Note: This does NOT show the health report UI (that's a separate feature accessed via toolbar)
-            print("📊 [Analyze Finances] Calculating health metrics for allocation planning...")
-            self.healthMetrics = FinancialHealthCalculator.calculateHealthMetrics(
-                snapshot: calculatedSnapshot,
-                transactions: allTransactions,
-                accounts: accounts
-            )
-
-            // Cache health metrics
-            cacheHealthMetrics()
-            print("📊 [Analyze Finances] ✅ Health metrics calculated and cached")
 
             // Generate analysis snapshot for the Analysis Complete screen
             self.analysisSnapshot = TransactionAnalyzer.generateAnalysisSnapshot(
@@ -487,24 +484,15 @@ class FinancialViewModel: ObservableObject {
 
             print("🎯 [Create Plan] Current savings: \(currentSavings), Total debt: \(totalDebt)")
 
-            // Validate health metrics are available
-            guard let healthMetrics = self.healthMetrics else {
-                print("❌ [Create Plan] No health metrics available")
-                error = NSError(domain: "FinancialViewModel", code: 5,
-                              userInfo: [NSLocalizedDescriptionKey: "Health metrics not available. Please re-analyze your finances."])
-                return
-            }
+            print("🎯 [Create Plan] Generating allocation buckets...")
 
-            print("🎯 [Create Plan] Generating allocation buckets with health-aware AI...")
-
-            // Generate allocation buckets (calls backend API with health metrics)
+            // Generate allocation buckets (calls backend API)
             try await budgetManager.generateAllocationBuckets(
                 monthlyIncome: monthlyIncome,
                 monthlyExpenses: monthlyExpenses,
                 currentSavings: currentSavings,
                 totalDebt: totalDebt,
                 categoryBreakdown: categoryBreakdown,
-                healthMetrics: healthMetrics,
                 transactions: transactions,
                 accounts: accounts
             )
@@ -663,25 +651,15 @@ class FinancialViewModel: ObservableObject {
                 print("🔄 [Refresh All Data] Processing itemId: \(itemId)")
 
                 do {
-                    let accessToken = try KeychainService.shared.load(for: itemId)
-                    print("🔄 [Refresh All Data] Access token loaded for itemId: \(itemId)")
-
                     // Fetch accounts
                     print("🔄 [Refresh All Data] Fetching accounts for itemId: \(itemId)...")
-                    let accounts = try await plaidService.fetchAccounts(accessToken: accessToken)
+                    let accounts = try await plaidService.fetchAccounts(itemId: itemId)
                     print("🔄 [Refresh All Data] Fetched \(accounts.count) account(s) for itemId: \(itemId)")
 
-                    // Verify and log itemId assignment
-                    // Note: Backend now injects item_id into response, so decoder should set it automatically
+                    // Set itemId on each account if needed
                     for account in accounts {
                         if account.itemId.isEmpty {
-                            print("⚠️ [Refresh All Data] Account '\(account.name)' has EMPTY itemId after decode - setting manually")
                             account.itemId = itemId
-                        } else if account.itemId != itemId {
-                            print("⚠️ [Refresh All Data] Account '\(account.name)' has MISMATCHED itemId: '\(account.itemId)' vs expected '\(itemId)' - fixing")
-                            account.itemId = itemId
-                        } else {
-                            print("✅ [Refresh All Data] Account '\(account.name)' (id: \(account.id)) correctly has itemId: '\(itemId)'")
                         }
                     }
 
@@ -695,7 +673,7 @@ class FinancialViewModel: ObservableObject {
                     print("🔄 [Refresh All Data] Fetching transactions for itemId: \(itemId)...")
                     loadingStep = .analyzingTransactions(count: 0)
                     let transactions = try await plaidService.fetchTransactions(
-                        accessToken: accessToken,
+                        itemId: itemId,
                         startDate: startDate,
                         endDate: endDate
                     )
@@ -706,18 +684,12 @@ class FinancialViewModel: ObservableObject {
                     loadingStep = .analyzingTransactions(count: allTransactions.count)
                 } catch {
                     print("❌ [Refresh All Data] Failed to fetch data for itemId \(itemId): \(error.localizedDescription)")
-                    print("❌ [Refresh All Data] Error details: \(error)")
 
-                    // Only delete from Keychain if it's a Plaid "item not found" error
-                    // For other errors (network, decode, etc), keep the itemId
+                    // Clean up orphaned itemIds if item not found
                     let errorString = error.localizedDescription.lowercased()
                     if errorString.contains("item") && errorString.contains("not found") {
-                        print("⚠️ [Refresh All Data] Item was removed from Plaid, cleaning up orphaned itemId: \(itemId)")
+                        print("⚠️ [Refresh All Data] Item not found, cleaning up itemId: \(itemId)")
                         try? KeychainService.shared.delete(for: itemId)
-                        print("✅ [Refresh All Data] Orphaned itemId removed from Keychain")
-                    } else {
-                        print("⚠️ [Refresh All Data] Keeping itemId in Keychain despite error (may be temporary network issue)")
-                        // Keep the accounts we already fetched, just skip transactions for this item
                     }
                 }
             }
@@ -803,20 +775,17 @@ class FinancialViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            // Get access token for this itemId
-            print("🗑️ [Account Removal] Loading access token from Keychain...")
-            let accessToken = try KeychainService.shared.load(for: itemId)
-            print("🗑️ [Account Removal] Access token loaded successfully")
-
-            // Call Plaid API to remove the account
+            // Call backend to remove the account from Plaid and SQLite
             print("🗑️ [Account Removal] Calling backend to remove account...")
-            let removedItemId = try await plaidService.removeAccount(accessToken: accessToken)
-            print("🗑️ [Account Removal] Backend returned removed itemId: \(removedItemId)")
+            try await plaidService.removeAccount(itemId: itemId)
+            print("🗑️ [Account Removal] Backend removed item successfully")
 
-            // Remove access token from Keychain
-            print("🗑️ [Account Removal] Deleting access token from Keychain...")
-            try KeychainService.shared.delete(for: removedItemId)
-            print("🗑️ [Account Removal] Access token deleted from Keychain")
+            // Remove itemId from Keychain
+            print("🗑️ [Account Removal] Deleting itemId from Keychain...")
+            try KeychainService.shared.delete(for: itemId)
+            print("🗑️ [Account Removal] ItemId deleted from Keychain")
+
+            let removedItemId = itemId
 
             // Invalidate encrypted transaction cache for this item
             transactionFetchService.invalidateCache(for: removedItemId)
@@ -1016,173 +985,6 @@ class FinancialViewModel: ObservableObject {
 
         isShowingGuidance = false
         currentAlert = nil
-    }
-
-    // MARK: - Health Report Setup
-
-    // UserDefaults keys for health report state
-    private let healthReportSetupCompletedKey = "health_report_setup_completed"
-    private let hasViewedHealthTabKey = "has_viewed_health_tab"
-
-    /// Whether the health report setup has been completed (account tagging done)
-    var healthReportSetupCompleted: Bool {
-        UserDefaults.standard.bool(forKey: healthReportSetupCompletedKey)
-    }
-
-    /// Whether the user has viewed the Health tab (controls badge visibility)
-    var hasViewedHealthTab: Bool {
-        UserDefaults.standard.bool(forKey: hasViewedHealthTabKey)
-    }
-
-    /// Marks the Health tab as viewed (removes badge)
-    func markHealthTabViewed() {
-        UserDefaults.standard.set(true, forKey: hasViewedHealthTabKey)
-        print("🏥 [Health] Health tab marked as viewed")
-    }
-
-    /// Marks health report setup as complete
-    func completeHealthReportSetup() {
-        UserDefaults.standard.set(true, forKey: healthReportSetupCompletedKey)
-        print("🏥 [Health] Health report setup marked as complete")
-        objectWillChange.send() // Trigger UI refresh
-    }
-
-    /// Sets up health report after user completes account tagging
-    /// Calculates health metrics and recalculates allocation with health-aware logic
-    func setupHealthReport() async {
-        print("🏥 [Health Setup] Starting health report setup...")
-
-        // Validate preconditions
-        guard !accounts.isEmpty else {
-            print("❌ [Health Setup] Cannot setup - no accounts connected")
-            return
-        }
-
-        guard !transactions.isEmpty else {
-            print("❌ [Health Setup] Cannot setup - no transaction data")
-            return
-        }
-
-        guard let summary = self.summary else {
-            print("❌ [Health Setup] Cannot setup - no summary available")
-            return
-        }
-
-        // Calculate health metrics using tagged accounts
-        print("🏥 [Health Setup] Calculating health metrics with tagged accounts...")
-        self.healthMetrics = FinancialHealthCalculator.calculateHealthMetrics(
-            snapshot: summary,
-            transactions: transactions,
-            accounts: accounts
-        )
-
-        // Cache metrics
-        cacheHealthMetrics()
-
-        // Save setup completion flag
-        completeHealthReportSetup()
-
-        // Recalculate allocation with health-aware logic
-        guard let healthMetrics = self.healthMetrics else {
-            print("❌ [Health Setup] Health metrics calculation failed")
-            return
-        }
-
-        print("🏥 [Health Setup] Recalculating allocation with health-aware logic...")
-
-        do {
-            // Calculate current savings and debt
-            let currentSavings = accounts
-                .filter { $0.type == "depository" }
-                .compactMap { $0.availableBalance ?? $0.currentBalance }
-                .reduce(0, +)
-
-            let totalDebt = accounts
-                .filter { $0.type == "credit" || $0.subtype?.contains("loan") == true }
-                .compactMap { $0.currentBalance }
-                .reduce(0, +)
-
-            let categoryBreakdown = calculateCategoryBreakdown(transactions)
-
-            // Regenerate allocation buckets with health metrics
-            try await budgetManager.generateAllocationBuckets(
-                monthlyIncome: summary.avgMonthlyIncome,
-                monthlyExpenses: summary.avgMonthlyExpenses,
-                currentSavings: currentSavings,
-                totalDebt: totalDebt,
-                categoryBreakdown: categoryBreakdown,
-                healthMetrics: healthMetrics,
-                transactions: transactions,
-                accounts: accounts
-            )
-
-            print("🏥 [Health Setup] Allocation recalculated with \(budgetManager.allocationBuckets.count) buckets")
-
-            // Save to cache
-            saveToCache()
-
-            // Show success message
-            await MainActor.run {
-                successMessage = "Health report activated! Your allocation has been optimized."
-                showSuccessBanner = true
-            }
-
-            // Auto-dismiss after 4 seconds
-            Task {
-                try? await Task.sleep(nanoseconds: 4_000_000_000)
-                await MainActor.run {
-                    showSuccessBanner = false
-                }
-            }
-
-            print("✅ [Health Setup] Health report setup complete")
-
-        } catch {
-            print("❌ [Health Setup] Failed to recalculate allocation: \(error.localizedDescription)")
-            await MainActor.run {
-                self.error = error
-            }
-        }
-    }
-
-    /// Recalculates health metrics when account tags change
-    /// Used when user manually updates tags outside of setup flow
-    func recalculateHealth() async {
-        print("🏥 [Health Recalc] Recalculating health metrics...")
-
-        guard let summary = self.summary else {
-            print("❌ [Health Recalc] Cannot recalculate - no summary available")
-            return
-        }
-
-        // Recalculate health metrics
-        self.healthMetrics = FinancialHealthCalculator.calculateHealthMetrics(
-            snapshot: summary,
-            transactions: transactions,
-            accounts: accounts
-        )
-
-        // Cache updated metrics
-        cacheHealthMetrics()
-
-        // Save to persistent storage
-        saveToCache()
-
-        // Show feedback
-        await MainActor.run {
-            successMessage = "Health metrics updated"
-            showSuccessBanner = true
-        }
-
-        // Auto-dismiss after 2 seconds
-        Task {
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
-            await MainActor.run {
-                showSuccessBanner = false
-            }
-        }
-
-        print("✅ [Health Recalc] Health metrics recalculated")
     }
 
     // MARK: - Notification Handling
@@ -1421,17 +1223,17 @@ class FinancialViewModel: ObservableObject {
         }
         print("💾 [Cache Save] ✅ Saved \(transactions.count) transactions to encrypted cache")
 
-        // Save summary
+        // Save summary (user-scoped)
         if let summaryData = try? encoder.encode(summary) {
-            UserDefaults.standard.set(summaryData, forKey: "cached_summary")
+            UserDefaults.standard.set(summaryData, forKey: cacheKey("summary"))
             print("💾 [Cache Save] ✅ Saved summary")
         } else {
             print("💾 [Cache Save] ❌ Failed to encode summary")
         }
 
-        // Save user journey state
+        // Save user journey state (user-scoped)
         if let stateData = try? encoder.encode(userJourneyState) {
-            UserDefaults.standard.set(stateData, forKey: "cached_journey_state")
+            UserDefaults.standard.set(stateData, forKey: cacheKey("journey_state"))
             print("💾 [Cache] Saved journey state: \(userJourneyState.rawValue)")
         }
 
@@ -1521,8 +1323,8 @@ class FinancialViewModel: ObservableObject {
             print("💾 [Cache Load] ✅ Migration complete, legacy cache cleared")
         }
 
-        // Load summary
-        if let summaryData = UserDefaults.standard.data(forKey: "cached_summary") {
+        // Load summary (user-scoped)
+        if let summaryData = UserDefaults.standard.data(forKey: cacheKey("summary")) {
             print("💾 [Cache Load] Found cached summary data (\(summaryData.count) bytes)")
             if let summary = try? decoder.decode(AnalysisSnapshot.self, from: summaryData) {
                 self.summary = summary
@@ -1542,8 +1344,8 @@ class FinancialViewModel: ObservableObject {
             print("💾 [Cache Load] No transactions available for budget generation")
         }
 
-        // Load user journey state
-        if let stateData = UserDefaults.standard.data(forKey: "cached_journey_state"),
+        // Load user journey state (user-scoped)
+        if let stateData = UserDefaults.standard.data(forKey: cacheKey("journey_state")),
            let state = try? decoder.decode(UserJourneyState.self, from: stateData) {
             self.userJourneyState = state
             print("📂 [Cache] Loaded journey state: \(state.rawValue)")
@@ -1552,53 +1354,12 @@ class FinancialViewModel: ObservableObject {
             inferStateFromCache()
         }
 
-        // Load health metrics
-        loadCachedHealthMetrics()
-
         // Load allocation schedule
         allocationScheduleConfig = AllocationScheduleConfig.load()
         scheduledAllocations = [ScheduledAllocation].load()
         allocationHistory = [AllocationExecution].load()
 
         print("💾 [Cache Load] Cache load complete - Accounts: \(accounts.count), Transactions: \(transactions.count)")
-    }
-
-    // MARK: - Health Metrics Caching
-
-    /// Caches current health metrics and moves current to previous
-    private func cacheHealthMetrics() {
-        guard let metrics = healthMetrics else { return }
-
-        let encoder = JSONEncoder()
-        if let data = try? encoder.encode(metrics) {
-            // Move current to previous for next time
-            if let currentData = UserDefaults.standard.data(forKey: "cached_health_metrics") {
-                UserDefaults.standard.set(currentData, forKey: "cached_previous_health_metrics")
-            }
-
-            // Save new current
-            UserDefaults.standard.set(data, forKey: "cached_health_metrics")
-            print("💾 [Health] Saved health metrics to cache")
-        }
-    }
-
-    /// Loads current and previous health metrics from cache
-    private func loadCachedHealthMetrics() {
-        let decoder = JSONDecoder()
-
-        // Load current metrics
-        if let currentData = UserDefaults.standard.data(forKey: "cached_health_metrics"),
-           let current = try? decoder.decode(FinancialHealthMetrics.self, from: currentData) {
-            healthMetrics = current
-            print("💾 [Health] Loaded current health metrics from cache")
-        }
-
-        // Load previous metrics for comparison
-        if let previousData = UserDefaults.standard.data(forKey: "cached_previous_health_metrics"),
-           let previous = try? decoder.decode(FinancialHealthMetrics.self, from: previousData) {
-            previousHealthMetrics = previous
-            print("💾 [Health] Loaded previous health metrics for comparison")
-        }
     }
 
     /// Infers user journey state from cached data (for existing users after app update)
