@@ -34,6 +34,7 @@ final class AuthService: ObservableObject {
     @Published private(set) var authState: AuthState = .loading
     @Published private(set) var currentUser: AuthUser?
     @Published var error: AuthError?
+    @Published private(set) var isNewRegistration: Bool = false
 
     private let tokenStorage = SecureTokenStorage.shared
     private let baseURL: String
@@ -82,7 +83,12 @@ final class AuthService: ObservableObject {
 
         let response: AuthResponse = try await postAuth(endpoint: "/auth/register", body: body)
         handleAuthResponse(response)
+        isNewRegistration = true
         print("✅ [AuthService] Registration successful: \(response.user.id)")
+    }
+
+    func clearNewRegistrationFlag() {
+        isNewRegistration = false
     }
 
     func login(email: String, password: String) async throws {

@@ -2,7 +2,9 @@ import SwiftUI
 
 struct OnboardingView: View {
     @Binding var isPresented: Bool
+    @ObservedObject var viewModel: FinancialViewModel
     @State private var currentPage = 0
+    @State private var showAccountsConnected = false
 
     let pages: [OnboardingPage] = [
         OnboardingPage(
@@ -25,17 +27,30 @@ struct OnboardingView: View {
         )
     ]
 
-    var body: some View {
-        VStack {
-            // Skip button
-            HStack {
-                Spacer()
-                Button("Skip") {
-                    isPresented = false
-                }
-                .padding()
-            }
+    // Colors from design
+    private let bgBase = Color(red: 0.04, green: 0.05, blue: 0.06)
+    private let accentLight = Color(red: 0.18, green: 0.75, blue: 0.61)
 
+    var body: some View {
+        Group {
+            if showAccountsConnected {
+                AccountsConnectedView(viewModel: viewModel)
+                    .primaryBackgroundGradient()
+            } else {
+                onboardingContent
+            }
+        }
+        .onChange(of: viewModel.accounts.count) { newCount in
+            if newCount > 0 {
+                withAnimation {
+                    showAccountsConnected = true
+                }
+            }
+        }
+    }
+
+    private var onboardingContent: some View {
+        VStack {
             TabView(selection: $currentPage) {
                 ForEach(Array(pages.enumerated()), id: \.offset) { index, page in
                     OnboardingPageView(page: page)
@@ -45,27 +60,44 @@ struct OnboardingView: View {
             .tabViewStyle(.page(indexDisplayMode: .always))
             .indexViewStyle(.page(backgroundDisplayMode: .always))
 
-            // Continue/Get Started button
+            // Connect button
             Button {
-                if currentPage < pages.count - 1 {
-                    withAnimation {
-                        currentPage += 1
-                    }
-                } else {
-                    isPresented = false
+                Task {
+                    await viewModel.connectBankAccount(from: nil)
                 }
             } label: {
-                Text(currentPage == pages.count - 1 ? "Get Started" : "Continue")
+                Text("Connect my accounts")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(bgBase)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.blue)
+                    .background(accentLight)
                     .cornerRadius(12)
             }
             .padding(.horizontal, 32)
+
+            // Skip button
+            Button("Skip") {
+                isPresented = false
+            }
+            .foregroundColor(.white.opacity(0.7))
+            .padding(.top, 12)
             .padding(.bottom, 32)
         }
+        .background(
+            LinearGradient(
+                stops: [
+                    Gradient.Stop(color: Color(red: 0.04, green: 0.05, blue: 0.06), location: 0.00),
+                    Gradient.Stop(color: Color(red: 0.05, green: 0.08, blue: 0.09), location: 0.25),
+                    Gradient.Stop(color: Color(red: 0.05, green: 0.07, blue: 0.09), location: 0.45),
+                    Gradient.Stop(color: Color(red: 0.06, green: 0.13, blue: 0.11), location: 0.50),
+                    Gradient.Stop(color: Color(red: 0.12, green: 0.44, blue: 0.35), location: 0.75),
+                    Gradient.Stop(color: Color(red: 0.18, green: 0.75, blue: 0.61), location: 1.00),
+                ],
+                startPoint: UnitPoint(x: 0.5, y: 1),
+                endPoint: UnitPoint(x: 0.5, y: 0)
+            )
+        )
     }
 }
 
@@ -79,18 +111,21 @@ struct OnboardingPageView: View {
             Spacer()
 
             Image(systemName: page.icon)
-                .font(.system(size: 80))
-                .foregroundColor(page.color)
+                .font(.system(size: 40))
+                .foregroundColor(DesignTokens.Colors.accentPrimary)
+                .padding(16)
+                .primaryCardStyle()
 
             VStack(spacing: 16) {
                 Text(page.title)
                     .font(.title)
                     .fontWeight(.bold)
+                    .foregroundColor(DesignTokens.Colors.textPrimary)
                     .multilineTextAlignment(.center)
 
                 Text(page.description)
                     .font(.body)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(DesignTokens.Colors.textSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
             }
@@ -107,4 +142,9 @@ struct OnboardingPage {
     let title: String
     let description: String
     let color: Color
+}
+
+#Preview {
+    OnboardingView(isPresented: .constant(true), viewModel: FinancialViewModel())
+        .preferredColorScheme(.dark)
 }

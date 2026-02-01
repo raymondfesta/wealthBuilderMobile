@@ -12,7 +12,7 @@ struct PrimaryButton: View {
             HStack(spacing: DesignTokens.Spacing.xs) {
                 if isLoading {
                     ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: DesignTokens.Colors.backgroundPrimary))
+                        .progressViewStyle(CircularProgressViewStyle(tint: DesignTokens.Colors.buttonTextPrimary))
                         .scaleEffect(0.8)
                 }
 
@@ -21,7 +21,7 @@ struct PrimaryButton: View {
                     .foregroundColor(
                         isDisabled
                             ? DesignTokens.Colors.textSecondary
-                            : DesignTokens.Colors.backgroundPrimary
+                            : DesignTokens.Colors.buttonTextPrimary
                     )
                     .tracking(-0.43)
             }
@@ -99,6 +99,44 @@ struct TextButton: View {
                 .font(.subheadlineRegular)
                 .foregroundColor(color)
                 .tracking(-0.23)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Glassmorphic button with translucent background
+struct GlassButton: View {
+    let title: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.subheadlineRegular)
+                .foregroundColor(DesignTokens.Colors.textSecondary)
+                .padding(.horizontal, DesignTokens.Spacing.md)
+                .padding(.vertical, DesignTokens.Spacing.xs)
+                .background(
+                    ZStack {
+                        // Glass overlay
+                        LinearGradient(
+                            gradient: Gradient(stops: [
+                                .init(color: DesignTokens.Colors.glassOverlayTop, location: 0),
+                                .init(color: DesignTokens.Colors.glassOverlayMid, location: 0.35),
+                                .init(color: DesignTokens.Colors.glassOverlayBottom, location: 1)
+                            ]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .blendMode(.screen)
+                    }
+                )
+                .background(DesignTokens.Colors.cardBase.opacity(0.6))
+                .cornerRadius(DesignTokens.CornerRadius.pill)
+                .overlay(
+                    RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.pill)
+                        .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
+                )
         }
         .buttonStyle(.plain)
     }

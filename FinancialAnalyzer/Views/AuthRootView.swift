@@ -44,13 +44,23 @@ private struct LoadingView: View {
 }
 
 struct MainAppView: View {
-    @AppStorage("hasSeenWelcome") private var hasSeenWelcome = false
+    @ObservedObject private var authService = AuthService.shared
+    @StateObject private var viewModel = FinancialViewModel()
+    @State private var showOnboarding = false
 
     var body: some View {
-        if !hasSeenWelcome {
-            WelcomePageView(isPresented: $hasSeenWelcome)
-        } else {
-            ContentView()
+        Group {
+            if showOnboarding {
+                OnboardingView(isPresented: $showOnboarding, viewModel: viewModel)
+            } else {
+                ContentView()
+            }
+        }
+        .onAppear {
+            if authService.isNewRegistration {
+                showOnboarding = true
+                authService.clearNewRegistrationFlag()
+            }
         }
     }
 }
