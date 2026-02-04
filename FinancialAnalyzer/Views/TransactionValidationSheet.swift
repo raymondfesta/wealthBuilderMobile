@@ -204,15 +204,16 @@ struct TransactionValidationSheet: View {
 
     private var categoryPickerSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Correct Category")
+            Text("What is this transaction?")
                 .font(.headline)
 
-            Text("If our analysis is wrong, select the correct category below:")
+            Text("If our analysis is wrong, select the correct category:")
                 .font(.caption)
                 .foregroundColor(.secondary)
 
             VStack(spacing: 8) {
-                ForEach(BucketCategory.allCases, id: \.self) { category in
+                // Show user-selectable categories (excludes .disposable)
+                ForEach(BucketCategory.userSelectableCases, id: \.self) { category in
                     Button {
                         selectedCategory = category
                     } label: {
@@ -223,7 +224,7 @@ struct TransactionValidationSheet: View {
                                 .frame(width: 32)
 
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(category.rawValue)
+                                Text(categoryDisplayName(category))
                                     .font(.subheadline)
                                     .fontWeight(.medium)
                                     .foregroundColor(.primary)
@@ -298,7 +299,21 @@ struct TransactionValidationSheet: View {
         case "blue": return .blue
         case "mint": return .mint
         case "purple": return .purple
+        case "gray": return .gray
         default: return .gray
+        }
+    }
+
+    /// User-friendly display name for category picker
+    private func categoryDisplayName(_ category: BucketCategory) -> String {
+        switch category {
+        case .income: return "Income"
+        case .expenses: return "Expense"
+        case .debt: return "Debt Payment"
+        case .invested: return "Investment Contribution"
+        case .cash: return "Savings Transfer"
+        case .excluded: return "Exclude from Analysis"
+        case .disposable: return "Other"
         }
     }
 

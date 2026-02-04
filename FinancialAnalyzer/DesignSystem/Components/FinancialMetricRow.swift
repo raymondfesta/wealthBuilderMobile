@@ -42,6 +42,7 @@ struct FinancialMetricRow: View {
                         .frame(width: 24, height: 24)
                 }
             }
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(action == nil)
@@ -101,6 +102,7 @@ struct TextMetricRow: View {
                         .frame(width: 24, height: 24)
                 }
             }
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(action == nil)

@@ -58,21 +58,13 @@ struct LoginView: View {
                         .cornerRadius(DesignTokens.CornerRadius.sm)
 
                         // Create account button
-                        Button {
+                        PrimaryButton(title: "Create account") {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 isSignUp = true
                                 showForm = true
                                 errorMessage = nil
                             }
-                        } label: {
-                            Text("Create account")
-                                .font(.body)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 50)
                         }
-                        .background(DesignTokens.Colors.accentPrimary)
-                        .cornerRadius(DesignTokens.CornerRadius.pill)
 
                         // Sign in with email link
                         Button {
@@ -136,26 +128,12 @@ struct LoginView: View {
                     .multilineTextAlignment(.center)
             }
 
-            Button {
-                Task { await handleEmailAuth() }
-            } label: {
-                Group {
-                    if isLoading {
-                        ProgressView()
-                            .tint(.white)
-                    } else {
-                        Text(isSignUp ? "Create Account" : "Sign In")
-                    }
-                }
-                .font(.body)
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 50)
-            }
-            .background(DesignTokens.Colors.accentPrimary)
-            .cornerRadius(DesignTokens.CornerRadius.pill)
-            .disabled(!isFormValid || isLoading)
-            .opacity(isFormValid && !isLoading ? 1 : 0.5)
+            PrimaryButton(
+                title: isSignUp ? "Create Account" : "Sign In",
+                action: { Task { await handleEmailAuth() } },
+                isDisabled: !isFormValid,
+                isLoading: isLoading
+            )
 
             Button {
                 withAnimation(.easeInOut(duration: 0.3)) {

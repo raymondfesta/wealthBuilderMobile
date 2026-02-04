@@ -6,14 +6,6 @@ struct OnboardingFlowView: View {
     @ObservedObject var viewModel: FinancialViewModel
     @State private var showProfileSheet = false
 
-    // Drill-down sheet states for AnalysisCompleteView
-    @State private var showIncomeSheet = false
-    @State private var showExpensesSheet = false
-    @State private var showDebtMinimumsSheet = false
-    @State private var showEmergencyFundSheet = false
-    @State private var showDebtSheet = false
-    @State private var showInvestmentsSheet = false
-
     var body: some View {
         ZStack {
             NavigationStack {
@@ -84,59 +76,6 @@ struct OnboardingFlowView: View {
                 .sheet(isPresented: $showProfileSheet) {
                     ProfileView(authService: AuthService.shared)
                 }
-                // Drill-down sheets for AnalysisCompleteView
-                .sheet(isPresented: $showIncomeSheet) {
-                    if let snapshot = viewModel.analysisSnapshot {
-                        IncomeDetailSheet(
-                            transactions: viewModel.transactions,
-                            monthlyAverage: snapshot.monthlyFlow.income
-                        )
-                    }
-                }
-                .sheet(isPresented: $showExpensesSheet) {
-                    if let snapshot = viewModel.analysisSnapshot {
-                        ExpenseDetailSheet(
-                            transactions: viewModel.transactions,
-                            monthlyAverage: snapshot.monthlyFlow.essentialExpenses,
-                            expenseBreakdown: snapshot.monthlyFlow.expenseBreakdown,
-                            onValidateTransaction: { _ in }
-                        )
-                    }
-                }
-                .sheet(isPresented: $showDebtMinimumsSheet) {
-                    if let snapshot = viewModel.analysisSnapshot {
-                        DebtMinimumsDetailSheet(
-                            accounts: viewModel.accounts,
-                            monthlyMinimums: snapshot.monthlyFlow.debtMinimums
-                        )
-                    }
-                }
-                .sheet(isPresented: $showEmergencyFundSheet) {
-                    if let snapshot = viewModel.analysisSnapshot {
-                        EmergencyFundDetailSheet(
-                            accounts: viewModel.accounts,
-                            totalCash: snapshot.position.emergencyCash,
-                            monthsCovered: snapshot.position.emergencyCash / max(snapshot.monthlyFlow.essentialExpenses, 1)
-                        )
-                    }
-                }
-                .sheet(isPresented: $showDebtSheet) {
-                    if let snapshot = viewModel.analysisSnapshot {
-                        DebtMinimumsDetailSheet(
-                            accounts: viewModel.accounts,
-                            monthlyMinimums: snapshot.monthlyFlow.debtMinimums
-                        )
-                    }
-                }
-                .sheet(isPresented: $showInvestmentsSheet) {
-                    if let snapshot = viewModel.analysisSnapshot {
-                        InvestmentDetailSheet(
-                            accounts: viewModel.accounts,
-                            totalInvested: snapshot.position.investmentBalances,
-                            monthlyContributions: snapshot.position.monthlyInvestmentContributions
-                        )
-                    }
-                }
             }
 
             // Loading overlay
@@ -177,13 +116,16 @@ struct OnboardingFlowView: View {
         if let snapshot = viewModel.analysisSnapshot {
             AnalysisCompleteView(
                 snapshot: snapshot,
+                viewModel: viewModel,
                 onSeePlan: {
                     Task {
                         await viewModel.createMyPlan()
                     }
                 },
-                onDrillDown: { drillDownType in
-                    handleDrillDown(drillDownType)
+                onAddAccount: {
+                    Task {
+                        await viewModel.connectBankAccount(from: nil)
+                    }
                 }
             )
         } else {
@@ -196,24 +138,6 @@ struct OnboardingFlowView: View {
         }
     }
 
-    // MARK: - Drill-Down Handler
-
-    private func handleDrillDown(_ type: AnalysisCompleteView.DrillDownType) {
-        switch type {
-        case .income:
-            showIncomeSheet = true
-        case .expenses:
-            showExpensesSheet = true
-        case .debtMinimums:
-            showDebtMinimumsSheet = true
-        case .emergencyFund:
-            showEmergencyFundSheet = true
-        case .debt:
-            showDebtSheet = true
-        case .investments:
-            showInvestmentsSheet = true
-        }
-    }
 }
 
 #if DEBUG

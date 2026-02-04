@@ -4,35 +4,45 @@ import SwiftUI
 struct TransactionRow: View {
     let transaction: Transaction
 
+    private var categoryLabel: String {
+        transaction.category.first ?? "Uncategorized"
+    }
+
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM d, yyyy"
+        return f
+    }()
+
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(transaction.name)
-                    .subheadlineStyle(color: DesignTokens.Colors.textPrimary)
+                    .font(.system(size: 16))
+                    .foregroundColor(DesignTokens.Colors.textPrimary)
 
-                if let merchantName = transaction.merchantName {
-                    Text(merchantName)
-                        .captionStyle()
-                }
+                Text(categoryLabel)
+                    .font(.system(size: 12))
+                    .foregroundColor(DesignTokens.Colors.textSecondary)
 
-                Text(transaction.date, style: .date)
-                    .captionStyle()
+                Text(Self.dateFormatter.string(from: transaction.date))
+                    .font(.system(size: 12))
+                    .foregroundColor(DesignTokens.Colors.textSecondary)
             }
 
             Spacer()
 
             Text(formattedAmount)
-                .subheadlineStyle(color: transaction.amount < 0 ? DesignTokens.Colors.progressGreen : DesignTokens.Colors.textPrimary)
+                .font(.system(size: 16))
+                .foregroundColor(DesignTokens.Colors.textPrimary)
         }
-        .padding(DesignTokens.Spacing.md)
-        .primaryCardStyle()
     }
 
     private var formattedAmount: String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.maximumFractionDigits = 2
-        let value = transaction.amount < 0 ? abs(transaction.amount) : transaction.amount
+        let value = abs(transaction.amount)
         let sign = transaction.amount < 0 ? "+" : "-"
         return sign + (formatter.string(from: NSNumber(value: value)) ?? "$0.00")
     }
@@ -44,14 +54,22 @@ struct TransactionRow_Previews: PreviewProvider {
         let transaction = Transaction(
             id: "1",
             accountId: "acc1",
-            amount: 5.50,
+            amount: 500.00,
             date: Date(),
-            name: "Coffee Shop",
-            merchantName: "Starbucks",
-            category: ["Food and Drink", "Coffee Shop"],
+            name: "Alpine Bikes LLC",
+            merchantName: "Alpine Bikes",
+            category: ["Vendor", "Shopping"],
             pending: false
         )
         return TransactionRow(transaction: transaction)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
+            .background(DesignTokens.Colors.backgroundSecondary)
+            .cornerRadius(14)
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.white.opacity(0.04), lineWidth: 1)
+            )
             .padding()
             .primaryBackgroundGradient()
     }

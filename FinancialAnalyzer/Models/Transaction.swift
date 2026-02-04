@@ -52,6 +52,72 @@ final class Transaction: Identifiable {
         return true
     }
 
+    /// Whether this transaction has characteristics suggesting it might be a transfer
+    /// These are flagged for user review, not auto-excluded
+    var needsTransferReview: Bool {
+        // Already validated by user - no review needed
+        if userValidated { return false }
+
+        // Already marked as excluded - no review needed
+        if userCorrectedCategory == .excluded { return false }
+
+        // Only check outflows (expenses)
+        guard amount > 0 else { return false }
+
+        // Check for transfer-like characteristics
+        let nameLower = name.lowercased()
+        let merchantLower = (merchantName ?? "").lowercased()
+
+        // Pattern 1: Contains "transfer" keyword
+        let hasTransferKeyword = nameLower.contains("transfer") ||
+                                 nameLower.contains("xfer") ||
+                                 merchantLower.contains("transfer")
+
+        // Pattern 2: Contains bank name (suggesting inter-bank transfer)
+        let bankNames = [
+            "usaa", "chase", "wells fargo", "bank of america", "bofa",
+            "capital one", "citi", "pnc", "td bank", "us bank", "ally",
+            "discover", "marcus", "synchrony", "navy federal", "schwab",
+            "fidelity", "vanguard", "etrade", "ameritrade"
+        ]
+        let hasBankName = bankNames.contains { nameLower.contains($0) || merchantLower.contains($0) }
+
+        // Pattern 3: Round amount ($100, $500, $1000, etc.) - transfers are often round
+        let isRoundAmount = amount.truncatingRemainder(dividingBy: 100) == 0 && abs(amount) >= 100
+
+        // Pattern 4: Plaid category suggests transfer but not internal/same-institution
+        let plaidSaysTransfer: Bool = {
+            guard let pfc = personalFinanceCategory else { return false }
+            let primary = pfc.primary.uppercased()
+            let detailed = pfc.detailed.uppercased()
+
+            // Must contain TRANSFER
+            guard primary.contains("TRANSFER") || detailed.contains("TRANSFER") else { return false }
+
+            // But NOT be same-institution (those are auto-handled)
+            if detailed.contains("INTERNAL") || detailed.contains("SAME_INSTITUTION") {
+                return false
+            }
+
+            return true
+        }()
+
+        // Flag for review if:
+        // - Has transfer keyword AND round amount
+        // - Has bank name AND round amount
+        // - Plaid says transfer but not internal
+        if hasTransferKeyword && isRoundAmount { return true }
+        if hasBankName && isRoundAmount { return true }
+        if plaidSaysTransfer { return true }
+
+        return false
+    }
+
+    /// Combined flag: needs either confidence review OR transfer review
+    var needsAnyReview: Bool {
+        needsValidation || needsTransferReview
+    }
+
     // Confidence level for UI display
     var confidenceLevel: ConfidenceLevel {
         return personalFinanceCategory?.confidenceLevel ?? .unknown

@@ -45,6 +45,9 @@ struct DesignTokens {
         static let glassOverlayMid = Color.white.opacity(0.02)
         static let glassOverlayBottom = Color.white.opacity(0)
         static let glassInnerStroke = Color.white.opacity(0.05)
+
+        // Button Colors
+        static let buttonTextPrimary = Color.black
     }
 
     // MARK: - Spacing (8px Grid)

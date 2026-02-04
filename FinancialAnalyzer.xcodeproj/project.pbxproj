@@ -39,6 +39,11 @@
 		99806AD12E94D22C00114B52 /* ProactiveGuidanceDemoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99806ACE2E94D22C00114B52 /* ProactiveGuidanceDemoView.swift */; };
 		99CA9B802EAC1FA600822E05 /* TransactionValidationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99CA9B7F2EAC1FA600822E05 /* TransactionValidationSheet.swift */; };
 		99CA9B812EAC1FA600822E05 /* AccountTagSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99CA9B7E2EAC1FA600822E05 /* AccountTagSheet.swift */; };
+		99F438432F2D037C00D8EECF /* EmergencyFundBreakdownSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99F438402F2D037C00D8EECF /* EmergencyFundBreakdownSheet.swift */; };
+		99F438442F2D037C00D8EECF /* IncomeBreakdownSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99F438412F2D037C00D8EECF /* IncomeBreakdownSheet.swift */; };
+		99F438452F2D037C00D8EECF /* InvestmentBreakdownSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99F438422F2D037C00D8EECF /* InvestmentBreakdownSheet.swift */; };
+		99F438462F2D037C00D8EECF /* DebtBreakdownSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99F4383E2F2D037C00D8EECF /* DebtBreakdownSheet.swift */; };
+		99F438472F2D037C00D8EECF /* DebtMinimumsBreakdownSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99F4383F2F2D037C00D8EECF /* DebtMinimumsBreakdownSheet.swift */; };
 		AA001001 /* AllocationExecution.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA002001 /* AllocationExecution.swift */; };
 		AA001002 /* AllocationScheduleConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA002002 /* AllocationScheduleConfig.swift */; };
 		AA001003 /* AnalysisSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA002003 /* AnalysisSnapshot.swift */; };
@@ -57,7 +62,7 @@
 		AA001016 /* AllocationHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA004001 /* AllocationHistoryView.swift */; };
 		AA001017 /* AllocationReminderSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA004002 /* AllocationReminderSheet.swift */; };
 		AA001018 /* AnalysisCompleteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA004003 /* AnalysisCompleteView.swift */; };
-		AA001019 /* AnalysisDrillDownSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA004004 /* AnalysisDrillDownSheets.swift */; };
+
 		AA001020 /* CurrencyTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA004005 /* CurrencyTextField.swift */; };
 		AA001022 /* PaycheckScheduleEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA004007 /* PaycheckScheduleEditorView.swift */; };
 		AA001023 /* PaycheckScheduleSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA004008 /* PaycheckScheduleSetupView.swift */; };
@@ -120,6 +125,9 @@
 		OB001001 /* OnboardingFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = OB002001 /* OnboardingFlowView.swift */; };
 		OB001002 /* WelcomeConnectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = OB002002 /* WelcomeConnectView.swift */; };
 		OB001003 /* AccountsConnectedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = OB002003 /* AccountsConnectedView.swift */; };
+		TR001001 /* TransactionReviewSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = TR002001 /* TransactionReviewSection.swift */; };
+		TR001002 /* EmptyAccountStateCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = TR002002 /* EmptyAccountStateCard.swift */; };
+		TR001003 /* DisposableIncomeCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = TR002003 /* DisposableIncomeCard.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -136,6 +144,7 @@
 		991CAD832EAD537200000EDB /* HapticFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticFeedback.swift; sourceTree = "<group>"; };
 		991CAD872EAD544300000EDB /* AllocationEditorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationEditorViewModel.swift; sourceTree = "<group>"; };
 		993520E02F29755500EE7405 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		993520E22F29AE2400EE7405 /* FinancialAnalyzerRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FinancialAnalyzerRelease.entitlements; sourceTree = "<group>"; };
 		993D58AE2F285B410062D9F9 /* app_icon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = app_icon.icon; path = ../app_icon.icon; sourceTree = SOURCE_ROOT; };
 		9978B8F02EA811860065A5FE /* AddBudgetSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBudgetSheet.swift; sourceTree = "<group>"; };
 		9978B8F12EA811860065A5FE /* LoadingOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingOverlay.swift; sourceTree = "<group>"; };
@@ -155,6 +164,11 @@
 		99806ACF2E94D22C00114B52 /* ProactiveGuidanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProactiveGuidanceView.swift; sourceTree = "<group>"; };
 		99CA9B7E2EAC1FA600822E05 /* AccountTagSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountTagSheet.swift; sourceTree = "<group>"; };
 		99CA9B7F2EAC1FA600822E05 /* TransactionValidationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionValidationSheet.swift; sourceTree = "<group>"; };
+		99F4383E2F2D037C00D8EECF /* DebtBreakdownSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebtBreakdownSheet.swift; sourceTree = "<group>"; };
+		99F4383F2F2D037C00D8EECF /* DebtMinimumsBreakdownSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebtMinimumsBreakdownSheet.swift; sourceTree = "<group>"; };
+		99F438402F2D037C00D8EECF /* EmergencyFundBreakdownSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmergencyFundBreakdownSheet.swift; sourceTree = "<group>"; };
+		99F438412F2D037C00D8EECF /* IncomeBreakdownSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomeBreakdownSheet.swift; sourceTree = "<group>"; };
+		99F438422F2D037C00D8EECF /* InvestmentBreakdownSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvestmentBreakdownSheet.swift; sourceTree = "<group>"; };
 		AA002001 /* AllocationExecution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationExecution.swift; sourceTree = "<group>"; };
 		AA002002 /* AllocationScheduleConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationScheduleConfig.swift; sourceTree = "<group>"; };
 		AA002003 /* AnalysisSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalysisSnapshot.swift; sourceTree = "<group>"; };
@@ -173,7 +187,7 @@
 		AA004001 /* AllocationHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationHistoryView.swift; sourceTree = "<group>"; };
 		AA004002 /* AllocationReminderSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationReminderSheet.swift; sourceTree = "<group>"; };
 		AA004003 /* AnalysisCompleteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalysisCompleteView.swift; sourceTree = "<group>"; };
-		AA004004 /* AnalysisDrillDownSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalysisDrillDownSheets.swift; sourceTree = "<group>"; };
+
 		AA004005 /* CurrencyTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrencyTextField.swift; sourceTree = "<group>"; };
 		AA004007 /* PaycheckScheduleEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaycheckScheduleEditorView.swift; sourceTree = "<group>"; };
 		AA004008 /* PaycheckScheduleSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaycheckScheduleSetupView.swift; sourceTree = "<group>"; };
@@ -237,6 +251,9 @@
 		OB002001 /* OnboardingFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlowView.swift; sourceTree = "<group>"; };
 		OB002002 /* WelcomeConnectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeConnectView.swift; sourceTree = "<group>"; };
 		OB002003 /* AccountsConnectedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsConnectedView.swift; sourceTree = "<group>"; };
+		TR002001 /* TransactionReviewSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionReviewSection.swift; sourceTree = "<group>"; };
+		TR002002 /* EmptyAccountStateCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyAccountStateCard.swift; sourceTree = "<group>"; };
+		TR002003 /* DisposableIncomeCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisposableIncomeCard.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -265,6 +282,9 @@
 				CP002002 /* TransactionRow.swift */,
 				CP002003 /* BudgetStatusCard.swift */,
 				CP002004 /* AllocationBucketSummaryCard.swift */,
+				TR002001 /* TransactionReviewSection.swift */,
+				TR002002 /* EmptyAccountStateCard.swift */,
+				TR002003 /* DisposableIncomeCard.swift */,
 				FA009004 /* RefreshIndicatorView.swift */,
 			);
 			path = Components;
@@ -311,6 +331,7 @@
 		FA000003 /* FinancialAnalyzer */ = {
 			isa = PBXGroup;
 			children = (
+				993520E22F29AE2400EE7405 /* FinancialAnalyzerRelease.entitlements */,
 				993520E02F29755500EE7405 /* Assets.xcassets */,
 				AU002007 /* FinancialAnalyzer.entitlements */,
 				991CAD842EAD537200000EDB /* Extensions */,
@@ -401,6 +422,11 @@
 		FA005004 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				99F4383E2F2D037C00D8EECF /* DebtBreakdownSheet.swift */,
+				99F4383F2F2D037C00D8EECF /* DebtMinimumsBreakdownSheet.swift */,
+				99F438402F2D037C00D8EECF /* EmergencyFundBreakdownSheet.swift */,
+				99F438412F2D037C00D8EECF /* IncomeBreakdownSheet.swift */,
+				99F438422F2D037C00D8EECF /* InvestmentBreakdownSheet.swift */,
 				991CAD7A2EAD533300000EDB /* Components */,
 				OB003000 /* Onboarding */,
 				MP003000 /* MyPlan */,
@@ -428,8 +454,8 @@
 				9978B8F92EA839BB0065A5FE /* AllocationBucketDetailView.swift */,
 				AA004001 /* AllocationHistoryView.swift */,
 				AA004002 /* AllocationReminderSheet.swift */,
-				AA004004 /* AnalysisDrillDownSheets.swift */,
 				AA004005 /* CurrencyTextField.swift */,
+
 				AA004007 /* PaycheckScheduleEditorView.swift */,
 				AA004008 /* PaycheckScheduleSetupView.swift */,
 				AA004009 /* PrivacyPolicyView.swift */,
@@ -577,13 +603,18 @@
 				AA001016 /* AllocationHistoryView.swift in Sources */,
 				AA001017 /* AllocationReminderSheet.swift in Sources */,
 				AA001018 /* AnalysisCompleteView.swift in Sources */,
-				AA001019 /* AnalysisDrillDownSheets.swift in Sources */,
+
 				AA001020 /* CurrencyTextField.swift in Sources */,
 				AA001022 /* PaycheckScheduleEditorView.swift in Sources */,
 				AA001023 /* PaycheckScheduleSetupView.swift in Sources */,
 				AA001024 /* PrivacyPolicyView.swift in Sources */,
 				AA001025 /* ScheduleTabView.swift in Sources */,
 				AA001026 /* UpcomingAllocationsView.swift in Sources */,
+				99F438432F2D037C00D8EECF /* EmergencyFundBreakdownSheet.swift in Sources */,
+				99F438442F2D037C00D8EECF /* IncomeBreakdownSheet.swift in Sources */,
+				99F438452F2D037C00D8EECF /* InvestmentBreakdownSheet.swift in Sources */,
+				99F438462F2D037C00D8EECF /* DebtBreakdownSheet.swift in Sources */,
+				99F438472F2D037C00D8EECF /* DebtMinimumsBreakdownSheet.swift in Sources */,
 				AA001027 /* UserConsentView.swift in Sources */,
 				AA001028 /* AccountLinkingDetailSheet.swift in Sources */,
 				AA001029 /* AllocationChecklistItem.swift in Sources */,
@@ -654,6 +685,9 @@
 				CP001002 /* TransactionRow.swift in Sources */,
 				CP001003 /* BudgetStatusCard.swift in Sources */,
 				CP001004 /* AllocationBucketSummaryCard.swift in Sources */,
+				TR001001 /* TransactionReviewSection.swift in Sources */,
+				TR001002 /* EmptyAccountStateCard.swift in Sources */,
+				TR001003 /* DisposableIncomeCard.swift in Sources */,
 				MP001001 /* MyPlanView.swift in Sources */,
 				MP001002 /* PlanAdherenceCard.swift in Sources */,
 			);
@@ -816,7 +850,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = app_icon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
-				CODE_SIGN_ENTITLEMENTS = FinancialAnalyzer/FinancialAnalyzer.entitlements;
+				CODE_SIGN_ENTITLEMENTS = FinancialAnalyzer/FinancialAnalyzerRelease.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";

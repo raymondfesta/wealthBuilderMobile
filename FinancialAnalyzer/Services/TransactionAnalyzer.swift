@@ -143,6 +143,24 @@ struct TransactionAnalyzer {
         }
         let expenseBreakdown = categorizeEssentialExpenses(essentialTransactions, months: months)
 
+        // DIAGNOSTIC: Log excluded transactions
+        let excludedByUser = transactions.filter { $0.userCorrectedCategory == .excluded }
+        let excludedAsTransfer = transactions.filter {
+            isInternalTransfer($0) && $0.userCorrectedCategory != .excluded
+        }
+        let flaggedForReview = transactions.filter { $0.needsTransferReview }
+
+        print("📊 [MonthlyFlow] User-excluded: \(excludedByUser.count)")
+        print("📊 [MonthlyFlow] Auto-excluded (same-institution): \(excludedAsTransfer.count)")
+        print("📊 [MonthlyFlow] Flagged for review: \(flaggedForReview.count)")
+
+        for txn in excludedByUser.prefix(3) {
+            print("   🚫 User excluded: '\(txn.name)' $\(Int(abs(txn.amount)))")
+        }
+        for txn in flaggedForReview.prefix(3) {
+            print("   ⚠️ Needs review: '\(txn.name)' $\(Int(abs(txn.amount)))")
+        }
+
         print("📊 [MonthlyFlow] Expense transactions: \(essentialTransactions.count)")
         print("📊 [MonthlyFlow] Monthly expenses: $\(Int(expenseBreakdown.total))")
 
@@ -352,37 +370,50 @@ struct TransactionAnalyzer {
     }
 
     /// Determines if a transaction is an internal transfer (between user's own accounts)
+    /// NOTE: This is CONSERVATIVE - only auto-excludes clear same-institution transfers.
+    /// Cross-institution transfers (e.g., "USAA Transfer" to Chase) require user review.
     static func isInternalTransfer(_ transaction: Transaction) -> Bool {
-        // Check PFC
+        // CRITICAL: Respect user exclusions first
+        if transaction.userCorrectedCategory == .excluded {
+            return true
+        }
+
+        // Check PFC for SAME INSTITUTION transfers only
         if let pfc = transaction.personalFinanceCategory {
             let detailed = pfc.detailed.uppercased()
-            if detailed.contains("ACCOUNT_TRANSFER") ||
-               detailed.contains("SAME_INSTITUTION") {
+            // Only auto-detect if Plaid is confident it's same-institution
+            if detailed.contains("SAME_INSTITUTION") ||
+               detailed.contains("INTERNAL_ACCOUNT_TRANSFER") {
                 return true
             }
         }
 
-        let transferCategories = [
-            "TRANSFER_INTERNAL", "TRANSFER_SAME_INSTITUTION"
-        ]
-
+        // Check legacy categories for same-institution only
+        let transferCategories = ["TRANSFER_INTERNAL", "TRANSFER_SAME_INSTITUTION"]
         if let category = transaction.category.first?.uppercased() {
             if transferCategories.contains(where: { category.contains($0) }) {
                 return true
             }
         }
 
+        // Check for credit card/loan PAYMENTS (paying your own debt is not an expense)
         let nameLower = transaction.name.lowercased()
-        let transferTerms = [
-            "transfer to", "transfer from", "internal transfer",
-            "online transfer", "funds transfer",
-            // Debt payment patterns (should not count as expenses)
+        let debtPaymentPatterns = [
             "credit card payment", "card payment", "loan payment",
             "autopay", "auto pay", "payment - chase", "payment - citi",
-            "payment - amex", "payment - discover", "payment - capital one"
+            "payment - amex", "payment - discover", "payment - capital one",
+            "payment thank you", "automatic payment"
         ]
 
-        return transferTerms.contains(where: { nameLower.contains($0) })
+        if debtPaymentPatterns.contains(where: { nameLower.contains($0) }) {
+            return true
+        }
+
+        // DO NOT auto-detect cross-institution transfers here
+        // "USAA Transfer" to a different bank should be flagged for review, not auto-excluded
+        // The Transaction.needsTransferReview property handles flagging these
+
+        return false
     }
 
     /// Determines if a transaction is an essential expense
@@ -390,10 +421,15 @@ struct TransactionAnalyzer {
         // Must be an outflow (positive amount in Plaid = money OUT)
         guard transaction.amount > 0 else { return false }
 
+        // CRITICAL: Respect user exclusions first
+        if transaction.userCorrectedCategory == .excluded {
+            return false
+        }
+
         // Must NOT be an investment contribution
         guard !isInvestmentContribution(transaction) else { return false }
 
-        // Must NOT be an internal transfer
+        // Must NOT be an internal transfer (conservative auto-detection)
         guard !isInternalTransfer(transaction) else { return false }
 
         return true
@@ -978,6 +1014,8 @@ struct TransactionAnalyzer {
             return "Sum of available balances in all checking and savings accounts"
         case .disposable:
             return "Monthly income minus essential expenses and minimum debt payments"
+        case .excluded:
+            return "Transactions marked as transfers, refunds, or one-time items"
         }
     }
 }

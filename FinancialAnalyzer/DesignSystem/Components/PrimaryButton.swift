@@ -142,6 +142,44 @@ struct GlassButton: View {
     }
 }
 
+/// Glassmorphic icon button (circular)
+struct GlassIconButton: View {
+    let icon: String
+    var iconColor: Color = DesignTokens.Colors.textSecondary
+    let action: () -> Void
+    var size: CGFloat = 44
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 17, weight: .medium))
+                .foregroundColor(iconColor)
+                .frame(width: size, height: size)
+                .background(
+                    ZStack {
+                        LinearGradient(
+                            gradient: Gradient(stops: [
+                                .init(color: DesignTokens.Colors.glassOverlayTop, location: 0),
+                                .init(color: DesignTokens.Colors.glassOverlayMid, location: 0.35),
+                                .init(color: DesignTokens.Colors.glassOverlayBottom, location: 1)
+                            ]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .blendMode(.screen)
+                    }
+                )
+                .background(DesignTokens.Colors.cardBase.opacity(0.6))
+                .clipShape(Circle())
+                .overlay(
+                    Circle()
+                        .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - Preview
 
 #Preview("Buttons") {

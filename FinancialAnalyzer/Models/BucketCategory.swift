@@ -8,6 +8,7 @@ enum BucketCategory: String, Codable, CaseIterable {
     case invested = "Total Invested"
     case cash = "Total Cash Available"
     case disposable = "Disposable Income"
+    case excluded = "Excluded"
 
     var description: String {
         switch self {
@@ -23,6 +24,8 @@ enum BucketCategory: String, Codable, CaseIterable {
             return "Available cash in checking and savings accounts"
         case .disposable:
             return "Income available to allocate after essential expenses and debt minimums"
+        case .excluded:
+            return "Transfers, refunds, or one-time items excluded from analysis"
         }
     }
 
@@ -40,6 +43,8 @@ enum BucketCategory: String, Codable, CaseIterable {
             return "dollarsign.circle.fill"
         case .disposable:
             return "banknote.fill"
+        case .excluded:
+            return "eye.slash"
         }
     }
 
@@ -57,6 +62,8 @@ enum BucketCategory: String, Codable, CaseIterable {
             return "mint"
         case .disposable:
             return "purple"
+        case .excluded:
+            return "gray"
         }
     }
 
@@ -75,6 +82,14 @@ enum BucketCategory: String, Codable, CaseIterable {
             return DesignTokens.Colors.protectionMint
         case .disposable:
             return DesignTokens.Colors.accentPrimary
+        case .excluded:
+            return Color.secondary
         }
+    }
+
+    /// Categories that users can select when correcting a transaction
+    /// Excludes computed categories like .disposable
+    static var userSelectableCases: [BucketCategory] {
+        [.income, .expenses, .debt, .invested, .cash, .excluded]
     }
 }

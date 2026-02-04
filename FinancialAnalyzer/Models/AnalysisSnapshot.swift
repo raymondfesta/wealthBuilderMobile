@@ -128,6 +128,8 @@ struct AnalysisSnapshot: Codable, Equatable {
             return position.emergencyCash
         case .disposable:
             return monthlyFlow.disposableIncome
+        case .excluded:
+            return 0 // Excluded transactions don't contribute to any value
         }
     }
 

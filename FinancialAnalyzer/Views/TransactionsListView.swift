@@ -27,51 +27,63 @@ struct TransactionsListView: View {
     }
 
     var body: some View {
-        List {
-            // Category filter
-            if !categories.isEmpty {
-                Section {
+        ScrollView {
+            VStack(spacing: 16) {
+                // Toolbar
+                HStack {
+                    Text("Transactions")
+                        .font(.system(size: 34, weight: .bold))
+                        .foregroundColor(.white)
+
+                    Spacer()
+
+                    Button(action: {}) {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundColor(Color(white: 0.75))
+                            .frame(width: 36, height: 36)
+                            .background(Color.white.opacity(0.1))
+                            .clipShape(Circle())
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 10)
+
+                // Category filter chips
+                if !categories.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack {
-                            CategoryChip(
-                                title: "All",
-                                isSelected: selectedCategory == nil
-                            ) {
+                            CategoryChip(title: "All", isSelected: selectedCategory == nil) {
                                 selectedCategory = nil
                             }
-
                             ForEach(categories, id: \.self) { category in
-                                CategoryChip(
-                                    title: category,
-                                    isSelected: selectedCategory == category
-                                ) {
+                                CategoryChip(title: category, isSelected: selectedCategory == category) {
                                     selectedCategory = category
                                 }
                             }
                         }
-                        .padding(.horizontal)
+                        .padding(.horizontal, 16)
                     }
                 }
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
-            }
 
-            // Transactions grouped by month
-            ForEach(groupedByMonth.keys.sorted(by: >), id: \.self) { month in
-                Section {
-                    ForEach(groupedByMonth[month] ?? [], id: \.id) { transaction in
-                        TransactionRow(transaction: transaction)
-                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                // Transaction cards by month
+                ForEach(groupedByMonth.keys.sorted(by: >), id: \.self) { month in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(monthFormatter.string(from: month))
+                            .font(.headline)
+                            .foregroundColor(DesignTokens.Colors.textPrimary)
+                            .padding(.horizontal, 16)
+
+                        transactionCard(for: month)
+                            .padding(.horizontal, 16)
                     }
-                } header: {
-                    Text(monthFormatter.string(from: month))
-                        .font(.headline)
                 }
             }
+            .padding(.vertical, 16)
         }
         .searchable(text: $searchText, prompt: "Search transactions")
-        .navigationTitle("Transactions")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarHidden(true)
+        .primaryBackgroundGradient()
     }
 
     private var groupedByMonth: [Date: [Transaction]] {
@@ -85,6 +97,25 @@ struct TransactionsListView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMMM yyyy"
         return formatter
+    }
+
+    @ViewBuilder
+    private func transactionCard(for month: Date) -> some View {
+        let transactions = groupedByMonth[month] ?? []
+        GlassmorphicCard(showDivider: false) {
+            VStack(spacing: 0) {
+                ForEach(Array(transactions.enumerated()), id: \.element.id) { index, transaction in
+                    TransactionRow(transaction: transaction)
+
+                    if index < transactions.count - 1 {
+                        Rectangle()
+                            .fill(DesignTokens.Colors.divider)
+                            .frame(height: 1)
+                            .padding(.vertical, 16)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -105,5 +136,49 @@ struct CategoryChip: View {
                 .foregroundColor(isSelected ? .white : .primary)
                 .cornerRadius(20)
         }
+    }
+}
+
+// MARK: - Preview
+
+#Preview {
+    TransactionsListView(transactions: .mock)
+        .preferredColorScheme(.dark)
+}
+
+private extension Array where Element == Transaction {
+    static var mock: [Transaction] {
+        [
+            Transaction(
+                id: "1",
+                accountId: "acc1",
+                amount: 500.00,
+                date: Date(),
+                name: "Alpine Bikes LLC",
+                merchantName: "Alpine Bikes",
+                category: ["Vendor", "Shopping"],
+                pending: false
+            ),
+            Transaction(
+                id: "2",
+                accountId: "acc1",
+                amount: 500.00,
+                date: Date(),
+                name: "Alpine Bikes LLC",
+                merchantName: "Alpine Bikes",
+                category: ["Vendor", "Shopping"],
+                pending: false
+            ),
+            Transaction(
+                id: "3",
+                accountId: "acc1",
+                amount: 500.00,
+                date: Date(),
+                name: "Alpine Bikes LLC",
+                merchantName: "Alpine Bikes",
+                category: ["Vendor", "Shopping"],
+                pending: false
+            )
+        ]
     }
 }

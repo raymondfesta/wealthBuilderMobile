@@ -1527,6 +1527,93 @@ class FinancialViewModel: ObservableObject {
         return bucketTransactions.filter { $0.needsValidation && !$0.userValidated }.count
     }
 
+    // MARK: - Transaction Review Helpers
+
+    /// Transactions flagged as potential transfers needing user review
+    var transactionsNeedingTransferReview: [Transaction] {
+        transactions.filter { $0.needsTransferReview }
+    }
+
+    /// All transactions needing any kind of review (confidence OR transfer)
+    var transactionsNeedingAnyReview: [Transaction] {
+        transactions.filter { $0.needsAnyReview }
+    }
+
+    /// Count of transactions that might be miscategorized transfers
+    var potentialTransferCount: Int {
+        transactionsNeedingTransferReview.count
+    }
+
+    /// Whether the analysis has issues that need user attention
+    var analysisNeedsAttention: Bool {
+        // Negative disposable income OR has potential transfers to review
+        let hasNegativeDisposable = (summary?.toAllocate ?? 0) < 0
+        let hasPotentialTransfers = potentialTransferCount > 0
+        return hasNegativeDisposable || hasPotentialTransfers
+    }
+
+    /// Estimated impact of flagged transactions on expenses
+    var flaggedTransactionsTotal: Double {
+        transactionsNeedingTransferReview.reduce(0) { $0 + abs($1.amount) }
+    }
+
+    /// Monthly impact of flagged transactions
+    var flaggedTransactionsMonthlyImpact: Double {
+        let months = max(summary?.monthsAnalyzed ?? 1, 1)
+        return flaggedTransactionsTotal / Double(months)
+    }
+
+    /// Quickly mark a transaction as excluded (transfer/ignore)
+    /// - Parameters:
+    ///   - transaction: The transaction to exclude
+    ///   - applyToSimilar: If true, applies to all matching transactions
+    /// - Returns: Count of transactions affected
+    @discardableResult
+    func markAsExcluded(_ transaction: Transaction, applyToSimilar: Bool) -> Int {
+        let count = validateTransaction(
+            transaction,
+            correctedCategory: .excluded,
+            applyToAll: applyToSimilar
+        )
+
+        // Recalculate summary after exclusion
+        recalculateAnalysis()
+
+        return count
+    }
+
+    /// Confirm a transaction is correctly categorized (not a transfer)
+    /// - Parameter transaction: The transaction to confirm
+    /// - Returns: Count of transactions affected (always 1)
+    @discardableResult
+    func confirmAsExpense(_ transaction: Transaction) -> Int {
+        return validateTransaction(
+            transaction,
+            correctedCategory: nil,  // Keep current category
+            applyToAll: false
+        )
+    }
+
+    /// Recalculates the analysis summary after transaction changes
+    func recalculateAnalysis() {
+        guard !transactions.isEmpty else { return }
+
+        self.summary = TransactionAnalyzer.generateSnapshot(
+            transactions: transactions,
+            accounts: accounts
+        )
+
+        self.analysisSnapshot = TransactionAnalyzer.generateAnalysisSnapshot(
+            transactions: transactions,
+            accounts: accounts
+        )
+
+        // Persist changes
+        saveToCache()
+
+        print("📊 [Recalculate] Updated analysis after transaction changes")
+    }
+
     /// Persists accounts to UserDefaults (for tag changes)
     func saveAccounts() {
         print("💾 [Persistence] Saving accounts with tags...")
@@ -1611,6 +1698,11 @@ class FinancialViewModel: ObservableObject {
         // Force SwiftUI to detect changes by reassigning the array
         // This triggers @Published wrapper to notify all observers (including badge counts)
         self.transactions = self.transactions
+
+        // Recalculate analysis if we excluded transactions
+        if correctedCategory == .excluded {
+            recalculateAnalysis()
+        }
 
         return validatedCount
     }

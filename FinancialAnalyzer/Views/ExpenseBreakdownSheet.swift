@@ -5,7 +5,20 @@ import SwiftUI
 struct ExpenseBreakdownSheet: View {
     let breakdown: ExpenseBreakdown
     let monthlyAverage: Double
+    var transactions: [Transaction] = []
     @Environment(\.dismiss) private var dismiss
+
+    // MARK: - Computed Properties
+
+    private var expenseTransactions: [Transaction] {
+        transactions
+            .filter { $0.bucketCategory == .expenses }
+            .sorted { $0.date > $1.date }
+    }
+
+    private var transactionsNeedingValidation: [Transaction] {
+        expenseTransactions.filter { $0.needsValidation }
+    }
 
     var body: some View {
         NavigationStack {
@@ -16,6 +29,16 @@ struct ExpenseBreakdownSheet: View {
 
                     // Category breakdown
                     categoryBreakdownSection
+
+                    // Needs review section
+                    if !transactionsNeedingValidation.isEmpty {
+                        needsReviewSection
+                    }
+
+                    // All expenses section
+                    if !expenseTransactions.isEmpty {
+                        allExpensesSection
+                    }
 
                     // Explanation footer
                     explanationSection
@@ -130,6 +153,56 @@ struct ExpenseBreakdownSheet: View {
         }
     }
 
+    // MARK: - Needs Review Section
+
+    private var needsReviewSection: some View {
+        GlassmorphicCard(title: "Needs Review (\(transactionsNeedingValidation.count))") {
+            VStack(spacing: 0) {
+                ForEach(transactionsNeedingValidation) { transaction in
+                    HStack {
+                        TransactionRow(transaction: transaction)
+                        Image(systemName: "exclamationmark.circle")
+                            .foregroundColor(DesignTokens.Colors.opportunityOrange)
+                    }
+
+                    if transaction.id != transactionsNeedingValidation.last?.id {
+                        Rectangle()
+                            .fill(DesignTokens.Colors.divider)
+                            .frame(height: 1)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - All Expenses Section
+
+    private var allExpensesSection: some View {
+        GlassmorphicCard(title: "All Expenses") {
+            VStack(spacing: 0) {
+                ForEach(Array(expenseTransactions.prefix(50))) { transaction in
+                    TransactionRow(transaction: transaction)
+
+                    if transaction.id != expenseTransactions.prefix(50).last?.id {
+                        Rectangle()
+                            .fill(DesignTokens.Colors.divider)
+                            .frame(height: 1)
+                    }
+                }
+
+                if expenseTransactions.count > 50 {
+                    Rectangle()
+                        .fill(DesignTokens.Colors.divider)
+                        .frame(height: 1)
+
+                    Text("+ \(expenseTransactions.count - 50) more")
+                        .captionStyle()
+                        .padding(.top, DesignTokens.Spacing.sm)
+                }
+            }
+        }
+    }
+
     // MARK: - Explanation Section
 
     private var explanationSection: some View {
@@ -216,6 +289,49 @@ private func formatCurrency(_ value: Double) -> String {
 
 #if DEBUG
 struct ExpenseBreakdownSheet_Previews: PreviewProvider {
+    static var previewTransactions: [Transaction] {
+        [
+            Transaction(
+                id: "exp_1", accountId: "acc_1", amount: 89.50, date: Date(),
+                name: "Whole Foods Market", merchantName: "Whole Foods",
+                category: ["Food and Drink", "Groceries"],
+                personalFinanceCategory: PersonalFinanceCategory(
+                    primary: "FOOD_AND_DRINK", detailed: "FOOD_AND_DRINK_GROCERIES",
+                    confidenceLevel: .veryHigh
+                ),
+                userCorrectedCategory: .expenses
+            ),
+            Transaction(
+                id: "exp_2", accountId: "acc_1", amount: 1200, date: Date().addingTimeInterval(-86400 * 3),
+                name: "Rent Payment", merchantName: nil,
+                category: ["Rent"],
+                userCorrectedCategory: .expenses
+            ),
+            Transaction(
+                id: "exp_3", accountId: "acc_1", amount: 45.00, date: Date().addingTimeInterval(-86400 * 5),
+                name: "Shell Gas Station", merchantName: "Shell",
+                category: ["Transportation"],
+                userCorrectedCategory: .expenses
+            ),
+            Transaction(
+                id: "exp_4", accountId: "acc_1", amount: 150, date: Date().addingTimeInterval(-86400 * 7),
+                name: "Unknown Merchant", merchantName: nil,
+                category: ["General Merchandise"],
+                personalFinanceCategory: PersonalFinanceCategory(
+                    primary: "GENERAL_MERCHANDISE", detailed: "GENERAL_MERCHANDISE_OTHER",
+                    confidenceLevel: .low
+                ),
+                userCorrectedCategory: .expenses
+            ),
+            Transaction(
+                id: "exp_5", accountId: "acc_1", amount: 12.99, date: Date().addingTimeInterval(-86400 * 10),
+                name: "Netflix", merchantName: "Netflix",
+                category: ["Entertainment"],
+                userCorrectedCategory: .expenses
+            ),
+        ]
+    }
+
     static var previews: some View {
         ExpenseBreakdownSheet(
             breakdown: ExpenseBreakdown(
@@ -229,7 +345,8 @@ struct ExpenseBreakdownSheet_Previews: PreviewProvider {
                 other: 150,
                 confidence: 0.78
             ),
-            monthlyAverage: 3500
+            monthlyAverage: 3500,
+            transactions: previewTransactions
         )
         .preferredColorScheme(.dark)
     }
