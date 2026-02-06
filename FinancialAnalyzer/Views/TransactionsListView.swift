@@ -49,33 +49,79 @@ struct TransactionsListView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 10)
 
-                // Category filter chips
-                if !categories.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack {
-                            CategoryChip(title: "All", isSelected: selectedCategory == nil) {
-                                selectedCategory = nil
-                            }
-                            ForEach(categories, id: \.self) { category in
-                                CategoryChip(title: category, isSelected: selectedCategory == category) {
-                                    selectedCategory = category
+                // Empty state
+                if transactions.isEmpty {
+                    VStack(spacing: DesignTokens.Spacing.lg) {
+                        Spacer()
+
+                        Image(systemName: "list.bullet.rectangle")
+                            .font(.system(size: 60))
+                            .foregroundColor(DesignTokens.Colors.textTertiary)
+
+                        VStack(spacing: DesignTokens.Spacing.xs) {
+                            Text("No transactions yet")
+                                .headlineStyle()
+
+                            Text("Your transactions will appear here once your accounts sync")
+                                .subheadlineStyle()
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, DesignTokens.Spacing.xl)
+                        }
+
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 100)
+                } else if filteredTransactions.isEmpty {
+                    // No results state (when filtering)
+                    VStack(spacing: DesignTokens.Spacing.lg) {
+                        Spacer()
+
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 60))
+                            .foregroundColor(DesignTokens.Colors.textTertiary)
+
+                        VStack(spacing: DesignTokens.Spacing.xs) {
+                            Text("No matching transactions")
+                                .headlineStyle()
+
+                            Text("Try adjusting your search or filters")
+                                .subheadlineStyle()
+                        }
+
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 100)
+                } else {
+                    // Category filter chips
+                    if !categories.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack {
+                                CategoryChip(title: "All", isSelected: selectedCategory == nil) {
+                                    selectedCategory = nil
+                                }
+                                ForEach(categories, id: \.self) { category in
+                                    CategoryChip(title: category, isSelected: selectedCategory == category) {
+                                        selectedCategory = category
+                                    }
                                 }
                             }
+                            .padding(.horizontal, 16)
                         }
-                        .padding(.horizontal, 16)
                     }
-                }
 
-                // Transaction cards by month
-                ForEach(groupedByMonth.keys.sorted(by: >), id: \.self) { month in
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(monthFormatter.string(from: month))
-                            .font(.headline)
-                            .foregroundColor(DesignTokens.Colors.textPrimary)
-                            .padding(.horizontal, 16)
+                    // Transaction cards by month
+                    ForEach(groupedByMonth.keys.sorted(by: >), id: \.self) { month in
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(monthFormatter.string(from: month))
+                                .font(.headline)
+                                .foregroundColor(DesignTokens.Colors.textPrimary)
+                                .padding(.horizontal, 16)
 
-                        transactionCard(for: month)
-                            .padding(.horizontal, 16)
+                            transactionCard(for: month)
+                                .padding(.horizontal, 16)
+                        }
                     }
                 }
             }

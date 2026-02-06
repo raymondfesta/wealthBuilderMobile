@@ -17,30 +17,64 @@ struct AccountsView: View {
     }
 
     var body: some View {
-        List {
-            ForEach(groupedAccounts.keys.sorted(), id: \.self) { type in
-                Section {
-                    ForEach(groupedAccounts[type] ?? [], id: \.id) { account in
-                        AccountRow(account: account)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button(role: .destructive) {
-                                    accountToRemove = account
-                                    showRemovalConfirmation = true
-                                } label: {
-                                    Label("Remove", systemImage: "trash")
-                                }
-                            }
-                            .contextMenu {
-                                Button(role: .destructive) {
-                                    accountToRemove = account
-                                    showRemovalConfirmation = true
-                                } label: {
-                                    Label("Remove Account", systemImage: "trash")
-                                }
-                            }
+        ZStack {
+            if accounts.isEmpty && !viewModel.isLoading {
+                // Empty state
+                VStack(spacing: DesignTokens.Spacing.xl) {
+                    Spacer()
+
+                    Image(systemName: "building.columns.circle")
+                        .font(.system(size: 60))
+                        .foregroundColor(DesignTokens.Colors.accentPrimary.opacity(0.6))
+
+                    VStack(spacing: DesignTokens.Spacing.xs) {
+                        Text("No accounts connected")
+                            .headlineStyle()
+
+                        Text("Connect your first account to start tracking your finances")
+                            .subheadlineStyle()
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, DesignTokens.Spacing.xl)
                     }
-                } header: {
-                    Text(type.capitalized)
+
+                    PrimaryButton(title: "Connect Account", action: {
+                        Task {
+                            await viewModel.connectBankAccount(from: nil)
+                        }
+                    })
+                    .padding(.horizontal, DesignTokens.Spacing.xl)
+
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .primaryBackgroundGradient()
+            } else {
+                List {
+                    ForEach(groupedAccounts.keys.sorted(), id: \.self) { type in
+                        Section {
+                            ForEach(groupedAccounts[type] ?? [], id: \.id) { account in
+                                AccountRow(account: account)
+                                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                        Button(role: .destructive) {
+                                            accountToRemove = account
+                                            showRemovalConfirmation = true
+                                        } label: {
+                                            Label("Remove", systemImage: "trash")
+                                        }
+                                    }
+                                    .contextMenu {
+                                        Button(role: .destructive) {
+                                            accountToRemove = account
+                                            showRemovalConfirmation = true
+                                        } label: {
+                                            Label("Remove Account", systemImage: "trash")
+                                        }
+                                    }
+                            }
+                        } header: {
+                            Text(type.capitalized)
+                        }
+                    }
                 }
             }
         }
