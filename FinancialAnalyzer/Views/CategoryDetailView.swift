@@ -133,7 +133,7 @@ struct CategoryDetailView: View {
 
                         breakdownRow(
                             label: "To Allocate",
-                            value: summary.toAllocate,
+                            value: summary.disposableIncome,
                             color: .purple,
                             isBold: true
                         )

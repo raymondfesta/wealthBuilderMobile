@@ -1640,7 +1640,7 @@ class FinancialViewModel: ObservableObject {
     /// Whether the analysis has issues that need user attention
     var analysisNeedsAttention: Bool {
         // Negative disposable income OR has potential transfers to review
-        let hasNegativeDisposable = (summary?.toAllocate ?? 0) < 0
+        let hasNegativeDisposable = (summary?.disposableIncome ?? 0) < 0
         let hasPotentialTransfers = potentialTransferCount > 0
         return hasNegativeDisposable || hasPotentialTransfers
     }

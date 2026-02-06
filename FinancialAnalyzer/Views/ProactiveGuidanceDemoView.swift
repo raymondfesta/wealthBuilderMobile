@@ -20,7 +20,7 @@ struct ProactiveGuidanceDemoView: View {
                                 Text("To Allocate")
                                     .foregroundColor(.secondary)
                                 Spacer()
-                                Text(formatCurrency(summary.toAllocate))
+                                Text(formatCurrency(summary.disposableIncome))
                                     .fontWeight(.bold)
                             }
 
