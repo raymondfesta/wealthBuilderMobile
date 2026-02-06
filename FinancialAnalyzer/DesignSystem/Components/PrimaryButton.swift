@@ -206,9 +206,9 @@ struct GlassIconButton: View {
                     print("Secondary tapped")
                 }
 
-                SecondaryButton(title: "Disabled state", isDisabled: true) {
+                SecondaryButton(title: "Disabled state", action: {
                     print("Disabled tapped")
-                }
+                }, isDisabled: true)
             }
 
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
@@ -219,9 +219,9 @@ struct GlassIconButton: View {
                     print("Text tapped")
                 }
 
-                TextButton(title: "Learn more", color: DesignTokens.Colors.accentSecondary) {
+                TextButton(title: "Learn more", action: {
                     print("Text tapped")
-                }
+                }, color: DesignTokens.Colors.accentSecondary)
             }
         }
         .padding(DesignTokens.Spacing.md)

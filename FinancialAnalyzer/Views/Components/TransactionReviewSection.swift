@@ -1,98 +1,155 @@
 import SwiftUI
 
-/// Inline section showing transactions that need user review
-/// Surfaces potential transfers and miscategorized transactions with quick actions
+/// Clean summary card for transactions needing review
+/// Shows count and impact with CTA to dedicated review screen
 struct TransactionReviewSection: View {
     @ObservedObject var viewModel: FinancialViewModel
-    @State private var selectedTransaction: Transaction?
+    @State private var showingReviewSheet = false
 
     private var reviewableTransactions: [Transaction] {
         viewModel.transactionsNeedingTransferReview
-            .sorted { abs($0.amount) > abs($1.amount) }  // Largest impact first
-    }
-
-    private var displayedTransactions: [Transaction] {
-        Array(reviewableTransactions.prefix(5))
+            .sorted { abs($0.amount) > abs($1.amount) }
     }
 
     var body: some View {
         if !reviewableTransactions.isEmpty {
-            VStack(alignment: .leading, spacing: 16) {
-                // Header
-                HStack(spacing: 8) {
+            Button(action: { showingReviewSheet = true }) {
+                HStack(spacing: DesignTokens.Spacing.md) {
+                    // Warning icon
                     Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.title2)
                         .foregroundColor(DesignTokens.Colors.opportunityOrange)
+                        .frame(width: 40)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(reviewableTransactions.count) Transaction\(reviewableTransactions.count == 1 ? "" : "s") to Review")
-                            .font(.headline)
+                    // Content
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(reviewableTransactions.count) transaction\(reviewableTransactions.count == 1 ? "" : "s") need review")
+                            .headlineStyle(color: DesignTokens.Colors.textPrimary)
+                            .multilineTextAlignment(.leading)
 
-                        Text("These might be transfers between your accounts")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        if viewModel.flaggedTransactionsMonthlyImpact > 0 {
+                            Text("May impact budget by \(formatCurrency(viewModel.flaggedTransactionsMonthlyImpact))/mo")
+                                .subheadlineStyle(color: DesignTokens.Colors.textSecondary)
+                        } else {
+                            Text("Potential transfers between accounts")
+                                .subheadlineStyle(color: DesignTokens.Colors.textSecondary)
+                        }
                     }
 
                     Spacer()
+
+                    // Chevron
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(DesignTokens.Colors.textTertiary)
                 }
-
-                // Impact summary
-                if viewModel.flaggedTransactionsMonthlyImpact > 0 {
-                    HStack {
-                        Text("Potential monthly impact:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                        Text(formatCurrency(viewModel.flaggedTransactionsMonthlyImpact))
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(DesignTokens.Colors.opportunityOrange)
-                    }
-                }
-
-                // Transaction cards (show up to 5)
-                VStack(spacing: 8) {
-                    ForEach(displayedTransactions) { transaction in
-                        ReviewableTransactionCard(
-                            transaction: transaction,
-                            similarCount: viewModel.countMatchingTransactions(transaction),
-                            onExclude: { applyToSimilar in
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    _ = viewModel.markAsExcluded(transaction, applyToSimilar: applyToSimilar)
-                                }
-                            },
-                            onKeep: {
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    _ = viewModel.confirmAsExpense(transaction)
-                                }
-                            },
-                            onTapDetails: {
-                                selectedTransaction = transaction
-                            }
+                .padding(DesignTokens.Spacing.md)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(DesignTokens.Colors.opportunityOrange.opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(DesignTokens.Colors.opportunityOrange.opacity(0.3), lineWidth: 1)
                         )
+                )
+            }
+            .buttonStyle(.plain)
+            .sheet(isPresented: $showingReviewSheet) {
+                TransactionReviewSheet(viewModel: viewModel)
+            }
+        }
+    }
+
+    private func formatCurrency(_ amount: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.maximumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: amount)) ?? "$0"
+    }
+}
+
+// MARK: - Transaction Review Sheet
+
+/// Full-screen sheet for reviewing flagged transactions
+struct TransactionReviewSheet: View {
+    @ObservedObject var viewModel: FinancialViewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedTransaction: Transaction?
+
+    private var reviewableTransactions: [Transaction] {
+        viewModel.transactionsNeedingTransferReview
+            .sorted { abs($0.amount) > abs($1.amount) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.lg) {
+                    // Impact summary
+                    if viewModel.flaggedTransactionsMonthlyImpact > 0 {
+                        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+                            Text("Potential monthly impact")
+                                .subheadlineStyle(color: DesignTokens.Colors.textSecondary)
+
+                            Text(formatCurrency(viewModel.flaggedTransactionsMonthlyImpact))
+                                .titleValueStyle(color: DesignTokens.Colors.opportunityOrange)
+                        }
+                        .padding(DesignTokens.Spacing.md)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .primaryCardStyle()
                     }
 
-                    // "More" indicator
-                    if reviewableTransactions.count > 5 {
-                        HStack {
-                            Spacer()
-                            Text("+ \(reviewableTransactions.count - 5) more to review")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Spacer()
+                    // Explanation
+                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+                        Text("Why review these?")
+                            .headlineStyle()
+
+                        Text("These look like transfers between your accounts. Excluding them prevents counting the same money twice in your budget.")
+                            .subheadlineStyle(color: DesignTokens.Colors.textSecondary)
+                    }
+
+                    // Transaction cards
+                    VStack(spacing: DesignTokens.Spacing.sm) {
+                        ForEach(reviewableTransactions) { transaction in
+                            ReviewableTransactionCard(
+                                transaction: transaction,
+                                similarCount: viewModel.countMatchingTransactions(transaction),
+                                onExclude: { applyToSimilar in
+                                    withAnimation(.easeInOut(duration: 0.3)) {
+                                        _ = viewModel.markAsExcluded(transaction, applyToSimilar: applyToSimilar)
+                                        // Auto-dismiss if all done
+                                        if viewModel.transactionsNeedingTransferReview.isEmpty {
+                                            dismiss()
+                                        }
+                                    }
+                                },
+                                onKeep: {
+                                    withAnimation(.easeInOut(duration: 0.3)) {
+                                        _ = viewModel.confirmAsExpense(transaction)
+                                        // Auto-dismiss if all done
+                                        if viewModel.transactionsNeedingTransferReview.isEmpty {
+                                            dismiss()
+                                        }
+                                    }
+                                },
+                                onTapDetails: {
+                                    selectedTransaction = transaction
+                                }
+                            )
                         }
-                        .padding(.top, 4)
                     }
                 }
+                .padding(DesignTokens.Spacing.md)
             }
-            .padding()
-            .background {
-                let warningColor: Color = .opportunityOrange
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(warningColor.opacity(0.1))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(warningColor.opacity(0.3), lineWidth: 1)
-                    )
+            .primaryBackgroundGradient()
+            .navigationTitle("Review Transactions")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
             }
             .sheet(item: $selectedTransaction) { transaction in
                 TransactionValidationSheet(
@@ -104,7 +161,6 @@ struct TransactionReviewSection: View {
                             correctedCategory: correctedCategory,
                             applyToAll: applyToAll
                         )
-                        // Recalculate if excluded
                         if correctedCategory == .excluded {
                             viewModel.recalculateAnalysis()
                         }
