@@ -22,6 +22,12 @@ class FinancialViewModel: ObservableObject {
     @Published var currentAlert: ProactiveAlert?
     @Published var isShowingGuidance = false
 
+    // Proactive guidance throttling
+    private var lastSavingsCheckDate: Date?
+    private var lastCashFlowCheckDate: Date?
+    private let savingsCheckInterval: TimeInterval = 24 * 60 * 60 // 24 hours
+    private let cashFlowCheckInterval: TimeInterval = 12 * 60 * 60 // 12 hours
+
     // Analysis snapshot for Analysis Complete screen
     @Published var analysisSnapshot: AnalysisSnapshot?
 
@@ -1458,6 +1464,93 @@ class FinancialViewModel: ObservableObject {
 
         isShowingGuidance = false
         currentAlert = nil
+    }
+
+    /// Check for savings opportunities and present guidance if found
+    func checkSavingsOpportunities() {
+        guard !budgetManager.budgets.isEmpty else { return }
+
+        // Throttle: Only check once per day
+        if let lastCheck = lastSavingsCheckDate,
+           Date().timeIntervalSince(lastCheck) < savingsCheckInterval {
+            print("⏭️  [Proactive] Skipping savings check - checked \(Int(Date().timeIntervalSince(lastCheck) / 3600))h ago")
+            return
+        }
+
+        if let savingsAlert = AlertRulesEngine.evaluateSavingsOpportunity(
+            budgets: budgetManager.budgets,
+            goals: budgetManager.goals,
+            transactions: transactions
+        ) {
+            lastSavingsCheckDate = Date()
+            // Fetch AI recommendation
+            savingsAlert.isLoadingAIInsight = true
+            currentAlert = savingsAlert
+            isShowingGuidance = true
+
+            Task {
+                do {
+                    let goalContexts = budgetManager.goals.map { goal in
+                        GoalContext(
+                            name: goal.name,
+                            current: goal.currentAmount,
+                            target: goal.targetAmount,
+                            priority: goal.priority == .high ? "high" : goal.priority == .medium ? "medium" : "low"
+                        )
+                    }
+
+                    let recommendation = try await AIInsightService.shared.getSavingsRecommendation(
+                        surplusAmount: savingsAlert.impactSummary.currentRemaining,
+                        monthlyExpenses: summary?.avgMonthlyExpenses ?? 0,
+                        currentSavings: summary?.totalCashAvailable ?? 0,
+                        goals: goalContexts
+                    )
+
+                    await MainActor.run {
+                        savingsAlert.aiInsight = recommendation
+                        savingsAlert.isLoadingAIInsight = false
+                    }
+                } catch {
+                    print("❌ [AIInsight] Failed to fetch savings recommendation: \(error)")
+                    await MainActor.run {
+                        savingsAlert.isLoadingAIInsight = false
+                    }
+                }
+            }
+        }
+    }
+
+    /// Check for cash flow risks and present guidance if found
+    func checkCashFlowRisks(daysAhead: Int = 7) {
+        guard !accounts.isEmpty else { return }
+
+        // Throttle: Only check twice per day (cash flow is more critical)
+        if let lastCheck = lastCashFlowCheckDate,
+           Date().timeIntervalSince(lastCheck) < cashFlowCheckInterval {
+            print("⏭️  [Proactive] Skipping cash flow check - checked \(Int(Date().timeIntervalSince(lastCheck) / 3600))h ago")
+            return
+        }
+
+        if let cashFlowAlert = AlertRulesEngine.evaluateCashFlowRisk(
+            transactions: transactions,
+            accounts: accounts,
+            daysAhead: daysAhead
+        ) {
+            lastCashFlowCheckDate = Date()
+            currentAlert = cashFlowAlert
+            isShowingGuidance = true
+        }
+    }
+
+    /// Run all proactive checks (call after data refresh)
+    func runProactiveChecks() {
+        Task {
+            // Check for savings opportunities (less frequent)
+            checkSavingsOpportunities()
+
+            // Check for cash flow risks (more critical)
+            checkCashFlowRisks()
+        }
     }
 
     // MARK: - Notification Handling

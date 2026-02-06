@@ -1,5 +1,90 @@
 # Build Log
 
+## 2026-02-06 — AI Guidance Triggers Refinement Complete
+
+### What was built
+
+**Proactive AI Guidance System - Trigger Integration Complete**
+
+Refined AI guidance trigger logic to make proactive financial alerts functional:
+
+1. **New ViewModel Methods** (FinancialViewModel.swift:1469-1556)
+   - `checkSavingsOpportunities()` - Detects under-budget surplus, fetches AI recommendation
+   - `checkCashFlowRisks()` - Warns of upcoming bills based on spending patterns
+   - `runProactiveChecks()` - Master method to run all checks after data refresh
+   - Throttling logic: savings (24h), cash flow (12h) to prevent alert spam
+
+2. **Trigger Throttling Implementation**
+   - Added `lastSavingsCheckDate` and `lastCashFlowCheckDate` tracking
+   - Configurable intervals: `savingsCheckInterval` (24h), `cashFlowCheckInterval` (12h)
+   - Console logging shows throttle status for debugging
+
+3. **AI Integration** (AIInsightService.swift - existing)
+   - Purchase insights: OpenAI GPT-4o-mini generates personalized spending advice
+   - Savings recommendations: AI suggests allocation based on goals and surplus
+   - Tested backend endpoints - both working correctly
+
+4. **Existing Components Verified**
+   - AlertRulesEngine.swift - Complete with 3 evaluation methods:
+     - `evaluatePurchase()` - Budget impact analysis
+     - `evaluateSavingsOpportunity()` - Surplus detection
+     - `evaluateCashFlowRisk()` - Upcoming bills prediction
+   - SpendingPatternAnalyzer.swift - Merchant patterns, category trends
+   - ProactiveGuidanceView.swift - Full alert UI with AI insight section
+   - NotificationService.swift - Local notification scheduling
+
+### Build Status
+
+✅ **BUILD SUCCEEDED** - 8 non-critical warnings (deprecated properties, unused vars)
+
+Modified files:
+- FinancialAnalyzer/ViewModels/FinancialViewModel.swift (+90 lines)
+  - Lines 25-29: Throttling state tracking
+  - Lines 1469-1556: Proactive check methods with throttling
+
+### Backend AI Testing Results
+
+✅ **Purchase Insight Endpoint** (`/api/ai/purchase-insight`)
+```
+Test: $87.43 Target purchase, $50 budget remaining
+Response: "This $87.43 purchase significantly exceeds your typical spending..."
+Tokens: 219 (157 prompt + 62 completion)
+Response time: ~2s
+```
+
+✅ **Savings Recommendation Endpoint** (`/api/ai/savings-recommendation`)
+```
+Test: $200 surplus, $3000 current savings, $15000 emergency fund goal
+Response: "Given your high-priority goal... allocate the entire $200..."
+Tokens: 173 (123 prompt + 50 completion)
+Response time: ~2s
+```
+
+### What needs your review (Tier 2)
+
+- [ ] **Trigger timing** - Savings (daily), cash flow (twice daily) appropriate frequency?
+- [ ] **Alert prioritization** - Currently shows first alert found, should we queue multiple?
+- [ ] **AI insight fallbacks** - Hardcoded context-aware text shown if API fails
+- [ ] **User preference** - Should users be able to disable specific alert types?
+
+### Assumptions made
+
+- 24h throttle for savings checks acceptable (not annoying)
+- 12h throttle for cash flow checks (more critical, check more often)
+- Showing one alert at a time better UX than queuing multiple
+- AI API failures graceful - fallback to rule-based insights
+- Backend always running (no offline check before AI calls)
+- Proactive checks run after data refresh, not on timer
+
+### What's queued next
+
+Per DIRECTION.md priorities:
+1. ~~AI guidance triggers refinement~~ ✅ COMPLETE
+2. Transaction analysis polish - accuracy and UX improvements
+3. UI polish pass - animations, consistency, empty states review
+
+---
+
 ## 2026-02-06 — Allocation Execution History Complete
 
 ### What was built
