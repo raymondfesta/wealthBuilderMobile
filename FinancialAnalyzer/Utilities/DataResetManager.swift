@@ -170,6 +170,10 @@ class DataResetManager {
         // Clear allocation plan storage
         AllocationPlanStorage.shared.clearAllData()
 
+        // Clear allocation schedule and execution history
+        [ScheduledAllocation].clear()
+        [AllocationExecution].clear()
+
         UserDefaults.standard.synchronize()
         print("🗑️ [Reset] UserDefaults cleared (\(keysToRemove.count) keys removed)")
     }
@@ -184,6 +188,9 @@ class DataResetManager {
             viewModel.budgetManager.budgets.removeAll()
             viewModel.budgetManager.goals.removeAll()
             viewModel.budgetManager.allocationBuckets.removeAll()
+            viewModel.scheduledAllocations.removeAll()
+            viewModel.allocationHistory.removeAll()
+            viewModel.allocationScheduleConfig = nil
             viewModel.summary = nil
             viewModel.currentAlert = nil
             viewModel.isShowingGuidance = false
