@@ -1,36 +1,44 @@
 # Wealth App - DIRECTION
 
-## CRITICAL PRIORITY: Device Testing Setup
+## ✅ DEPLOYMENT READY - Ray's Action Required
 
-### ACTIVE TASK: Enable Ray to Test on iOS Device
+### STATUS: All Code Prepared, Awaiting Railway Deployment
 
-**IMMEDIATE GOAL:** Get the complete wealth app running on Ray's iOS device for testing.
+**IMMEDIATE GOAL:** Ray deploys to Railway and tests on device (45 min total)
 
-**REQUIRED ACTIONS:**
-1. **Deploy Backend to Railway** 
-   - Set up Railway project and deploy Node.js backend
-   - Configure environment variables for production
-   - Ensure Plaid API works with deployed backend
-   - Get live server URL for iOS app configuration
+**COMPLETED BY BUILDER:**
+- ✅ Railway configuration (`railway.json`)
+- ✅ Environment variable documentation (`.env.example` with 12 vars)
+- ✅ iOS environment switching (`AppConfig.swift`)
+- ✅ Deployment guides (`DEPLOY_NOW.md`, `RAILWAY_DEPLOYMENT.md`, `DEPLOYMENT_CHECKLIST.md`)
+- ✅ Backend health endpoint verified
+- ✅ Build passing (zero errors)
+- ✅ All changes committed and pushed to GitHub
 
-2. **iOS Device Build Configuration**
-   - Update app to point to Railway backend URL (not localhost)
-   - Verify iOS build works on physical device 
-   - Test complete user flow: onboarding → Plaid connection → data analysis
-   - Ensure all features work end-to-end with live backend
+**RAY'S REQUIRED ACTIONS:**
 
-3. **End-to-End Testing Verification**
-   - Bank account connection via Plaid works
-   - Transaction analysis displays correctly
-   - Allocation recommendations function properly
-   - All UI screens load and function on device
+### 1. Deploy Backend to Railway (30 min)
+**Guide:** `DEPLOY_NOW.md` - 7 simple steps
 
-**DEPLOYMENT PRIORITY:** Ray needs to test immediately - backend deployment is the critical blocker.
+Quick summary:
+1. Go to railway.app/new → Deploy from GitHub
+2. Select `wealthBuilderMobile` repo
+3. Settings → Root Directory = `backend`
+4. Variables → Add 12 env vars (copy from local `.env` + generate new secrets)
+5. Railway auto-deploys
+6. Generate Domain → Copy URL: `https://your-app.up.railway.app`
 
-**Git Requirements:**
-- Make meaningful commits with descriptive messages for all deployment work
-- Push all changes to GitHub repo regularly
-- Keep repository current and synced
+### 2. Update iOS App (5 min)
+Edit `FinancialAnalyzer/Utilities/AppConfig.swift`:
+- Line 8: Change to `.development`
+- Line 30: Replace with your Railway URL
+
+### 3. Test on Device (15 min)
+- Connect iPhone via USB
+- Xcode → Cmd+R
+- Register account, connect Plaid (user_good/pass_good), verify flow
+
+**DEPLOYMENT PRIORITY:** Backend deployment is now Ray's only blocker.
 
 ## Background Context
 
@@ -41,15 +49,21 @@
 - UI consistency and polish - DONE
 - Analysis page transaction review - DONE
 
-**Build Status:** ✅ Clean builds, zero warnings
+**Build Status:** ✅ Clean builds, zero errors
 
-**Current Blocker:** Backend not deployed - app can't connect to live server for Ray's device testing.
+**Deployment Preparation:** ✅ COMPLETE
+- Railway config ready
+- Env switching implemented
+- Documentation complete
+- Backend verified functional
+
+**Current Blocker:** Railway deployment requires Ray's account login (cannot be automated)
 
 ## Design Notes
-Ray's priority is device testing readiness. Focus entirely on deployment and device compatibility - no new features needed.
+All deployment infrastructure ready. Ray follows 30-minute guide to deploy and test.
 
 ## Next Steps
-1. Deploy Railway backend with production configuration
-2. Configure iOS app for production backend URL
-3. Verify complete user flow works on iOS device
-4. Provide Ray with deployment URL and testing instructions
+1. Ray deploys to Railway (follow `DEPLOY_NOW.md`)
+2. Ray updates AppConfig.swift with Railway URL
+3. Ray tests complete flow on iPhone
+4. Monitor Railway logs for issues
