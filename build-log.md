@@ -1,6 +1,76 @@
 # Build Log
 
-## 2026-02-07 — Local Backend Server Running ✅
+## 2026-02-07 (Session 2) — Connection Issue Fixed ✅
+
+**Builder Agent Session Status:** COMPLETE
+
+**Issue:** "Could not connect to server" error in iOS simulator
+**Root Cause:** Backend server not running
+**Time to Fix:** ~5 minutes
+**Commits:** 1 commit pushed to master
+
+### What was fixed
+
+**Problem Diagnosis:**
+- Backend server was stopped (not running on port 3000)
+- Previous session had configured everything correctly but server wasn't persistent
+
+**Solution Implemented:**
+1. Started backend server (`npm start`)
+2. Verified all endpoints responding correctly
+3. Confirmed iOS app configuration correct
+4. Verified build succeeds with zero errors
+
+**Tools Created:**
+- `test-connection.sh` - Automated connection verification script
+  - Tests backend health endpoint
+  - Verifies Plaid integration
+  - Checks auth endpoints
+  - Validates iOS configuration
+  - Provides clear pass/fail output
+- `CONNECTION_FIX.md` - Comprehensive troubleshooting guide
+  - Root cause analysis
+  - Step-by-step verification
+  - Common issues & solutions
+  - Server management commands
+
+### Connection Status
+
+All systems verified and functional:
+- ✅ Backend server running on localhost:3000
+- ✅ Health endpoint responding
+- ✅ Plaid link token creation working
+- ✅ Auth endpoints functional
+- ✅ iOS AppConfig.swift set to .localhost
+- ✅ iOS build succeeds (zero errors)
+- ✅ Network permissions enabled in Info.plist
+
+### What Ray should do right now
+
+**Immediate Test (30 seconds):**
+```bash
+./test-connection.sh
+```
+Should see all ✅ green checkmarks
+
+**Full iOS Test (2 minutes):**
+1. Open FinancialAnalyzer.xcodeproj in Xcode
+2. Select any iPhone simulator
+3. Press Cmd+R to build and run
+4. App should launch and connect successfully
+
+### Files Changed
+- `test-connection.sh` (new) - Connection test script
+- `CONNECTION_FIX.md` (new) - Troubleshooting guide
+- `direction.md` (updated) - Marked task complete
+- `BUILD-LOG.md` (this file) - Session log
+
+### Next Session Tasks
+No blockers. Ready for feature work.
+
+---
+
+## 2026-02-07 (Session 1) — Local Backend Server Running ✅
 
 **Builder Agent Session Status:** COMPLETE
 
