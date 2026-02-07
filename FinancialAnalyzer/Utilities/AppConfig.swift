@@ -4,7 +4,7 @@ enum AppConfig {
     // MARK: - Environment Configuration
 
     /// Set this to switch between local development and production
-    private static let environment: Environment = .development
+    private static let environment: Environment = .localhost
 
     enum Environment {
         case local          // Local Mac (wifi network)
