@@ -18,7 +18,9 @@
 - **Ready for:** Immediate simulator testing
 
 ### Resources for Ray:
-- **LOCAL_TESTING_READY.md** - Complete testing guide (start here!)
+- **SESSION_COMPLETE.md** - Session summary (start here!)
+- **QUICK_START.md** - One-page quick reference
+- **LOCAL_TESTING_READY.md** - Complete testing guide
 - **verify-local-setup.sh** - Run to verify everything working
 - **build-log.md** - Session details and deliverables
 
