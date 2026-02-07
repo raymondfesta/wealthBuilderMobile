@@ -1,30 +1,25 @@
 # Wealth App Development Direction
 
-## ✅ COMPLETE: Local Backend Server for iOS Simulator Testing
+## 🚨 URGENT: Fix "Could not connect to server" Error
 
-**Status:** Backend server running on localhost:3000, iOS app configured and ready.
+**IMMEDIATE PRIORITY:** Ray is getting "Could not connect to server" errors when testing in iOS simulator despite backend running on localhost:3000.
 
-### ✅ Completed Tasks:
-1. ✅ **Node.js backend server running locally** on localhost:3000
-2. ✅ **Configured for iOS simulator** - AppConfig.swift set to .localhost
-3. ✅ **All endpoints verified working** - Plaid, auth, health check tested
-4. ✅ **Database connectivity confirmed** - SQLite initialized and functional
-5. ✅ **API responses validated** - Link token, registration, login all working
+### Debug and Fix Required:
+1. **Verify server is actually running** - Check if localhost:3000 is responsive
+2. **Check iOS simulator network configuration** - Simulator might not be connecting to localhost properly
+3. **Verify AppConfig.swift localhost URL** - Ensure iOS app pointing to correct endpoint
+4. **Test actual API calls** - Make sure endpoints respond to iOS simulator requests
+5. **Fix any networking/CORS issues** - Enable iOS simulator to connect to local backend
 
-### Server Status:
-- **Running:** http://localhost:3000
-- **Environment:** sandbox (Plaid)
-- **Build Status:** iOS app builds with zero errors
-- **Ready for:** Immediate simulator testing
+### Expected Outcome:
+- iOS simulator successfully connects to localhost:3000
+- Ray can test full app functionality immediately
+- All API calls work from simulator to local backend
 
-### Resources for Ray:
-- **SESSION_COMPLETE.md** - Session summary (start here!)
-- **QUICK_START.md** - One-page quick reference
-- **LOCAL_TESTING_READY.md** - Complete testing guide
-- **verify-local-setup.sh** - Run to verify everything working
-- **build-log.md** - Session details and deliverables
+### Background:
+Previous session showed server running and configured, but Ray cannot connect when testing. Need immediate diagnosis and fix of the connection issue.
 
-### Next Session Focus:
-- Ray testing full user flow in simulator
-- Deploy to Railway when ready (docs in RAILWAY_DEPLOYMENT.md)
-- Any bug fixes or refinements from testing
+Server should be at: http://localhost:3000
+iOS app should be configured for localhost environment.
+
+**Ray needs to test NOW - fix the connection immediately.**
