@@ -17,6 +17,11 @@
 - **Build Status:** iOS app builds with zero errors
 - **Ready for:** Immediate simulator testing
 
+### Resources for Ray:
+- **LOCAL_TESTING_READY.md** - Complete testing guide (start here!)
+- **verify-local-setup.sh** - Run to verify everything working
+- **build-log.md** - Session details and deliverables
+
 ### Next Session Focus:
 - Ray testing full user flow in simulator
 - Deploy to Railway when ready (docs in RAILWAY_DEPLOYMENT.md)
