@@ -18,7 +18,10 @@
 2. Open Xcode and press Cmd+R to test app
 3. All systems ready for immediate testing
 
-See `CONNECTION_FIX.md` for detailed troubleshooting info.
+**Documentation:**
+- `SESSION_SUMMARY.md` - Complete session overview
+- `CONNECTION_FIX.md` - Detailed troubleshooting guide
+- `START_HERE.md` - Quick start instructions
 
 ---
 
